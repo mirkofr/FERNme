@@ -1,0 +1,44 @@
+"""Central hyperparameters for FERN. Every tunable lives here so experiments
+are reproducible and the paper can report exact settings."""
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Config:
+    # --- Hebbian write (write/hebbian.py) ---
+    alpha: float = 1.5        # user->attr learn rate
+    beta: float = 1.0         # attr<->attr (associative) learn rate
+    w_max: float = 9.0        # fuzzy scale ceiling (Zadeh, single-digit on the wire)
+    gamma: float = 0.6        # confidence growth rate: conf = 1 - exp(-gamma * hits)
+
+    # --- Decay / forgetting (ACT-R, batch) ---
+    lam: float = 0.02         # SLOW weight decay per day (durable identity)
+    alpha_fast: float = 2.0   # fast-lane learn rate (recent context)
+    lam_fast: float = 0.40    # FAST weight decay per day (fades quickly)
+    beta_fast: float = 0.5    # how much the fast lane boosts ranking
+    floor: float = 1.0        # drop edges below this after decay
+    bl_decay: float = 0.5     # ACT-R base-level decay exponent d
+
+    # --- Differential / population-prior encoding (prior/population.py) ---
+    theta: float = 2.0        # store a user edge only if |w_user - w_prior| > theta
+
+    # --- Retrieval (retrieve/) ---
+    hops: int = 2             # spreading-activation hops
+    top_n: int = 8            # max attributes on the wire card
+
+    # --- Wire encoding ---
+    conf_known: float = 0.6   # confidence at/above which a link is treated as 'known' (act silently)
+
+    # --- multi-signal confidence (confidence.py); weights sum to 1, all TUNABLE ---
+    w_evidence: float = 0.30      # how much independent evidence (hits)
+    w_consistency: float = 0.25   # absence of conflicting signal (A->B flips)
+    w_taxonomy: float = 0.20      # how cleanly the input mapped to a known attribute
+    w_recency: float = 0.15       # confirmed recently?
+    w_outcome: float = 0.10       # did acting on it lead to good outcomes?
+    conf_high: float = 0.85       # >= -> act silently
+    conf_low: float = 0.45        # <  -> ask (if important) or ignore
+    ask_importance: float = 0.5   # importance threshold to bother asking
+    ask_budget: int = 3           # max clarifying asks per user (rate limit)
+
+
+DEFAULT = Config()

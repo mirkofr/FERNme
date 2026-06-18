@@ -1,0 +1,133 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FERN — your memory</title>
+<style>
+  :root{--bg:#faf9f5;--surf:#fff;--bd:rgba(0,0,0,.12);--tx:#1a1a18;--mut:#6b6a64;
+        --teal:#0f6e56;--tealbg:#e1f5ee;--amber:#854f0b;--amberbg:#faeeda;
+        --gray:#444441;--graybg:#f1efe8;--danger:#a32d2d;--dangerbg:#fcebeb;--info:#185fa5;}
+  @media(prefers-color-scheme:dark){:root{--bg:#1f1e1c;--surf:#2a2927;--bd:rgba(255,255,255,.14);
+        --tx:#ecebe6;--mut:#a3a29a;--tealbg:#0c2c25;--teal:#5dcaa5;--amberbg:#2e2407;--amber:#ef9f27;
+        --graybg:#2c2c2a;--gray:#b4b2a9;--dangerbg:#2e0f0f;--danger:#f09595;}}
+  *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  body{margin:0;background:var(--bg);color:var(--tx);padding:24px;line-height:1.5}
+  .wrap{max-width:680px;margin:0 auto}
+  .card{background:var(--surf);border:.5px solid var(--bd);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  h1{font-size:20px;font-weight:500;margin:0 0 2px}
+  .sub{color:var(--mut);font-size:13px;margin:0}
+  .cfg{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  input,button{font-size:14px;padding:7px 10px;border:.5px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx)}
+  input[type=range]{padding:0}
+  button{cursor:pointer}button:hover{background:var(--graybg)}
+  .row{display:grid;grid-template-columns:130px 76px 1fr 26px;align-items:center;gap:10px;
+       background:var(--surf);border:.5px solid var(--bd);border-radius:8px;padding:8px 12px;margin-bottom:9px}
+  .badge{font-size:11px;text-align:center;padding:3px 6px;border-radius:8px}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--mut);margin:10px 0 14px;flex-wrap:wrap}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:1px;margin-right:4px}
+  .wire{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:var(--graybg);
+        border-radius:8px;padding:10px 12px;word-break:break-all;color:var(--tx)}
+  .act{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+  .muted{color:var(--mut);font-size:13px}
+  pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:var(--graybg);padding:10px;border-radius:8px;max-height:240px;overflow:auto}
+</style></head>
+<body><div class="wrap">
+  <div class="card">
+    <h1>What this site remembers about you</h1>
+    <p class="sub">FERN glass-box · you own this · every value is editable</p>
+    <div class="cfg" style="margin-top:12px">
+      <input id="base" value="http://localhost:8077" size="22" aria-label="API base URL"/>
+      <input id="site" value="demo_grocery" size="12" aria-label="site"/>
+      <input id="user" value="mirko" size="10" aria-label="user"/>
+      <button onclick="load()">Load</button>
+      <span id="status" class="muted"></span>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:#1d9e75"></span>known — acts silently</span>
+      <span><span class="dot" style="background:#ef9f27"></span>guessed — verifies first</span>
+      <span><span class="dot" style="background:#888780"></span>locked — your override</span>
+    </div>
+    <div class="wire" id="wire">— load a profile —</div>
+  </div>
+
+  <div class="card">
+    <p class="sub" style="margin-bottom:10px">Preferences (0–9). Drag to correct; an edit locks it as your override.</p>
+    <div id="rows"><p class="muted">Nothing loaded yet.</p></div>
+  </div>
+
+  <div class="card">
+    <p class="sub" style="margin-bottom:10px">Quantities</p>
+    <div id="nums"><p class="muted">—</p></div>
+  </div>
+
+  <div class="card">
+    <div class="act">
+      <button onclick="exportData()">Export my data</button>
+      <button onclick="forget()" style="border-color:var(--danger);color:var(--danger)">Forget me</button>
+    </div>
+    <pre id="out" style="display:none"></pre>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch($('base').value+path, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+function ctx(){return {site:$('site').value,user:$('user').value};}
+
+async function load(){
+  $('status').textContent = 'loading…';
+  try{
+    const card = await api('/card', {...ctx(), now: 9e6});
+    $('wire').textContent = card.wire || '(empty)';
+    renderRows(card.links||[]);
+    renderNums(card.numeric||{});
+    $('status').textContent = 'loaded';
+  }catch(e){ $('status').textContent = 'cannot reach API — is the server running?'; }
+}
+
+function renderRows(links){
+  const wrap = $('rows'); wrap.innerHTML = '';
+  if(!links.length){ wrap.innerHTML = '<p class="muted">No stored preferences yet.</p>'; return; }
+  links.forEach(l=>{
+    const row = document.createElement('div'); row.className='row';
+    const name = document.createElement('span'); name.textContent = l.attr.replace(/_/g,'-'); name.style.fontSize='14px';
+    const badge = document.createElement('span'); badge.className='badge';
+    const setBadge = (state)=>{
+      const m = state==='known'?['known','#0f6e56','#e1f5ee']: state==='override'?['locked','#444441','#f1efe8']:['guessed','#854f0b','#faeeda'];
+      badge.textContent=m[0]; badge.style.color=m[1]; badge.style.background=m[2];
+    };
+    let state = l.known ? 'known' : 'guessed';
+    const slider = document.createElement('input'); slider.type='range'; slider.min=0; slider.max=9; slider.step=1; slider.value=l.w;
+    const val = document.createElement('span'); val.style.cssText='font-size:14px;font-weight:500;text-align:right'; val.textContent=Math.round(l.w);
+    slider.addEventListener('input',()=>{ val.textContent=slider.value; });
+    slider.addEventListener('change', async ()=>{
+      await api('/edit', {...ctx(), attr:l.attr, weight:parseInt(slider.value,10)});
+      state='override'; setBadge(state); load();
+    });
+    setBadge(state);
+    row.append(name,badge,slider,val); wrap.appendChild(row);
+  });
+}
+
+function renderNums(num){
+  const wrap = $('nums'); wrap.innerHTML='';
+  const keys = Object.keys(num);
+  if(!keys.length){ wrap.innerHTML='<p class="muted">None.</p>'; return; }
+  keys.forEach(k=>{
+    const d=document.createElement('div'); d.style.cssText='display:flex;gap:10px;align-items:center;margin-bottom:8px';
+    const lab=document.createElement('span'); lab.textContent=k.replace(/_/g,' '); lab.style.fontSize='14px';
+    const inp=document.createElement('input'); inp.value=num[k]; inp.size=8;
+    inp.addEventListener('change', async ()=>{ await api('/numeric',{...ctx(),key:k,value:inp.value}); });
+    d.append(lab,inp); wrap.appendChild(d);
+  });
+}
+
+async function exportData(){
+  const data = await api('/export', ctx());
+  const out=$('out'); out.style.display='block'; out.textContent=JSON.stringify(data,null,2);
+}
+async function forget(){
+  if(!confirm('Delete everything stored about this user?')) return;
+  await api('/delete', ctx());
+  $('wire').textContent='(deleted)'; $('rows').innerHTML='<p class="muted">Forgotten.</p>'; $('nums').innerHTML=''; $('status').textContent='deleted';
+}
+load();
+</script></body></html>

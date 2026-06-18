@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: "FERNme: Fuzzy-Edged Recall Network"
+message: "If you use this software, please cite it."
+type: software
+authors:
+  - family-names: Sharipov
+    given-names: Mirkomil
+  - name: "Acquilab Inc."
+repository-code: "https://github.com/mirkofr/FERNme"
+url: "https://fernme.dev"
+license: Apache-2.0
+version: 0.1.0

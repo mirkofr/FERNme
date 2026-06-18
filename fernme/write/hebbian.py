@@ -1,0 +1,62 @@
+"""Hebbian write rule (no LLM) + ACT-R decay. Pure arithmetic on the graph."""
+from __future__ import annotations
+import math
+from typing import List, Tuple
+from ..core.graph import UserGraph, AssocGraph, Event, Edge
+from ..config import Config, DEFAULT
+
+
+def _saturating_bump(w: float, rate: float, mag: float, w_max: float) -> float:
+    # w <- w + rate*mag*(1 - w/w_max): fast early, asymptotes to w_max, never exceeds it
+    return w + rate * mag * (1.0 - w / w_max)
+
+
+def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
+            mapped: List[Tuple[str, float]], cfg: Config = DEFAULT) -> None:
+    """Apply one event to the user graph + shared association graph.
+    Crucially: this function calls no LLM and does no vector search."""
+    active = mapped
+    # 1) strengthen user -> attr
+    for attr, mag in active:
+        e = ug.edges.get(attr)
+        if e is None:
+            e = Edge(weight=0.0, source="known", last_reinforced=event.ts)
+            ug.edges[attr] = e
+        elif e.source == "guessed":
+            e.weight = 0.0; e.hits = 0; e.fast = 0.0   # shed borrowed prior
+        e.weight = _saturating_bump(e.weight, cfg.alpha, mag, cfg.w_max)
+        e.fast = _saturating_bump(e.fast, cfg.alpha_fast, mag, cfg.w_max)
+        e.hits += 1
+        e.confidence = 1.0 - math.exp(-cfg.gamma * e.hits)
+        e.source = "known" if e.source != "override" else "override"
+        e.last_reinforced = event.ts
+        ug.history.setdefault(attr, []).append(event.ts)
+
+    # 2) strengthen attr <-> attr (Hebb: fire together, wire together)
+    for i in range(len(active)):
+        for j in range(i + 1, len(active)):
+            a, ma = active[i]
+            b, mb = active[j]
+            k = AssocGraph.key(a, b)
+            assoc.edges[k] = _saturating_bump(assoc.edges.get(k, 0.0),
+                                              cfg.beta, ma * mb, cfg.w_max)
+
+
+def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT) -> int:
+    """Batch job: fade edges not reinforced; drop below floor. Overrides never
+    decay. Returns number of edges dropped. Forgetting is a feature: it keeps the
+    card small and cheap regardless of tenure."""
+    dropped = []
+    for attr, e in ug.edges.items():
+        if e.source == "override":
+            continue
+        dt = max(0.0, now - e.last_reinforced)
+        e.weight = e.weight * math.exp(-cfg.lam * dt)
+        e.fast = e.fast * math.exp(-cfg.lam_fast * dt)   # fast lane fades much quicker
+        e.last_reinforced = now            # reset clock -> safe to call periodically
+        if e.weight < cfg.floor:
+            dropped.append(attr)
+    for attr in dropped:
+        del ug.edges[attr]
+        ug.history.pop(attr, None)
+    return len(dropped)
