@@ -4,12 +4,12 @@
 
 ### Fuzzy-Edged Recall Network
 
-**Per-site, user-owned memory for agents on _any_ goal-driven site — shopping, support, booking, healthcare routing, tutoring, gov services — that learns each visitor (including how they talk and how they feel) without an LLM in the write path, stays token-flat forever, and lets people see and edit everything it knows.**
+**A user-owned, near-zero-LLM memory layer for AI agents. It learns each person from their behavior — including how they talk and feel — stays token-flat forever, and lets people see, edit, and own what's remembered. The engine is substrate-agnostic: it remembers wherever an agent acts — websites today (shopping, support, booking, healthcare, tutoring, gov), desktop and mobile next.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-77%20passing-1d9e75.svg)](#-tested-not-claimed)
+[![Tests](https://img.shields.io/badge/tests-83%20passing-1d9e75.svg)](#-tested-not-claimed)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.1%20research%20preview-7f77dd.svg)](#-honest-status)
 
@@ -23,7 +23,7 @@
 
 ## ✨ The one-paragraph pitch
 
-Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* on real websites for *many* visitors, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the site's goal is). Each user is a sparse, fuzzily-weighted node in a per-site graph; edges update by a **Hebbian co-occurrence rule with zero LLM calls**, retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct their own memory, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
+Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* for *many* people, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the goal is). It starts where agents already act today — websites — and the same user-owned memory is designed to extend to desktop and mobile. Each user is a sparse, fuzzily-weighted node in a per-site graph; edges update by a **Hebbian co-occurrence rule with zero LLM calls**, retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct their own memory, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
 
 ---
 
@@ -214,7 +214,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 77 tests (engine, store, supernode, safety, auth…)
+pytest -q                               # 83 tests (engine, store, supernode, safety, auth…)
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -223,6 +223,7 @@ python -m fernme.eval.pilot               # +16% simulated conversion lift
 # run it live
 FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077   # REST API (docs at /docs)
 open http://localhost:8077/ui                               # glass-box memory editor
+open http://localhost:8077/graph                            # your memory as a graph — focus by site / PC / phone
 python -m fernme.api.mcp_server                               # MCP server for agents/Claude
 ```
 
@@ -246,7 +247,7 @@ python -m fernme.api.mcp_server                               # MCP server for a
 - **Supernode** (`supernode.py` + `auth.py`) — user-owned cross-site profile, built by **sign-in** (verified token → opaque person id), default-deny scoped views, sensitive categories walled off.
 - **Proactive triggers** — due-to-reorder + fading-favorite nudges.
 - **Safety** — event tags treated as untrusted data: injection-pattern dropping, size/value caps.
-- **Interfaces** — REST (`/observe /card /recall /edit /export /delete /triggers …`) + MCP tools + a **glass-box web UI**.
+- **Interfaces** — REST (`/observe /card /recall /edit /export /delete /triggers …`) + MCP tools + a **glass-box web UI** (editor at `/ui`, cross-surface memory graph at `/graph` — one memory, focusable by site / PC / phone).
 - **Governance** — consent-gated everywhere; export & right-to-be-forgotten built in.
 
 ---
@@ -269,12 +270,13 @@ FERNme is a **different category** from conversational memories — it's a per-u
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (77 tests):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI, and the full results suite above.
+✅ **Done & tested (83 tests):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, and the full results suite above.
 
 🚧 **Still open (genuinely needs the outside world):**
 - A **real-human per-site pilot** — only live users close the loop a simulator can't.
 - The **Mem0 (LLM) head-to-head** — harness wired; run locally with `OPENAI_API_KEY`.
 - **Embeddings** for context→attribute matching; offline LLM catalog enrichment for messy inputs.
+- **Desktop & mobile surfaces** — the engine is substrate-agnostic; web ingestion ships today, desktop/mobile adapters are on the roadmap. The user-owned **supernode** is the bridge that assembles them, with consent, into one cross-surface profile.
 
 > Every claim above is backed by a test or a reproducible experiment. Where a result is simulated, it says so — a simulator proves the *mechanism*, not real-world behavior.
 
@@ -290,9 +292,9 @@ fernme/
   prior/     population prior · differential encoding · IDF cold-start
   store/     sqlite_store · postgres_store (one interface)
   supernode.py · auth.py · triggers.py · safety.py · service.py
-  api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html
+  api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       77 tests   ·   *_demo.py walkthroughs
+tests/       83 tests   ·   *_demo.py walkthroughs
 ```
 
 ---
@@ -303,5 +305,4 @@ Apache-2.0, © 2026 Acquilab Inc. — see [LICENSE](LICENSE) and [NOTICE](NOTICE
 If you use FERNme in research, please cite it via [CITATION.cff](CITATION.cff).
 
 <div align="center">
-<sub>© 2026 Acquilab Inc. · Built to be cheap, honest, and owned by the people it remembers.</sub>
-</div>
+<su

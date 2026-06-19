@@ -187,6 +187,54 @@ class FernService:
             sn.add_from_site(site, self.store.load_user(site, local_user))
         return sn
 
+    def memory_graph(self, person: str) -> Dict:
+        """The owner's ONE memory as a cross-surface graph: a central `you`, the
+        surfaces it was learned on (sites / PC / phone), and every preference,
+        tagged with provenance. Drives the /graph visualization."""
+        sn = self.build_supernode(person)
+        FAMCOL = {"web": "--teal", "pc": "--amber", "phone": "--violet"}
+        PALETTE = ["--teal", "--info", "--amber", "--violet"]
+
+        def family(site: str) -> str:
+            x = site.lower()
+            if any(t in x for t in ("pc", "desktop", "laptop", "mac", "windows")):
+                return "pc"
+            if any(t in x for t in ("phone", "ios", "android", "mobile")):
+                return "phone"
+            return "web"
+
+        surf_keys = sorted({site for slot in sn.attrs.values() for site in slot["sources"]})
+        colors = {}
+        for i, k in enumerate(surf_keys):
+            colors[k] = PALETTE[i % len(PALETTE)]
+        surfaces = [{"key": k, "label": k, "family": family(k), "color": colors[k]}
+                    for k in surf_keys]
+
+        nodes = [{"id": "you", "label": person, "kind": "owner", "size": 11}]
+        for sf in surfaces:
+            nodes.append({"id": "surf:" + sf["key"], "label": sf["label"],
+                          "kind": "surface", "surf": sf["key"],
+                          "family": sf["family"], "size": 7})
+        edges = []
+        for attr, slot in sn.attrs.items():
+            neg = attr.startswith("!"); base = attr.lstrip("!")
+            pid = "p:" + attr
+            srcs = list(slot["sources"].keys())
+            primary = max(slot["sources"].items(), key=lambda kv: kv[1])[0]
+            nodes.append({"id": pid, "label": base, "kind": "pref",
+                          "size": round(slot["weight"], 1), "surfaces": srcs,
+                          "color": colors[primary], "negative": neg,
+                          "sensitive": slot["sensitive"]})
+            edges.append({"source": "you", "target": pid,
+                          "weight": round(slot["weight"], 1),
+                          "known": slot["confidence"] >= self.cfg.conf_known,
+                          "negative": neg})
+            for site in srcs:
+                edges.append({"source": pid, "target": "surf:" + site,
+                              "surface": site, "prov": True})
+        return {"nodes": nodes, "edges": edges, "surfaces": surfaces,
+                "stats": {"memories": len(sn.attrs), "surfaces": len(surfaces)}}
+
     def supernode_card(self, person: str) -> Dict:
         """The OWNER's full cross-site view, with provenance."""
         return self.build_supernode(person).owner_card(self.cfg)
@@ -321,6 +369,39 @@ class FernService:
                 pruned.append(attr); del ug.edges[attr]; ug.history.pop(attr, None)
         self.store.save_user(ug)
         return {"pruned": len(pruned), "remaining": ug.n_edges()}
+
+    def graph(self, site: str, user: str = None, assoc_floor: float = 2.0) -> Dict:
+        """Memory as nodes + edges for visualization. user=None -> whole site
+        (all consented users + shared attributes); user set -> that user's subgraph."""
+        if user is not None:
+            self._require_consent(site, user)
+            users = [user]
+        else:
+            users = [u for u in self.store.list_users(site) if self.store.has_consent(site, u)]
+        nodes, edges = {}, []
+        for u in users:
+            ug = self.store.load_user(site, u)
+            if not ug.edges:
+                continue
+            uid = "user:" + u
+            nodes[uid] = {"id": uid, "label": u, "kind": "user", "size": 9}
+            for attr, e in ug.edges.items():
+                neg = attr.startswith("!"); base = attr.lstrip("!")
+                ns = base.split(":", 1)[0] if ":" in base else "attr"
+                n = nodes.setdefault(base, {"id": base, "label": base, "kind": ns, "size": 0})
+                n["size"] = max(n["size"], e.wire_weight(self.cfg.w_max))
+                edges.append({"source": uid, "target": base, "weight": e.wire_weight(self.cfg.w_max),
+                              "confidence": round(e.confidence, 2),
+                              "known": (e.confidence >= self.cfg.conf_known or e.source == "override"),
+                              "negative": neg})
+        present = {n for n, v in nodes.items() if v["kind"] != "user"}
+        ag = self.store.load_assoc(site)
+        for (a, b), w in ag.edges.items():
+            if a in present and b in present and w >= assoc_floor:
+                edges.append({"source": a, "target": b, "weight": round(w, 1), "assoc": True})
+        return {"nodes": list(nodes.values()), "edges": edges,
+                "stats": {"users": sum(1 for v in nodes.values() if v["kind"] == "user"),
+                          "attributes": len(present), "edges": len(edges)}}
 
     def confidence(self, site: str, user: str, attr: str, now: float = 0.0,
                    taxonomy_match=None, outcome_success=None, conflict: float = 0.0,

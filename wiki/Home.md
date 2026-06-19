@@ -1,8 +1,8 @@
 # FERNme Wiki
 
-**FERNme (Fuzzy-Edged Recall Network)** is a per-site, user-owned memory engine for AI agents. It learns each visitor from their behavior — *without* an LLM in the write path — keeps the prompt-facing memory token-flat as the profile grows, and lets people see, edit, and delete everything it knows.
+**FERNme (Fuzzy-Edged Recall Network)** is a user-owned, near-zero-LLM memory layer for AI agents. It learns each person from their behavior — *without* an LLM in the write path — keeps the prompt-facing memory token-flat as the profile grows, and lets people see, edit, and delete everything it knows. The engine is substrate-agnostic: it remembers wherever an agent acts (websites today; desktop and mobile on the roadmap).
 
-> Built for agents that **act** on real sites (shopping, support, booking, healthcare routing, tutoring, gov services) for **many** users — not single-user chat memory. "Success" is whatever the site's goal is.
+> Built for agents that **act** for **many** people — not single-user chat memory. Today's beachhead is websites (shopping, support, booking, healthcare, tutoring, gov); the same user-owned memory is designed to extend to desktop and mobile. "Success" is whatever the goal is.
 
 ## In one breath
 - **Zero-LLM writes** — memory updates are arithmetic on a graph (0 LLM calls/interaction).

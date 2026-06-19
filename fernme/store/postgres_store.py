@@ -178,3 +178,7 @@ class PostgresStore:
         return {r["category"]: bool(r["allowed"]) for r in
                 self._q("SELECT category,allowed FROM share_policy WHERE person=%s AND target_site=%s",
                         (person, target_site)).fetchall()}
+
+    def list_users(self, site):
+        return [r["user"] for r in self._q(
+            'SELECT DISTINCT "user" FROM user_edges WHERE site=%s', (site,)).fetchall()]

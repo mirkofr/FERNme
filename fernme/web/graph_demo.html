@@ -1,0 +1,181 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FERNme — your memory</title>
+<style>
+  :root{--bg:#faf9f5;--surf:#fff;--bd:rgba(0,0,0,.12);--tx:#1a1a18;--mut:#6b6a64;
+        --teal:#0f6e56;--amber:#a8690b;--info:#185fa5;--violet:#6d4bb0;--danger:#a32d2d;--owner:#2a2a27;}
+  @media(prefers-color-scheme:dark){:root{--bg:#1b1a18;--surf:#262523;--bd:rgba(255,255,255,.14);
+        --tx:#ecebe6;--mut:#a3a29a;--teal:#5dcaa5;--amber:#efa838;--info:#6fb0ef;--violet:#b79cf0;
+        --danger:#f09595;--owner:#ecebe6;}}
+  *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--tx)}
+  body{display:flex;flex-direction:column;overflow:hidden}
+  header{padding:11px 16px;border-bottom:.5px solid var(--bd);background:var(--surf);
+         display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:3}
+  h1{font-size:16px;font-weight:600;margin:0 12px 0 0}
+  h1 span{color:var(--mut);font-weight:400;font-size:12px;margin-left:6px}
+  label.fl{font-size:12px;color:var(--mut)}
+  select,button{font-size:13px;padding:6px 9px;border:.5px solid var(--bd);border-radius:8px;
+        background:var(--surf);color:var(--tx)}
+  button{cursor:pointer;font-weight:500}button:hover{background:var(--bg)}
+  .grow{flex:1}
+  #stage{flex:1;position:relative;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  .panel{position:absolute;background:var(--surf);border:.5px solid var(--bd);border-radius:10px;
+         padding:11px 13px;font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,.10);max-width:250px}
+  #legend{left:14px;bottom:14px;color:var(--mut);line-height:1.85}
+  #legend b{color:var(--tx);font-weight:600;display:block;margin:7px 0 3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  #legend b:first-child{margin-top:0}
+  .sw{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:2px;margin-right:6px}
+  .ndot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:6px}
+  #tip{display:none;pointer-events:none;z-index:5;line-height:1.5}
+  #tip .t{font-weight:600;word-break:break-all}
+  #tip .m{color:var(--mut)}
+  #stats{right:14px;top:14px;color:var(--mut);text-align:right;line-height:1.7}
+  #stats b{color:var(--tx);font-size:15px}
+</style></head>
+<body>
+<header>
+  <h1>FERNme<span>your memory</span></h1>
+  <label class="fl">Focus</label>
+  <select id="focus"><option value="all">All surfaces</option></select>
+  <button id="replay" title="reshuffle layout">Replay</button>
+  <button id="freeze">Pause</button>
+  <span class="grow"></span>
+  <span class="fl">one memory · learned across every surface</span>
+</header>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="stats" class="panel"></div>
+  <div id="tip" class="panel"></div>
+  <div id="legend" class="panel">
+    <b>nodes</b>
+    <span class="ndot" style="background:var(--owner)"></span>you<br/>
+    <span class="ndot" style="background:var(--mut)"></span>surface (site · PC · phone)<br/>
+    <span class="ndot" style="background:var(--teal)"></span>memory · colored by surface · size = strength<br/>
+    <b>links</b>
+    <span class="sw" style="background:var(--mut)"></span>known preference<br/>
+    <span class="sw" style="background:var(--mut);opacity:.45"></span>inferred (guessed)<br/>
+    <span class="sw" style="background:var(--danger)"></span>dislike / avoid<br/>
+    <span class="sw" style="background:var(--info);opacity:.5"></span>where it was learned
+  </div>
+</div>
+<script>
+const DATA = {"nodes": [{"id": "you", "label": "you", "kind": "owner", "size": 11}, {"id": "surf:shop", "label": "shop.com", "kind": "surface", "surf": "shop", "family": "web", "size": 7}, {"id": "surf:support", "label": "support.io", "kind": "surface", "surf": "support", "family": "web", "size": 7}, {"id": "surf:pc", "label": "PC \u00b7 desktop", "kind": "surface", "surf": "pc", "family": "pc", "size": 7}, {"id": "surf:phone", "label": "Phone \u00b7 iOS", "kind": "surface", "surf": "phone", "family": "phone", "size": 7}, {"id": "p:oat-milk", "label": "oat-milk", "kind": "pref", "size": 8, "surfaces": ["shop", "phone"], "color": "--teal", "negative": false}, {"id": "p:single-origin beans", "label": "single-origin beans", "kind": "pref", "size": 6, "surfaces": ["shop"], "color": "--teal", "negative": false}, {"id": "p:vanilla", "label": "vanilla", "kind": "pref", "size": 4, "surfaces": ["shop"], "color": "--teal", "negative": false}, {"id": "p:dairy", "label": "dairy", "kind": "pref", "size": 6, "surfaces": ["shop"], "color": "--teal", "negative": true}, {"id": "p:concise replies", "label": "concise replies", "kind": "pref", "size": 7, "surfaces": ["support", "pc"], "color": "--info", "negative": false}, {"id": "p:email over chat", "label": "email over chat", "kind": "pref", "size": 5, "surfaces": ["support"], "color": "--info", "negative": false}, {"id": "p:patient when rushed", "label": "patient when rushed", "kind": "pref", "size": 3, "surfaces": ["support"], "color": "--info", "negative": false}, {"id": "p:dark mode", "label": "dark mode", "kind": "pref", "size": 9, "surfaces": ["pc", "phone"], "color": "--amber", "negative": false}, {"id": "p:keyboard shortcuts", "label": "keyboard shortcuts", "kind": "pref", "size": 6, "surfaces": ["pc"], "color": "--amber", "negative": false}, {"id": "p:python", "label": "python", "kind": "pref", "size": 7, "surfaces": ["pc"], "color": "--amber", "negative": false}, {"id": "p:mornings", "label": "mornings", "kind": "pref", "size": 5, "surfaces": ["phone"], "color": "--violet", "negative": false}, {"id": "p:quiet notifications", "label": "quiet notifications", "kind": "pref", "size": 4, "surfaces": ["phone"], "color": "--violet", "negative": false}, {"id": "p:running", "label": "running", "kind": "pref", "size": 6, "surfaces": ["phone", "shop"], "color": "--violet", "negative": false}], "edges": [{"source": "you", "target": "p:oat-milk", "weight": 8, "known": true, "negative": false}, {"source": "p:oat-milk", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "p:oat-milk", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:single-origin beans", "weight": 6, "known": true, "negative": false}, {"source": "p:single-origin beans", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "you", "target": "p:vanilla", "weight": 4, "known": false, "negative": false}, {"source": "p:vanilla", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "you", "target": "p:dairy", "weight": 6, "known": true, "negative": true}, {"source": "p:dairy", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "you", "target": "p:concise replies", "weight": 7, "known": true, "negative": false}, {"source": "p:concise replies", "target": "surf:support", "surface": "support", "prov": true}, {"source": "p:concise replies", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "you", "target": "p:email over chat", "weight": 5, "known": true, "negative": false}, {"source": "p:email over chat", "target": "surf:support", "surface": "support", "prov": true}, {"source": "you", "target": "p:patient when rushed", "weight": 3, "known": false, "negative": false}, {"source": "p:patient when rushed", "target": "surf:support", "surface": "support", "prov": true}, {"source": "you", "target": "p:dark mode", "weight": 9, "known": true, "negative": false}, {"source": "p:dark mode", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "p:dark mode", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:keyboard shortcuts", "weight": 6, "known": true, "negative": false}, {"source": "p:keyboard shortcuts", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "you", "target": "p:python", "weight": 7, "known": true, "negative": false}, {"source": "p:python", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "you", "target": "p:mornings", "weight": 5, "known": true, "negative": false}, {"source": "p:mornings", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:quiet notifications", "weight": 4, "known": false, "negative": false}, {"source": "p:quiet notifications", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:running", "weight": 6, "known": true, "negative": false}, {"source": "p:running", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "p:running", "target": "surf:shop", "surface": "shop", "prov": true}], "surfaces": [{"key": "shop", "label": "shop.com", "family": "web", "color": "--teal"}, {"key": "support", "label": "support.io", "family": "web", "color": "--info"}, {"key": "pc", "label": "PC \u00b7 desktop", "family": "pc", "color": "--amber"}, {"key": "phone", "label": "Phone \u00b7 iOS", "family": "phone", "color": "--violet"}]};
+const $=id=>document.getElementById(id);
+const cv=$("c"), ctx=cv.getContext("2d");
+const DPR=Math.max(1,window.devicePixelRatio||1);
+let W=0,H=0,nodes=[],links=[],byId={},frozen=false,hover=null,raf=0,focus="all";
+let view={x:0,y:0,k:1},drag=null,pan=null;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim()||n;
+
+function resize(){const r=cv.getBoundingClientRect();W=Math.max(50,r.width);H=Math.max(50,r.height);
+  cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+window.addEventListener('resize',()=>{resize();});
+
+// focus dropdown
+DATA.surfaces.forEach(s=>{const o=document.createElement('option');o.value=s.key;o.textContent=s.label;$("focus").appendChild(o);});
+$("focus").onchange=e=>{focus=e.target.value;};
+
+function build(){
+  byId={};
+  nodes=DATA.nodes.map(n=>{
+    const o={...n,
+      x:(n.kind==="owner"?W/2:W/2+(Math.random()-.5)*360),
+      y:(n.kind==="owner"?H/2:H/2+(Math.random()-.5)*300),
+      vx:0,vy:0,
+      r:n.kind==="owner"?15:n.kind==="surface"?10:4+Math.min(11,(n.size||0)*1.1)};
+    byId[n.id]=o;return o;});
+  links=DATA.edges.map(e=>({...e,s:byId[e.source],t:byId[e.target]})).filter(l=>l.s&&l.t);
+  view={x:0,y:0,k:1};
+  $("stats").innerHTML=`<b>${DATA.nodes.filter(n=>n.kind==="pref").length}</b> memories<br/>`+
+    `<b>${DATA.surfaces.length}</b> surfaces`;
+  if(!raf) tick();
+}
+function active(n){ if(focus==="all")return true;
+  if(n.kind==="owner")return true;
+  if(n.kind==="surface")return n.surf===focus;
+  if(n.kind==="pref")return (n.surfaces||[]).includes(focus);
+  return true;}
+function lactive(l){ if(focus==="all")return true;
+  if(l.prov) return l.surface===focus;
+  return active(l.t); }
+
+function tick(){ if(!frozen) step(); paint(); raf=requestAnimationFrame(tick); }
+function step(){
+  const rep=1700,cx=W/2,cy=H/2;
+  for(const a of nodes){
+    if(a.kind==="owner"){a.vx+=(cx-a.x)*0.05;a.vy+=(cy-a.y)*0.05;}
+    else{a.vx+=(cx-a.x)*0.0014;a.vy+=(cy-a.y)*0.0014;}
+  }
+  for(let i=0;i<nodes.length;i++){const a=nodes[i];
+    for(let j=i+1;j<nodes.length;j++){const b=nodes[j];
+      let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||0.01;if(d2>140000)continue;
+      const d=Math.sqrt(d2),f=rep/d2;dx/=d;dy/=d;
+      a.vx+=dx*f*0.02;a.vy+=dy*f*0.02;b.vx-=dx*f*0.02;b.vy-=dy*f*0.02;}}
+  for(const l of links){const a=l.s,b=l.t;
+    const want=l.prov?70:l.t.kind==="surface"?70:96, w=l.prov?0.01:0.02;
+    let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||.01,f=(d-want)*w/d;
+    if(a!==drag&&a.kind!=="owner"){a.vx+=dx*f;a.vy+=dy*f;}
+    if(b!==drag&&b.kind!=="owner"){b.vx-=dx*f;b.vy-=dy*f;}}
+  for(const n of nodes){if(n===drag)continue;n.vx*=0.85;n.vy*=0.85;n.x+=n.vx;n.y+=n.vy;}
+}
+function T(x,y){return [x*view.k+view.x,y*view.k+view.y];}
+function paint(){
+  ctx.clearRect(0,0,W,H);
+  for(const l of links){
+    const on=lactive(l), [x1,y1]=T(l.s.x,l.s.y),[x2,y2]=T(l.t.x,l.t.y);
+    let col,wd,al;
+    if(l.prov){col=css(DATA.surfaces.find(s=>s.key===l.surface).color);wd=0.8;al=0.4;}
+    else if(l.negative){col=css('--danger');wd=0.9+0.5*(l.weight||1);al=0.8;}
+    else if(l.known){col=css('--mut');wd=0.8+0.55*(l.weight||1);al=0.75;}
+    else {col=css('--mut');wd=0.7+0.4*(l.weight||1);al=0.4;}
+    ctx.globalAlpha=on?Math.min(0.95,al):0.06;
+    ctx.strokeStyle=col;ctx.lineWidth=Math.max(0.7,wd)*view.k;
+    ctx.setLineDash((!l.known&&!l.prov&&!l.negative)?[3,3]:[]);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  }
+  ctx.setLineDash([]);ctx.globalAlpha=1;
+  ctx.font=Math.round(11*view.k)+"px -apple-system,Segoe UI,Roboto,sans-serif";ctx.textBaseline="middle";
+  for(const n of nodes){
+    const on=active(n),[x,y]=T(n.x,n.y),r=n.r*view.k;
+    let c = n.kind==="owner"?css('--owner'): n.kind==="surface"?css(DATA.surfaces.find(s=>s.key===n.surf).color): css(n.color);
+    ctx.globalAlpha=on?(hover&&hover!==n&&!isNbr(n)?0.55:1):0.12;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();
+    if(n.kind==="surface"){ctx.lineWidth=1.5*view.k;ctx.strokeStyle=css('--surf');ctx.stroke();}
+    if(n.kind==="pref"&&n.negative){ctx.lineWidth=2*view.k;ctx.strokeStyle=css('--danger');ctx.stroke();}
+    ctx.globalAlpha=on?1:0.2;
+    const show = n.kind!=="pref" || n.r>7 || hover===n || (hover&&isNbr(n)) || (focus!=="all"&&on);
+    if(show){ctx.fillStyle=n.kind==="owner"?css('--tx'):css('--tx');
+      const lab=(n.negative?"no ":"")+(n.label.length>24?n.label.slice(0,22)+"…":n.label);
+      ctx.font=(n.kind==="owner"?"600 ":"")+Math.round((n.kind==="owner"?13:11)*view.k)+"px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText(lab,x+r+4,y);}
+  }
+  ctx.globalAlpha=1;
+}
+function isNbr(n){if(!hover)return false;for(const l of links){if((l.s===hover&&l.t===n)||(l.t===hover&&l.s===n))return true;}return false;}
+function at(mx,my){let best=null,bd=1e9;for(const n of nodes){const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my);
+  if(d<Math.max(9,n.r*view.k+4)&&d<bd){bd=d;best=n;}}return best;}
+function deg(n){let c=0;for(const l of links)if((l.s===n||l.t===n)&&!l.prov)c++;return c;}
+function esc(s){return (s||"").replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
+cv.addEventListener('mousemove',e=>{const mx=e.offsetX,my=e.offsetY;
+  if(drag){drag.x=(mx-view.x)/view.k;drag.y=(my-view.y)/view.k;drag.vx=drag.vy=0;return;}
+  if(pan){view.x=pan.vx+(mx-pan.mx);view.y=pan.vy+(my-pan.my);return;}
+  const n=at(mx,my);hover=n;const tip=$("tip");
+  if(n){cv.style.cursor="grab";let h="";
+    if(n.kind==="owner")h=`<div class="t">you</div><div class="m">your memory across all surfaces</div>`;
+    else if(n.kind==="surface")h=`<div class="t">${esc(n.label)}</div><div class="m">surface · ${links.filter(l=>l.prov&&l.t===n).length} memories learned here</div>`;
+    else h=`<div class="t">${n.negative?'avoid: ':''}${esc(n.label)}</div><div class="m">strength ${(n.size||0)}/9 · ${(n.surfaces||[]).map(k=>DATA.surfaces.find(s=>s.key===k).label).join(', ')}</div>`;
+    tip.innerHTML=h;tip.style.display="block";tip.style.left=Math.min(W-255,mx+14)+"px";tip.style.top=Math.min(H-70,my+14)+"px";
+  }else{cv.style.cursor="default";tip.style.display="none";}});
+cv.addEventListener('mousedown',e=>{const n=at(e.offsetX,e.offsetY);
+  if(n){drag=n;cv.style.cursor="grabbing";}else pan={mx:e.offsetX,my:e.offsetY,vx:view.x,vy:view.y};});
+window.addEventListener('mouseup',()=>{drag=null;pan=null;});
+cv.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.12:0.89,mx=e.offsetX,my=e.offsetY;
+  const nx=(mx-view.x)/view.k,ny=(my-view.y)/view.k;view.k=Math.max(0.3,Math.min(4,view.k*f));
+  view.x=mx-nx*view.k;view.y=my-ny*view.k;},{passive:false});
+$("replay").onclick=build;
+$("freeze").onclick=()=>{frozen=!frozen;$("freeze").textContent=frozen?"Resume":"Pause";};
+resize();build();
+</script>
+</body></html>

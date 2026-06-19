@@ -1,16 +1,14 @@
 # Roadmap
 
 ## Built + tested (v0.1.0)
-| # | Dimension | |
-|---|---|---|
-| 9 | Communication-style & mood memory | ✅ |
-| 2 | Outcome-learning for any goal | ✅ |
-| 8 | Explainable provenance (`why`) | ✅ |
-| 1 | Private collective priors (k-anonymity + DP) | ✅ |
-| 4 | Verifiable data ownership + right-to-be-forgotten | ✅ |
-| 7 | Multi-timescale memory | ✅ |
-| 6 | Self-tuning forgetting | ✅ |
-| 5 | Injection-resistant by construction | ✅ |
+- ✅ **#9** — Communication-style & mood memory
+- ✅ **#2** — Outcome-learning for any goal
+- ✅ **#8** — Explainable provenance (`why`)
+- ✅ **#1** — Private collective priors (k-anonymity + differential privacy)
+- ✅ **#4** — Verifiable data ownership + right-to-be-forgotten
+- ✅ **#7** — Multi-timescale memory
+- ✅ **#6** — Self-tuning forgetting
+- ✅ **#5** — Injection-resistant by construction
 
 ## Open
 - **#3 — Open user-owned memory protocol**: a portable spec + vocabulary so any agent reads/writes the same consented profile. (Spec stage.)

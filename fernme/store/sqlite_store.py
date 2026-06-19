@@ -241,3 +241,7 @@ class SQLiteStore:
                  "detail": json.loads(r["detail"]), "hash": r["hash"]}
                 for r in self._conn.execute(
                     "SELECT * FROM audit WHERE site=? AND user=? ORDER BY seq", (site, user))]
+
+    def list_users(self, site):
+        return [r["user"] for r in self._conn.execute(
+            "SELECT DISTINCT user FROM user_edges WHERE site=?", (site,))]

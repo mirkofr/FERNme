@@ -14,6 +14,7 @@ svc = FernService()  # default: $FERNME_DB or ~/.fernme/fernme.db
 app = FastAPI(title="FERN Memory API", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 _UI = os.path.join(os.path.dirname(__file__), "..", "web", "glassbox.html")
+_GRAPH_UI = os.path.join(os.path.dirname(__file__), "..", "web", "graph.html")
 _API_KEY = os.environ.get("FERNME_API_KEY")  # if set, all data routes require X-API-Key
 _OPEN = {"/health", "/ui", "/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"}
 
@@ -29,6 +30,24 @@ async def _auth(request, call_next):
 @app.get("/ui")
 def ui():
     return FileResponse(_UI)
+
+class GraphIn(BaseModel):
+    site: str; user: Optional[str] = None
+
+class MemoryGraphIn(BaseModel):
+    person: str
+
+@app.get("/graph")
+def graph_ui():
+    return FileResponse(_GRAPH_UI)
+
+@app.post("/graph-data")
+def graph_data(b: GraphIn):
+    return _guard(svc.graph, b.site, b.user)
+
+@app.post("/memory-graph")
+def memory_graph(b: MemoryGraphIn):
+    return _guard(svc.memory_graph, b.person)
 
 
 class ConsentIn(BaseModel):

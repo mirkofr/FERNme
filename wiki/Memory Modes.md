@@ -19,10 +19,10 @@ One engine, a deployment-level dial: `FernService(memory_mode=...)`. The hot wri
 from fernme.service import FernService
 from fernme.tagging import LLMTagger
 
-# pure (default) — no LLM, no key
+# pure (default): no LLM, no key
 svc = FernService(memory_mode="pure")
 
-# gated — LLM only on novel free text
+# gated: LLM only on novel free text
 tagger = LLMTagger(my_llm_fn, vocabulary=my_vocab)   # my_llm_fn(prompt)->str
 svc = FernService(memory_mode="gated", tagger=tagger)
 ```

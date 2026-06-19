@@ -2,26 +2,9 @@
 
 FERNme is one engine with a deterministic hot path; the LLM is an optional, rare fallback.
 
-```mermaid
-flowchart TD
-    V[Event: prompt / action] --> API[FERNme Service]
-    API --> CONSENT{consent?}
-    CONSENT -->|no| STOP[blocked]
-    CONSENT -->|yes| ING[Ingestion bridge<br/>catalog + namespaced vocabulary]
-    ING --> ENGINE
-    subgraph ENGINE[Engine - no LLM in the write path]
-      W[Hebbian write + decay] --> G[(Per-site fuzzy graph<br/>0-9 edges)]
-      G --> R[Spreading-activation retrieval]
-      R --> CARD[Token-minimal card ~25 tok]
-      PRIOR[Population prior<br/>differential privacy] --> R
-    end
-    CARD --> AGENT[Agent: recommend / act]
-    G --> CAB[(Cabinet: raw event log)]
-    API -. low confidence .-> GATE[LLM gate - rare]
-    API --> STORE[(SQLite or Postgres)]
-    API --> GLASS[Glass-box editor]
-    API -. user signs in .-> SUPER[User-owned supernode<br/>cross-site, default-deny]
-```
+![FERNme architecture](https://github.com/mirkofr/FERNme/raw/main/explanation%20of%20fern/IMG_7788.PNG)
+
+*Ingestion bridge → namespaced vocabulary → fuzzy Hebbian graph → memory card → agent; the LLM gate only when uncertain.*
 
 ## Flow
 1. **Ingestion bridge** turns input into canonical tags — deterministically via a per-site catalog/vocabulary, or (rarely) via a gated LLM for novel free text.
