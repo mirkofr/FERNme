@@ -18,6 +18,10 @@ class Config:
     beta_fast: float = 0.5    # how much the fast lane boosts ranking
     floor: float = 1.0        # drop edges below this after decay
     bl_decay: float = 0.5     # ACT-R base-level decay exponent d
+    # --- salience (emotional/behavioral significance -> slower forgetting) ---
+    salience_beta: float = 0.0    # 0 = OFF (no change). >0: high-salience edges decay slower
+    salience_neg: float = 0.5     # dislikes (negative edges) get this salience floor
+    salience_decay: float = 0.25  # salience itself fades at lam*this (scars heal, slowly)
 
     # --- Differential / population-prior encoding (prior/population.py) ---
     theta: float = 2.0        # store a user edge only if |w_user - w_prior| > theta

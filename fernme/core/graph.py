@@ -14,6 +14,7 @@ class Edge:
     last_reinforced: float = 0.0 # day index of last reinforcement
     hits: int = 0                # independent observations
     fast: float = 0.0            # fast-timescale component (recent context); decays quickly
+    salience: float = 0.0        # 0..1 significance: high salience -> slower forgetting
 
     def wire_weight(self, w_max: float = 9.0) -> int:
         return max(0, min(int(round(self.weight)), int(w_max)))

@@ -9,7 +9,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-83%20passing-1d9e75.svg)](#-tested-not-claimed)
+[![Tests](https://img.shields.io/badge/tests-88%20passing-1d9e75.svg)](#-tested-not-claimed)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.1%20research%20preview-7f77dd.svg)](#-honest-status)
 
@@ -214,7 +214,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 83 tests (engine, store, supernode, safety, auth…)
+pytest -q                               # 88 tests (engine, store, supernode, safety, auth…)
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -270,7 +270,7 @@ FERNme is a **different category** from conversational memories — it's a per-u
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (83 tests):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, and the full results suite above.
+✅ **Done & tested (88 tests):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, and the full results suite above.
 
 🚧 **Still open (genuinely needs the outside world):**
 - A **real-human per-site pilot** — only live users close the loop a simulator can't.
@@ -294,7 +294,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       83 tests   ·   *_demo.py walkthroughs
+tests/       88 tests   ·   *_demo.py walkthroughs
 ```
 
 ---

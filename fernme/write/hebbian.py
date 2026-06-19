@@ -12,7 +12,8 @@ def _saturating_bump(w: float, rate: float, mag: float, w_max: float) -> float:
 
 
 def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
-            mapped: List[Tuple[str, float]], cfg: Config = DEFAULT) -> None:
+            mapped: List[Tuple[str, float]], cfg: Config = DEFAULT,
+            salience=None) -> None:
     """Apply one event to the user graph + shared association graph.
     Crucially: this function calls no LLM and does no vector search."""
     active = mapped
@@ -30,6 +31,11 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
         e.confidence = 1.0 - math.exp(-cfg.gamma * e.hits)
         e.source = "known" if e.source != "override" else "override"
         e.last_reinforced = event.ts
+        s_in = (salience or {}).get(attr, 0.0)
+        if attr.startswith("!"):
+            s_in = max(s_in, cfg.salience_neg)
+        if s_in > e.salience:
+            e.salience = min(1.0, s_in)
         ug.history.setdefault(attr, []).append(event.ts)
 
     # 2) strengthen attr <-> attr (Hebb: fire together, wire together)
@@ -51,7 +57,9 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT) -> int:
         if e.source == "override":
             continue
         dt = max(0.0, now - e.last_reinforced)
-        e.weight = e.weight * math.exp(-cfg.lam * dt)
+        lam_eff = cfg.lam * (1.0 - cfg.salience_beta * e.salience)
+        e.weight = e.weight * math.exp(-lam_eff * dt)
+        e.salience = e.salience * math.exp(-cfg.lam * cfg.salience_decay * dt)
         e.fast = e.fast * math.exp(-cfg.lam_fast * dt)   # fast lane fades much quicker
         e.last_reinforced = now            # reset clock -> safe to call periodically
         if e.weight < cfg.floor:

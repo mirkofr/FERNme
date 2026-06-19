@@ -1,0 +1,209 @@
+{
+ "entries": 86,
+ "facts": 180,
+ "high_conf": 74,
+ "llm_calls": 0,
+ "card_tokens": 40,
+ "corpus": 18043,
+ "fern_read": 3482,
+ "mem0_in": 36086,
+ "mem0_out": 2706,
+ "naive": 821424,
+ "usd_fern": 0.0005223,
+ "usd_mem0": 0.0070365,
+ "usd_naive": 0.12321359999999999,
+ "retained": 16,
+ "retain_total": 16,
+ "jasmine_final": 3.25,
+ "earlgrey_final": 5.84,
+ "top": [
+  [
+   "topic:work",
+   8.8,
+   24,
+   true
+  ],
+  [
+   "project:memory-journal-platform",
+   8.5,
+   19,
+   true
+  ],
+  [
+   "rel:jonas",
+   8.2,
+   16,
+   true
+  ],
+  [
+   "rel:daniel",
+   8.0,
+   15,
+   true
+  ],
+  [
+   "entity:miso",
+   7.3,
+   11,
+   true
+  ],
+  [
+   "topic:project",
+   7.3,
+   11,
+   true
+  ],
+  [
+   "entity:chatgpt",
+   7.0,
+   10,
+   true
+  ],
+  [
+   "rel:maya",
+   7.0,
+   10,
+   true
+  ],
+  [
+   "topic:chatgpt",
+   7.0,
+   10,
+   true
+  ],
+  [
+   "rel:priya",
+   6.3,
+   8,
+   true
+  ],
+  [
+   "topic:health",
+   6.3,
+   8,
+   true
+  ],
+  [
+   "topic:hobby",
+   6.3,
+   8,
+   true
+  ],
+  [
+   "rel:viktor",
+   5.8,
+   7,
+   true
+  ],
+  [
+   "topic:ordinary-life",
+   5.8,
+   7,
+   true
+  ],
+  [
+   "topic:shopping",
+   5.8,
+   7,
+   true
+  ]
+ ],
+ "retain": [
+  [
+   "name:elena-sofia-markovic",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "nickname:lena",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "birthday:1991-09-14",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "origin:croatian",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "city:ljubljana",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "employer:memoryforge",
+   true,
+   2.3,
+   2
+  ],
+  [
+   "pet:miso",
+   true,
+   3.3,
+   3
+  ],
+  [
+   "rel:jonas",
+   true,
+   8.2,
+   16
+  ],
+  [
+   "pref:macos",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "pref:iphone",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "pref:macbook",
+   true,
+   3.3,
+   3
+  ],
+  [
+   "pref:markdown",
+   true,
+   1.2,
+   1
+  ],
+  [
+   "activity:yoga",
+   true,
+   2.3,
+   2
+  ],
+  [
+   "activity:swimming",
+   true,
+   2.3,
+   2
+  ],
+  [
+   "pref:flat-white",
+   true,
+   4.1,
+   4
+  ],
+  [
+   "value:documentation",
+   true,
+   1.2,
+   1
+  ]
+ ]
+}

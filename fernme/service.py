@@ -66,6 +66,17 @@ class FernService:
             raise ConsentError(f"no consent on record for {site}/{user}")
 
     # ---------- write path ----------
+    def _salience_of(self, payload: Dict, mapped) -> Dict:
+        """Behavioral significance per attribute (no LLM): explicit intensity/rating in
+        the payload. Negative edges get a floor in the write rule; outcomes add salience."""
+        s0 = payload.get("intensity")
+        if isinstance(s0, (int, float)):
+            s0 = max(0.0, min(1.0, float(s0)))
+        else:
+            r = payload.get("rating")
+            s0 = max(0.0, min(1.0, abs(float(r) - 3.0) / 2.0)) if isinstance(r, (int, float)) else 0.0
+        return {attr: s0 for attr, _ in mapped} if s0 > 0 else {}
+
     def observe(self, site: str, user: str, type: str, payload: Dict,
                 ts: float = 0.0) -> Dict:
         """Record one interaction. payload may carry 'tags' (and/or 'item_id');
@@ -98,7 +109,7 @@ class FernService:
                 mapped = map_event(ev, self.catalog)
         if self.vocabulary is not None:           # ingestion bridge: canonicalize tags
             mapped = [(c, m) for (a, m) in mapped if (c := self.vocabulary.canonical(a))]
-        observe(ug, ag, ev, mapped, self.cfg)
+        observe(ug, ag, ev, mapped, self.cfg, salience=self._salience_of(payload, mapped))
         if st is not None:                      # update mood EMA + trend (domain-agnostic)
             old = ug.numeric.get("mood_ema")
             new = st["mood"] if old is None else round(0.5 * st["mood"] + 0.5 * old, 3)
@@ -291,6 +302,7 @@ class FernService:
                 e.weight = min(self.cfg.w_max, e.weight + self.cfg.alpha * 0.5 * weight * (1 - e.weight / self.cfg.w_max))
             else:
                 e.weight = max(0.0, e.weight * (1 - 0.3 * weight))
+            e.salience = max(e.salience, min(1.0, 0.5 * weight + (0.0 if success else 0.2)))
         self.store.save_user(ug)
         self.store.append_event(Event(site, user, now, "outcome",
                                        {"success": bool(success), "attrs": list(attrs)}))

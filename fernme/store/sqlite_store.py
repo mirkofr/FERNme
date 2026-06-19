@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS consents(
   PRIMARY KEY(site, user));
 CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, user TEXT, attr TEXT, weight REAL, confidence REAL,
-  source TEXT, last_reinforced REAL, hits INTEGER, fast REAL DEFAULT 0,
+  source TEXT, last_reinforced REAL, hits INTEGER, fast REAL DEFAULT 0, salience REAL DEFAULT 0,
   PRIMARY KEY(site, user, attr));
 CREATE TABLE IF NOT EXISTS user_numeric(
   site TEXT, user TEXT, key TEXT, value TEXT,
@@ -83,7 +83,8 @@ class SQLiteStore:
                 "SELECT * FROM user_edges WHERE site=? AND user=?", (site, user)):
             ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
                                        r["last_reinforced"], r["hits"],
-                                       r["fast"] if "fast" in r.keys() else 0.0)
+                                       r["fast"] if "fast" in r.keys() else 0.0,
+                                       r["salience"] if "salience" in r.keys() else 0.0)
         for r in self._conn.execute(
                 "SELECT key,value FROM user_numeric WHERE site=? AND user=?", (site, user)):
             v = r["value"]
@@ -104,9 +105,9 @@ class SQLiteStore:
             c = self._conn
             c.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany(
-                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?)",
                 [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                  e.last_reinforced, e.hits, e.fast) for a, e in ug.edges.items()])
+                  e.last_reinforced, e.hits, e.fast, e.salience) for a, e in ug.edges.items()])
             c.execute("DELETE FROM user_numeric WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany("INSERT INTO user_numeric VALUES(?,?,?,?)",
                           [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
