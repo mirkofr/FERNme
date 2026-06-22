@@ -29,6 +29,8 @@ def test_graph_emits_category_per_node():
 
 
 def test_why_endpoint_returns_evidence():
+    import pytest
+    pytest.importorskip("fastapi"); pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
     import fernme.api.rest as rest
     c = TestClient(rest.app)

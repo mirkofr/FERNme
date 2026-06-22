@@ -17,6 +17,6 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,viz]"
+          pip install -e ".[dev,viz,api]"
       - name: Run tests
         run: pytest -q
