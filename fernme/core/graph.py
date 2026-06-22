@@ -41,9 +41,19 @@ class UserGraph:
 @dataclass
 class AssocGraph:
     """Shared per-site attribute<->attribute association weights (Hebbian
-    co-use). Most users read this directly; rare per-user overrides not in v0."""
+    co-use). Most users read this directly; rare per-user overrides not in v0.
+
+    `edges` is the source of truth. `_adj` is a parallel adjacency index so
+    neighbors() is O(degree) instead of O(all edges) -- without it, spreading
+    activation re-scans every association edge for every node on every recall,
+    which is O(nodes x edges x hops) and blows past 200ms on a few hundred
+    memories. The index is built lazily on first read and kept in sync by
+    set_edge(); direct bulk loads just trigger a one-time reindex."""
     site: str
     edges: Dict[Tuple[str, str], float] = field(default_factory=dict)
+    # node -> {neighbor: weight}; not an init arg, rebuilt from edges on demand
+    _adj: Dict[str, Dict[str, float]] = field(default_factory=dict, init=False,
+                                              repr=False, compare=False)
 
     @staticmethod
     def key(a: str, b: str) -> Tuple[str, str]:
@@ -52,14 +62,27 @@ class AssocGraph:
     def get(self, a: str, b: str) -> float:
         return self.edges.get(self.key(a, b), 0.0)
 
-    def neighbors(self, a: str) -> List[Tuple[str, float]]:
-        out = []
+    def reindex(self) -> None:
+        """Rebuild the adjacency index from `edges` (one linear pass)."""
+        adj: Dict[str, Dict[str, float]] = {}
         for (x, y), w in self.edges.items():
-            if x == a:
-                out.append((y, w))
-            elif y == a:
-                out.append((x, w))
-        return out
+            adj.setdefault(x, {})[y] = w
+            adj.setdefault(y, {})[x] = w
+        self._adj = adj
+
+    def set_edge(self, a: str, b: str, w: float) -> None:
+        """Upsert an association weight, keeping `edges` and `_adj` in sync."""
+        if not self._adj and self.edges:
+            self.reindex()                 # ensure index is complete first
+        self.edges[self.key(a, b)] = w
+        self._adj.setdefault(a, {})[b] = w
+        self._adj.setdefault(b, {})[a] = w
+
+    def neighbors(self, a: str) -> List[Tuple[str, float]]:
+        if not self._adj and self.edges:   # lazily build after a bulk load
+            self.reindex()
+        nb = self._adj.get(a)
+        return list(nb.items()) if nb else []
 
 
 @dataclass

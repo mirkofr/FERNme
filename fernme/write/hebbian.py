@@ -43,9 +43,8 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
         for j in range(i + 1, len(active)):
             a, ma = active[i]
             b, mb = active[j]
-            k = AssocGraph.key(a, b)
-            assoc.edges[k] = _saturating_bump(assoc.edges.get(k, 0.0),
-                                              cfg.beta, ma * mb, cfg.w_max)
+            assoc.set_edge(a, b, _saturating_bump(assoc.get(a, b),
+                                                  cfg.beta, ma * mb, cfg.w_max))
 
 
 def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT) -> int:

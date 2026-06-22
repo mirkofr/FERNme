@@ -2,6 +2,21 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [0.2.1] — recall latency fix
+
+### Fixed
+- **Recall is no longer O(all association edges).** `AssocGraph.neighbors()` scanned
+  every association edge on every node, every hop — O(nodes × edges × hops) — pushing
+  recall past 200ms at a few hundred memories. Added an adjacency index (`_adj`, built
+  lazily and kept in sync by `set_edge()`), making `neighbors()` O(degree). Measured
+  p95 dropped from ~222ms to ~2ms at 200 memories, and stays ~30ms at 1,000 memories
+  over a 50k-edge graph. No API or behavior change; pure performance.
+
+### Added
+- `tests/test_perf_recall.py` — index-correctness + a latency-ceiling regression guard.
+- `docs/v0.3_scaling.md` — the measurements and the bounded-working-set plan for the
+  remaining single-large-graph case.
+
 ## [0.2.0] — salience, categories, memory map
 
 ### Added
