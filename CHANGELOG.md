@@ -2,6 +2,29 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [0.2.0] — salience, categories, memory map
+
+### Added
+- **Salience-modulated forgetting** — optional per-edge `salience` (off by default,
+  `salience_beta=0`) so behaviorally significant memories (strong outcomes, dislikes,
+  rating extremity) decay slower. Decoupled from confidence: retain vs. act.
+- **Deterministic memory categories** (`fernme/categories.py`) — a reproducible,
+  no-LLM `namespace -> category` rollup; `graph()` now emits a `category` per node and
+  the category list.
+- **`/why` REST endpoint** — exposes the existing explainability evidence over HTTP.
+- **Interactive memory-map demo** (`demo/elena/`) — category bubbles, associations,
+  Elena at the center, click-to-inspect a memory.
+- Natural-data **Elena evaluation** + LoCoMo-style QA, paper (Markdown + LaTeX),
+  related-work comparison.
+
+### Fixed
+- **DB forward-compatibility:** auto-migrate `user_edges` to add `fast`/`salience`
+  columns on open (previously, DBs created before these columns failed on write).
+
+### Notes
+- Salience and categories are additive and off/transparent by default; existing
+  behaviour and all prior numbers are unchanged.
+
 ## [0.1.0] — first public release
 Initial open-source release. A per-site, user-owned Hebbian preference-graph memory
 for transactional agents. Highlights:

@@ -60,7 +60,16 @@ class SQLiteStore:
         except sqlite3.OperationalError:
             pass
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self):
+        """Add columns introduced after a DB was first created (CREATE TABLE IF NOT
+        EXISTS never alters an existing table). Keeps old DBs forward-compatible."""
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(user_edges)")}
+        for col in ("fast", "salience"):
+            if col not in cols:
+                self._conn.execute("ALTER TABLE user_edges ADD COLUMN %s REAL DEFAULT 0" % col)
 
     # ---- consent ----
     def set_consent(self, site: str, user: str, granted: bool, ts: float = 0.0):

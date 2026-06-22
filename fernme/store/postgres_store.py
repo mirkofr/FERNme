@@ -50,6 +50,8 @@ class PostgresStore:
         self._lock = threading.Lock()
         self._conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
         self._conn.execute(SCHEMA)
+        for col in ("fast", "salience"):   # forward-compat for DBs created before these columns
+            self._conn.execute("ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS %s DOUBLE PRECISION DEFAULT 0" % col)
 
     def _q(self, sql, args=()):
         return self._conn.execute(sql, args)

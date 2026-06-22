@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import List, Dict, Optional
 from .core.graph import UserGraph, AssocGraph, Event, Edge
 from .write import Catalog, map_event, observe, decay
+from .categories import category_of, CATEGORIES
 from .retrieve.card import compile_card
 from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
@@ -400,7 +401,10 @@ class FernService:
             for attr, e in ug.edges.items():
                 neg = attr.startswith("!"); base = attr.lstrip("!")
                 ns = base.split(":", 1)[0] if ":" in base else "attr"
-                n = nodes.setdefault(base, {"id": base, "label": base, "kind": ns, "size": 0})
+                n = nodes.setdefault(base, {"id": base, "label": base, "kind": ns, "size": 0,
+                                            "category": category_of(attr)})
+                if neg:
+                    n["category"] = "emotional"
                 n["size"] = max(n["size"], e.wire_weight(self.cfg.w_max))
                 edges.append({"source": uid, "target": base, "weight": e.wire_weight(self.cfg.w_max),
                               "confidence": round(e.confidence, 2),
@@ -411,7 +415,7 @@ class FernService:
         for (a, b), w in ag.edges.items():
             if a in present and b in present and w >= assoc_floor:
                 edges.append({"source": a, "target": b, "weight": round(w, 1), "assoc": True})
-        return {"nodes": list(nodes.values()), "edges": edges,
+        return {"nodes": list(nodes.values()), "edges": edges, "categories": CATEGORIES,
                 "stats": {"users": sum(1 for v in nodes.values() if v["kind"] == "user"),
                           "attributes": len(present), "edges": len(edges)}}
 
