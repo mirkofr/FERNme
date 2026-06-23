@@ -23,6 +23,14 @@ class Config:
     salience_neg: float = 0.5     # dislikes (negative edges) get this salience floor
     salience_decay: float = 0.25  # salience itself fades at lam*this (scars heal, slowly)
 
+    # --- curation / editing policy (curation.py); OFF by default (additive) ---
+    curation: bool = False        # detect conflicts, supersede (tombstone) or ask
+    curation_ask_threshold: float = 0.4  # min importance to escalate a tension
+
+    # --- meaning per memory (glossary.py); free context + cheap/templated gloss ---
+    capture_context: bool = True  # store the sentence a memory came from (no LLM)
+    auto_gloss: bool = True        # fill missing glosses from namespace templates
+
     # --- Differential / population-prior encoding (prior/population.py) ---
     theta: float = 2.0        # store a user edge only if |w_user - w_prior| > theta
 

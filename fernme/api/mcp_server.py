@@ -17,9 +17,33 @@ if FastMCP is not None:
 
     @mcp.tool()
     def remember(site: str, user: str, type: str = "note", tags: list[str] = [],
+                 text: str = "", source: str = "stated", glosses: dict = {},
                  ts: float = 0.0) -> dict:
-        """Record an interaction/preference for a user on a site (consent required)."""
-        return svc.observe(site, user, type, {"tags": tags}, ts)
+        """Record an interaction/preference for a user on a site (consent required).
+
+        tags:    namespaced 'ns:value' tokens, e.g. 'pref:concise', 'topic:python',
+                 '!likes:dairy' (leading '!' = a dislike). Prefer SPECIFIC tags.
+        text:    the sentence this came from. Stored as free context (no token
+                 cost) so a bare tag isn't ambiguous later.
+        source:  'stated' (the user said it) or 'inferred' (you guessed it).
+                 Inferred never silently overrides stated; conflicts return a
+                 'questions' list to ask the user.
+        glosses: optional {tag: one-line meaning}. Emit these as a byproduct of
+                 your reply (a few tokens, no separate call). Missing ones fall
+                 back to a deterministic namespace template (0 tokens).
+        Returns stored attrs, plus 'questions'/'superseded' when curation is on."""
+        payload = {"tags": tags, "source": source}
+        if text:
+            payload["text"] = text
+        if glosses:
+            payload["glosses"] = glosses
+        return svc.observe(site, user, type, payload, ts)
+
+    @mcp.tool()
+    def recall_glossary(site: str, user: str) -> dict:
+        """What each remembered tag MEANS: {tag: {gloss, context}}. Context is the
+        sentence it came from; gloss is the supplied or templated one-liner."""
+        return svc.glossary(site, user)
 
     @mcp.tool()
     def grant_consent(site: str, user: str, granted: bool = True) -> dict:

@@ -2,6 +2,27 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [0.3.0] — curation, capture adapters, and per-memory meaning
+
+### Added
+- **Curation / editing policy** (`fernme/curation.py`, off by default) — deterministic
+  conflict detection (polarity, same-slot value change, declared semantic mutex),
+  an authority axis (an *inferred* signal never silently overrides an *explicit*
+  statement), supersession recorded as a tombstone event, and a 0-token clarifying
+  question surfaced from `observe()` instead of a silent overwrite.
+- **Pluggable capture adapters** (`fernme/capture/`) — `agent` (host LLM emits tags
+  as a byproduct, ~20-40 tok), `signal` (structured events to tags, 0 tokens), and
+  `local` (rules now, Ollama/Hermes later, 0 API tokens). Installer prints the
+  per-method token cost; `AGENTS.md` documents wiring Claude/Codex/Hermes.
+- **Per-memory meaning** (`fernme/glossary.py`) — `context` (the sentence a memory
+  came from, stored free) and `gloss` (supplied by the tagger or a deterministic
+  namespace template, 0 tokens). `service.glossary()` assembles `{tag: {gloss,
+  context}}`; MCP gains `remember(glosses=...)` and `recall_glossary`.
+
+### Notes
+- All additive and off/transparent by default; prior behaviour and benchmarks
+  unchanged. 119 tests passing.
+
 ## [0.2.1] — recall latency fix
 
 ### Fixed

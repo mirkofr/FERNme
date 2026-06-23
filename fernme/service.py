@@ -16,6 +16,8 @@ from . import style as _style
 from .dp import PrivatePrior
 from . import audit as _audit_mod
 from . import confidence as _confidence
+from . import curation as _curation
+from . import glossary as _glossary
 from .vocabulary import Vocabulary
 from dataclasses import replace as _replace
 from .triggers import due_reorders, fading_favorites
@@ -110,7 +112,15 @@ class FernService:
                 mapped = map_event(ev, self.catalog)
         if self.vocabulary is not None:           # ingestion bridge: canonicalize tags
             mapped = [(c, m) for (a, m) in mapped if (c := self.vocabulary.canonical(a))]
+        # snapshot existing memory BEFORE the write, for conflict/authority checks
+        existing_snapshot = ({a: _replace(e) for a, e in ug.edges.items()}
+                             if self.cfg.curation else {})
+        new_source = payload.get("source", "known")
         observe(ug, ag, ev, mapped, self.cfg, salience=self._salience_of(payload, mapped))
+        questions, superseded = ([], [])
+        if self.cfg.curation:
+            questions, superseded = self._curate(site, user, ug, mapped, new_source,
+                                                  existing_snapshot, ts)
         if st is not None:                      # update mood EMA + trend (domain-agnostic)
             old = ug.numeric.get("mood_ema")
             new = st["mood"] if old is None else round(0.5 * st["mood"] + 0.5 * old, 3)
@@ -120,7 +130,42 @@ class FernService:
         self.store.save_assoc(ag)
         self.store.append_event(ev)
         self._audit(site, user, "observe", {"type": type, "n_attrs": len(mapped)}, ts)
-        return {"stored_attrs": [a for a, _ in mapped], "edges": ug.n_edges()}
+        out = {"stored_attrs": [a for a, _ in mapped], "edges": ug.n_edges()}
+        if self.cfg.curation:
+            out["questions"] = questions
+            out["superseded"] = superseded
+        return out
+
+    def _curate(self, site, user, ug, mapped, new_source, existing, ts):
+        """Apply the editing policy to the just-written attrs: supersede a losing
+        memory (demote + tombstone in the event log) or raise a question. Returns
+        (questions, superseded). Deterministic, no LLM."""
+        questions, superseded = [], []
+        for attr, _mag in mapped:
+            imp = self._conflict_importance(attr)
+            for r in _curation.review(attr, new_source, ts, existing, importance=imp,
+                                      ask_threshold=self.cfg.curation_ask_threshold):
+                if r.action == "supersede" and r.old_attr in ug.edges:
+                    old = ug.edges[r.old_attr]
+                    old.weight = min(old.weight, self.cfg.floor)  # demote below recall
+                    old.source = "superseded"
+                    superseded.append({"old": r.old_attr, "by": attr, "kind": r.kind})
+                    self.store.append_event(Event(site, user, ts, "supersede",
+                        {"old": r.old_attr, "new": attr, "kind": r.kind}))
+                elif r.action == "ask":
+                    questions.append({"new": attr, "old": r.old_attr,
+                                      "kind": r.kind, "question": r.question})
+                    self.store.append_event(Event(site, user, ts, "question",
+                        {"new": attr, "old": r.old_attr, "question": r.question}))
+        return questions, superseded
+
+    @staticmethod
+    def _conflict_importance(attr: str) -> float:
+        """Identity facts and explicit dislikes are worth asking about; rest mid."""
+        ns = attr.lstrip("!").split(":", 1)[0]
+        if attr.startswith("!") or ns in _curation.SINGLE_VALUE_SLOTS:
+            return 0.8
+        return 0.5
 
     def set_numeric(self, site: str, user: str, key: str, value) -> Dict:
         self._require_consent(site, user)
@@ -308,6 +353,17 @@ class FernService:
         self.store.append_event(Event(site, user, now, "outcome",
                                        {"success": bool(success), "attrs": list(attrs)}))
         return {"success": bool(success), "attrs": list(attrs)}
+
+    def glossary(self, site: str, user: str, auto: bool = None) -> Dict:
+        """What each remembered tag MEANS, assembled from stored events (no LLM).
+        Returns {attr: {gloss, context, ts}}: 'context' is the sentence the memory
+        came from (event text), 'gloss' is the supplied or namespace-templated
+        one-liner. Closes the 'a bare tag carries no information' gap."""
+        self._require_consent(site, user)
+        if auto is None:
+            auto = self.cfg.auto_gloss
+        events = self.store.recall(site, user, limit=100000)
+        return _glossary.assemble(events, auto=auto)
 
     def why(self, site: str, user: str, attr: str) -> Dict:
         """Explainability (#8): the evidence behind a stored attribute."""
