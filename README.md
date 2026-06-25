@@ -13,7 +13,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/tests-119%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
-[![Status](https://img.shields.io/badge/status-v0.2%20research%20preview-7f77dd.svg)](#-honest-status)
+[![Status](https://img.shields.io/badge/status-v0.3%20research%20preview-7f77dd.svg)](#-honest-status)
 
 *Cheap to write · flat to read · interpretable by design · owned by the user*
 
