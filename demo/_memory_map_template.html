@@ -1,0 +1,206 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FERNme — memory</title>
+<style>
+:root{--bg:#0e1116;--bg2:#0a0d12;--surf:#161b22;--bd:rgba(255,255,255,.10);--tx:#e7e9ee;--mut:#8b93a1;--owner:#f5f7fa;--danger:#f0708a;}
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+html,body{margin:0;height:100%;background:radial-gradient(1200px 800px at 50% 40%,#141a23,var(--bg));color:var(--tx);overflow:hidden}
+body{display:flex;flex-direction:column}
+header{padding:10px 16px;display:flex;gap:12px;align-items:center;z-index:4;border-bottom:.5px solid var(--bd);background:rgba(10,13,18,.6);backdrop-filter:blur(6px)}
+h1{font-size:15px;font-weight:600;margin:0}h1 span{color:var(--mut);font-weight:400;font-size:12px;margin-left:8px}
+.btn{font-size:12px;padding:5px 10px;border:.5px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx);cursor:pointer}
+.btn:hover{background:#1d2530}.btn.on{background:#23425c;border-color:#3a6a93;color:#cfe6ff}
+.grow{flex:1}.hint{font-size:12px;color:var(--mut)}
+#stage{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+.panel{position:absolute;background:rgba(22,27,34,.92);border:.5px solid var(--bd);border-radius:12px;backdrop-filter:blur(8px);box-shadow:0 10px 40px rgba(0,0,0,.45)}
+#tip{display:none;pointer-events:none;z-index:6;padding:8px 11px;font-size:12px;max-width:260px;line-height:1.5}
+#tip .t{font-weight:600}#tip .m{color:var(--mut);margin-top:2px}
+#legend{left:14px;bottom:14px;padding:11px 13px;font-size:12px;color:var(--mut);line-height:1.9;z-index:5}
+#legend .sw{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:7px}
+#insp{position:absolute;top:0;right:0;height:100%;width:330px;transform:translateX(106%);transition:transform .24s ease;padding:18px;overflow:auto;z-index:8;border-left:.5px solid var(--bd);background:rgba(16,19,24,.96)}
+#insp.open{transform:none}
+#insp .x{position:absolute;top:12px;right:14px;cursor:pointer;color:var(--mut);font-size:22px;line-height:1}
+#insp h2{font-size:18px;margin:4px 36px 4px 0;word-break:break-word}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);margin-bottom:12px}
+.chip .dot{width:10px;height:10px;border-radius:50%}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(240,112,138,.16);color:var(--danger);margin-left:6px}
+.kv{margin:13px 0}.kv .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.kv .v{font-size:14px;font-weight:600}
+.box{font-size:13px;color:var(--tx);background:var(--bg2);border:.5px solid var(--bd);border-radius:9px;padding:10px 11px;line-height:1.5}
+.bar{height:7px;border-radius:6px;background:var(--bg2);overflow:hidden}.bar>i{display:block;height:100%;border-radius:6px}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-left:8px}
+.tag.known{background:rgba(93,202,165,.16);color:#5dcaa5}.tag.guess{background:rgba(139,147,161,.18);color:var(--mut)}
+.links a{display:block;font-size:13px;color:var(--tx);padding:6px 9px;border-radius:8px;cursor:pointer;border:.5px solid var(--bd);margin-bottom:6px;text-decoration:none}
+.links a:hover{background:#1d2530}.links a .w{float:right;color:var(--mut);font-size:11px}
+.note{margin-top:16px;font-size:11px;color:var(--mut);line-height:1.5;border-top:.5px solid var(--bd);padding-top:10px}
+</style></head><body>
+<header>
+  <h1>FERNme<span>__OWNER__'s memory</span></h1>
+  <button class="btn" id="fit">Fit view</button>
+  <button class="btn on" id="known">Known only</button>
+  <span class="grow"></span>
+  <span class="hint">click a node to inspect · hover to trace links · scroll to zoom · drag to pan</span>
+</header>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="tip" class="panel"></div>
+  <div id="legend" class="panel"></div>
+  <div id="insp" class="panel"><span class="x" id="ix">&times;</span><div id="ibody"></div></div>
+</div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const DATA=__DATA__;
+
+const cv=document.getElementById("c"),ctx=cv.getContext("2d"),DPR=Math.max(1,devicePixelRatio||1);
+const $=i=>document.getElementById(i);
+let W=0,H=0,view=d3.zoomIdentity,hover=null,selected=null,knownOnly=true;
+const CAT={}; DATA.cats.forEach(c=>CAT[c.key]=c);
+function catColor(k){return (CAT[k]&&CAT[k].color)||"#8b93a1";}
+
+// ---- build nodes/links ----
+const owner={id:"__owner__",label:"__OWNER__",owner:true,r:15,cat:null};
+let nodes=[], links=[], byId={}, adj={};
+function build(){
+  const ns=DATA.nodes.filter(n=>!knownOnly||n.known);
+  const keep=new Set(ns.map(n=>n.id));
+  nodes=[owner, ...ns.map(n=>({...n,r:4+Math.sqrt(n.size||1)*2.4}))];
+  byId={}; nodes.forEach(n=>byId[n.id]=n);
+  links=DATA.edges.filter(e=>keep.has(e.source)&&keep.has(e.target))
+                  .map(e=>({source:e.source,target:e.target,weight:e.weight}));
+  // owner links to the strongest node per category so it sits central + connected
+  const strongest={};
+  ns.forEach(n=>{ if(!strongest[n.cat]||n.size>strongest[n.cat].size) strongest[n.cat]=n; });
+  Object.values(strongest).forEach(n=>links.push({source:"__owner__",target:n.id,weight:3,owner:true}));
+  adj={}; links.forEach(l=>{const s=l.source.id||l.source,t=l.target.id||l.target;(adj[s]=adj[s]||new Set()).add(t);(adj[t]=adj[t]||new Set()).add(s);});
+}
+
+// ---- category anchor positions (ring) for clustering force ----
+let catPos={};
+function layoutAnchors(){
+  const ks=DATA.cats.map(c=>c.key), R=Math.min(W,H)*0.30;
+  ks.forEach((k,i)=>{const a=-Math.PI/2+i*2*Math.PI/ks.length;catPos[k]={x:W/2+Math.cos(a)*R,y:H/2+Math.sin(a)*R};});
+}
+
+let sim;
+function start(){
+  build();
+  sim=d3.forceSimulation(nodes)
+    .force("charge",d3.forceManyBody().strength(d=>d.owner?-200:-55))
+    .force("link",d3.forceLink(links).id(d=>d.id).distance(d=>d.owner?70:42).strength(d=>d.owner?0.06:0.18))
+    .force("collide",d3.forceCollide().radius(d=>d.r+2.5).strength(.9))
+    .force("x",d3.forceX(d=>d.owner?W/2:(catPos[d.cat]?catPos[d.cat].x:W/2)).strength(d=>d.owner?0.2:0.09))
+    .force("y",d3.forceY(d=>d.owner?H/2:(catPos[d.cat]?catPos[d.cat].y:H/2)).strength(d=>d.owner?0.2:0.09))
+    .on("tick",paint);
+  sim.alpha(1).restart();
+}
+
+function resize(){const r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);layoutAnchors();}
+function T(x,y){return [x*view.k+view.x, y*view.k+view.y];}
+function nb(n){return n&&hover&&(n===hover||(adj[hover.id]&&adj[hover.id].has(n.id)));}
+function nbSel(n){return n&&selected&&(n===selected||(adj[selected.id]&&adj[selected.id].has(n.id)));}
+
+function paint(){
+  ctx.clearRect(0,0,W,H);
+  const foc=hover||selected;
+  // edges
+  ctx.lineCap="round";
+  for(const l of links){
+    const s=l.source,t=l.target; if(s.x==null||t.x==null)continue;
+    const [x1,y1]=T(s.x,s.y),[x2,y2]=T(t.x,t.y);
+    const lit=foc&&(s===foc||t===foc);
+    const dim=foc&&!lit;
+    const col=l.owner?"255,255,255":hexToRgb(catColor(s.owner?t.cat:s.cat));
+    ctx.strokeStyle=`rgba(${col},${lit?0.85:(dim?0.03:0.16)})`;
+    ctx.lineWidth=(lit?1.6:0.6)*Math.min(1.5,view.k);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  }
+  // nodes
+  for(const n of nodes){
+    if(n.x==null)continue;
+    const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.7,view.k));
+    const focused=foc&&(nb(n)||nbSel(n));
+    const dim=foc&&!focused&&n!==foc;
+    ctx.globalAlpha=dim?0.22:1;
+    if(n.owner){
+      ctx.shadowColor="rgba(255,255,255,.55)";ctx.shadowBlur=18;
+      ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle="#f5f7fa";ctx.fill();ctx.shadowBlur=0;
+      ctx.fillStyle="#0e1116";ctx.font="600 11px -apple-system,Segoe UI";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("__OWNER__",x,y);
+    } else {
+      ctx.shadowColor=n.color;ctx.shadowBlur=(focused||n===foc)?16:7;
+      ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=n.color;ctx.fill();ctx.shadowBlur=0;
+      if(n===selected){ctx.lineWidth=2.5;ctx.strokeStyle="#fff";ctx.stroke();}
+      else if(n.negative){ctx.lineWidth=1.6;ctx.strokeStyle="var(--danger)";ctx.strokeStyle="#f0708a";ctx.stroke();}
+    }
+    ctx.globalAlpha=1;
+  }
+  // labels (strong nodes, or focused neighbourhood)
+  ctx.textAlign="left";ctx.textBaseline="middle";
+  for(const n of nodes){
+    if(n.owner)continue;
+    const show=n===hover||n===selected||nb(n)||nbSel(n)||(n.size>=4&&view.k>=0.85)||view.k>=2.2;
+    if(!show)continue;
+    const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.7,view.k));
+    ctx.fillStyle="rgba(231,233,238,.92)";ctx.font="11px -apple-system,Segoe UI";
+    const lab=(n.negative?"!":"")+n.label;
+    ctx.fillText(lab.length>26?lab.slice(0,24)+"…":lab, x+r+5, y);
+  }
+}
+function hexToRgb(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)].join(',');}
+
+// ---- interaction ----
+function nodeAt(mx,my){let best=null,bd=1e9;for(const n of nodes){if(n.x==null)continue;const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my),rr=Math.max(8,n.r*view.k+5);if(d<rr&&d<bd){bd=d;best=n;}}return best;}
+cv.addEventListener("mousemove",e=>{
+  const mx=e.offsetX,my=e.offsetY,n=nodeAt(mx,my),tip=$("tip");
+  hover=n;cv.style.cursor=n?"pointer":"grab";
+  if(n&&!n.owner){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+n.label}</div><div class="m">${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9</div>`;
+    tip.style.left=Math.min(W-270,mx+14)+"px";tip.style.top=Math.min(H-60,my+14)+"px";}
+  else tip.style.display="none";
+  paint();
+});
+cv.addEventListener("click",e=>{const n=nodeAt(e.offsetX,e.offsetY);if(n&&!n.owner)inspect(n);else closeInsp();});
+
+const zoom=d3.zoom().scaleExtent([0.2,6]).on("zoom",ev=>{view=ev.transform;paint();});
+d3.select(cv).call(zoom);
+function fit(){
+  const xs=nodes.filter(n=>n.x!=null);if(!xs.length)return;
+  const minx=d3.min(xs,n=>n.x),maxx=d3.max(xs,n=>n.x),miny=d3.min(xs,n=>n.y),maxy=d3.max(xs,n=>n.y);
+  const w=maxx-minx||1,h=maxy-miny||1,k=Math.min(W/(w+120),H/(h+120),2);
+  const tx=W/2-k*(minx+maxx)/2,ty=H/2-k*(miny+maxy)/2;
+  d3.select(cv).transition().duration(500).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(k));
+}
+$("fit").onclick=fit;
+$("known").onclick=()=>{knownOnly=!knownOnly;$("known").classList.toggle("on",knownOnly);start();setTimeout(fit,700);};
+$("ix").onclick=closeInsp;
+addEventListener("keydown",e=>{if(e.key==="Escape")closeInsp();});
+function closeInsp(){selected=null;$("insp").classList.remove("open");paint();}
+
+function strengthWord(s){return s>=7?"very strong":s>=4?"strong":s>=2?"moderate":"weak/tentative";}
+function inspect(n){
+  selected=n;const c=CAT[n.cat]||{label:n.cat,color:n.color};
+  const conf=Math.round((n.confidence||0)*100);
+  const conn=[...(adj[n.id]||[])].map(id=>byId[id]).filter(x=>x&&!x.owner).sort((a,b)=>b.size-a.size);
+  const why=n.known?`Reinforced enough to be treated as <b>known</b> — FERNme can act on it. Strength ${(n.size||0)}/9 (${strengthWord(n.size)}).`
+                   :`Seen, but not yet reinforced enough — FERNme would <b>ask before acting</b>. Strength ${(n.size||0)}/9 (${strengthWord(n.size)}).`;
+  $("ibody").innerHTML=
+    `<h2>${(n.negative?'not ':'')+n.label}${n.negative?'<span class="badge">dislike</span>':''}</h2>`+
+    `<div class="chip"><span class="dot" style="background:${c.color}"></span>${c.label}</div>`+
+    (n.gloss?`<div class="kv"><div class="k">What it means</div><div class="v">${n.gloss}</div></div>`:'')+
+    (n.context?`<div class="kv"><div class="k">Context</div><div class="box">${n.context}</div></div>`:'')+
+    `<div class="kv"><div class="k">Strength</div><div class="bar"><i style="width:${(n.size/9*100)}%;background:${c.color}"></i></div><div class="v" style="margin-top:5px">${(n.size||0)} / 9</div></div>`+
+    `<div class="kv"><div class="k">Confidence</div><div class="v">${conf}%<span class="tag ${n.known?'known':'guess'}">${n.known?'known':'tentative'}</span></div></div>`+
+    `<div class="kv"><div class="k">Why FERNme remembers this</div><div class="box">${why}</div></div>`+
+    `<div class="kv"><div class="k">Connected memories (${conn.length})</div><div class="links">`+
+      (conn.length?conn.slice(0,12).map(t=>`<a data-id="${t.id}">${(t.negative?'!':'')+t.label}<span class="w">${t.size}/9</span></a>`).join(''):'<span class="hint">none yet</span>')+
+    `</div></div>`+
+    `<div class="note">Read-only preview.</div>`;
+  $("ibody").querySelectorAll("a[data-id]").forEach(a=>a.onclick=()=>{const t=byId[a.dataset.id];if(t)inspect(t);});
+  $("insp").classList.add("open");paint();
+}
+function legend(){
+  $("legend").innerHTML="<b style='color:var(--tx);font-size:11px;text-transform:uppercase;letter-spacing:.05em'>categories</b><br/>"+
+    DATA.cats.map(c=>`<span class="sw" style="background:${c.color}"></span>${c.label}`).join("<br/>");
+}
+addEventListener("resize",()=>{resize();layoutAnchors();sim&&sim.alpha(.3).restart();paint();});
+resize();legend();start();setTimeout(fit,800);
+</script></body></html>

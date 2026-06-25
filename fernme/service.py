@@ -219,9 +219,26 @@ class FernService:
     # ---------- batch jobs ----------
     def decay(self, site: str, user: str, now: float) -> Dict:
         ug = self.store.load_user(site, user)
-        dropped = decay(ug, now, self.cfg)
+        conflict_map = self._decay_conflicts(ug) if self.cfg.resolution else {}
+        dropped = decay(ug, now, self.cfg, conflict_map=conflict_map,
+                        ctx={"now": now})
         self.store.save_user(ug)
         return {"dropped": dropped, "remaining": ug.n_edges()}
+
+    def _decay_conflicts(self, ug) -> Dict[str, float]:
+        conflicts = {}
+        for attr, e in ug.edges.items():
+            other = attr[1:] if attr.startswith("!") else "!" + attr
+            oe = ug.edges.get(other)
+            if oe is not None:
+                conflicts[attr] = max(conflicts.get(attr, 0.0),
+                                      min(1.0, oe.weight / self.cfg.w_max))
+        if self.cfg.curation:
+            attrs = list(ug.edges.keys())
+            for attr in attrs:
+                if _curation.detect(attr, attrs):
+                    conflicts[attr] = max(conflicts.get(attr, 0.0), 1.0)
+        return conflicts
 
     # ---------- supernode (user-owned cross-site) ----------
     def link_identity(self, person: str, site: str, local_user: str, ts: float = 0.0) -> Dict:

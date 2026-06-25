@@ -1,6 +1,6 @@
 """Central hyperparameters for FERN. Every tunable lives here so experiments
 are reproducible and the paper can report exact settings."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,20 @@ class Config:
     salience_beta: float = 0.0    # 0 = OFF (no change). >0: high-salience edges decay slower
     salience_neg: float = 0.5     # dislikes (negative edges) get this salience floor
     salience_decay: float = 0.25  # salience itself fades at lam*this (scars heal, slowly)
+
+    # --- resolution / temperature decay (resolution.py); OFF by default ---
+    resolution: bool = False
+    res_w_explicit: float = 0.35
+    res_w_repeated: float = 0.15
+    res_w_recent: float = 0.05
+    res_w_corrob: float = 0.25      # reserved for v1 evidence scans
+    res_w_outcome: float = 0.20     # reserved for v1 evidence scans
+    res_repeat_hits: int = 3
+    heat_gain: float = 1.0
+    resolution_cap_non_override: float = 0.95
+    temperature_floor_non_override: float = 0.05
+    species_decay: dict = field(default_factory=dict)  # empty == all species 1.0
+    phase_crystal: float = 0.95
 
     # --- curation / editing policy (curation.py); OFF by default (additive) ---
     curation: bool = False        # detect conflicts, supersede (tombstone) or ask

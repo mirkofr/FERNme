@@ -1,9 +1,10 @@
 """Hebbian write rule (no LLM) + ACT-R decay. Pure arithmetic on the graph."""
 from __future__ import annotations
 import math
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 from ..core.graph import UserGraph, AssocGraph, Event, Edge
 from ..config import Config, DEFAULT
+from .. import resolution as _resolution
 
 
 def _saturating_bump(w: float, rate: float, mag: float, w_max: float) -> float:
@@ -47,7 +48,8 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
                                                   cfg.beta, ma * mb, cfg.w_max))
 
 
-def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT) -> int:
+def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
+          conflict_map: Dict[str, float] = None, ctx: Dict = None) -> int:
     """Batch job: fade edges not reinforced; drop below floor. Overrides never
     decay. Returns number of edges dropped. Forgetting is a feature: it keeps the
     card small and cheap regardless of tenure."""
@@ -56,7 +58,13 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT) -> int:
         if e.source == "override":
             continue
         dt = max(0.0, now - e.last_reinforced)
-        lam_eff = cfg.lam * (1.0 - cfg.salience_beta * e.salience)
+        if cfg.resolution:
+            edge_ctx = dict(ctx or {})
+            edge_ctx.setdefault("now", now)
+            lam_eff = _resolution.lambda_eff(
+                attr, e, edge_ctx, (conflict_map or {}).get(attr, 0.0), cfg)
+        else:
+            lam_eff = cfg.lam * (1.0 - cfg.salience_beta * e.salience)
         e.weight = e.weight * math.exp(-lam_eff * dt)
         e.salience = e.salience * math.exp(-cfg.lam * cfg.salience_decay * dt)
         e.fast = e.fast * math.exp(-cfg.lam_fast * dt)   # fast lane fades much quicker

@@ -13,6 +13,12 @@ venv/
 *.sqlite
 *.sqlite3
 .fern/
+mirko_memory_map.html
+glossary.json
+claude_desktop_config.json
+.env
+*.key
+*.pem
 results_*.png
 *_state.json
 fern.db

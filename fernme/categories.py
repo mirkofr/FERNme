@@ -15,6 +15,8 @@ CATEGORIES = [
     {"key": "facts",     "label": "Facts & identity",    "color": "#0f6e56"},
     {"key": "habits",    "label": "Habits & skills",     "color": "#6d4bb0"},
     {"key": "media",     "label": "Media & sensory",     "color": "#2f8f4e"},
+    {"key": "knowledge", "label": "Knowledge & ideas",   "color": "#2a8c9e"},
+    {"key": "milestones","label": "Milestones & events", "color": "#b5478a"},
     {"key": "emotional", "label": "Emotional / dislikes","color": "#a32d2d"},
 ]
 
@@ -25,11 +27,16 @@ _NS_TO_CAT = {
     "value": "values", "goal": "values", "pref": "values",
     "rel": "people",
     "name": "facts", "nickname": "facts", "birthday": "facts", "city": "facts",
-    "origin": "facts", "field": "facts", "study": "facts", "topic": "facts",
+    "origin": "facts", "field": "facts", "study": "facts", "email": "facts",
     "employer": "facts", "role": "facts", "status": "facts", "metric": "facts",
     "project": "facts", "health": "facts", "domain": "facts", "context": "facts",
+    "github": "facts",
+    "topic": "knowledge", "tech": "knowledge", "concept": "knowledge",
+    "fact": "knowledge", "lesson": "knowledge", "insight": "knowledge",
+    "comparison": "knowledge",
+    "milestone": "milestones", "event": "milestones", "decision": "milestones",
     "habit": "habits", "activity": "habits", "trait": "habits", "style": "habits",
-    "comm": "habits", "phrase": "habits",
+    "comm": "habits", "phrase": "habits", "tool": "habits",
     "media": "media", "brand": "media", "food": "media", "tea": "media",
     "music": "media", "movie": "media", "book": "media", "pet": "media", "entity": "media",
 }

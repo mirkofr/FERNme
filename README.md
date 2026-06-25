@@ -4,12 +4,14 @@
 
 ### Fuzzy-Edged Recall Network
 
-**A user-owned, near-zero-LLM memory layer for AI agents. It learns each person from their behavior — including how they talk and feel — stays token-flat forever, and lets people see, edit, and own what's remembered. The engine is substrate-agnostic: it remembers wherever an agent acts — websites today (shopping, support, booking, healthcare, tutoring, gov), desktop and mobile next.**
+*Agent personalization memory that models the user, not the transcript.*
+
+**A user-owned, near-zero-LLM personalization memory layer for AI agents. It turns consented interactions into an inspectable model of each person's preferences, habits, communication style, and constraints — staying token-flat as it grows, while letting people see, edit, delete, and own what agents use to personalize.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-91%20passing-1d9e75.svg)](#-tested-not-claimed)
+[![Tests](https://img.shields.io/badge/tests-119%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.2%20research%20preview-7f77dd.svg)](#-honest-status)
 
@@ -23,7 +25,20 @@
 
 ## ✨ The one-paragraph pitch
 
-Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* for *many* people, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the goal is). It starts where agents already act today — websites — and the same user-owned memory is designed to extend to desktop and mobile. Each user is a sparse, fuzzily-weighted node in a per-site graph; edges update by a **Hebbian co-occurrence rule with zero LLM calls**, retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct their own memory, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
+Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* for *many* people, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the goal is). It starts where agents already act today — websites — and builds a user-owned personalization model the person can inspect and control. Each user is a sparse, fuzzily-weighted node in a per-site graph; edges update by a **Hebbian co-occurrence rule with zero LLM calls**, retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct what agents use to personalize, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
+
+---
+
+## What it is / is not
+
+| FERNme is | FERNme is not |
+|---|---|
+| A user-owned personalization memory layer for agents | A generic transcript store |
+| A fuzzy graph of preferences, habits, style, constraints, and outcomes | A folder of chat logs with search |
+| Deterministic-first memory writes with optional LLM enrichment | An LLM extraction call on every turn |
+| A bounded prompt card that stays small as memory grows | Full-history injection |
+| An inspectable and editable user model | Hidden behavioral profiling |
+| Consent-first, per-site, default-deny sharing | Cross-site surveillance |
 
 ---
 
@@ -180,32 +195,12 @@ flowchart TD
 
 ## 🧠 How FERNme works (visual walkthrough)
 
-![Why FERNme](explanation%20of%20fern/IMG_7794.PNG)
-*Why FERNme — adaptive local memory instead of expensive RAG/vector retrieval in the loop.*
-
-![Seven core principles](explanation%20of%20fern/IMG_7796.PNG)
-*What makes it different — near-zero-LLM, deterministic-first, Hebbian, fuzzy, memory cards, action-aware, user-owned.*
-
-![How memory grows](explanation%20of%20fern/IMG_7797.PNG)
-*How memory grows — new event → connect → strengthen → decay → update the card (Hebbian learning).*
-
-![Fuzzy Hebbian graph](explanation%20of%20fern/IMG_7799.PNG)
-*The fuzzy Hebbian graph — sparse, weighted (0–9) edges; nodes for users, preferences, topics, goals.*
-
-![The LLM gate](explanation%20of%20fern/IMG_7784.PNG)
-*The LLM gate — an exception, not the default. Most events are handled deterministically; the LLM is a rare fallback when uncertain.*
-
-![Memory card](explanation%20of%20fern/IMG_7802.PNG)
-*The memory card — a bounded, interpretable, token-minimal summary of what matters.*
-
-![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)
-*Action-aware learning — good outcomes strengthen connections, bad outcomes weaken them.*
-
-![The road ahead](explanation%20of%20fern/IMG_7780.PNG)
-*The road ahead — today's local memory; tomorrow's recursive organization and user-owned supernode (roadmap, not yet built).*
-
-![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)
-*Full architecture: ingestion bridge → namespaced vocabulary → fuzzy Hebbian graph → memory card → agent, with the LLM gate only when uncertain.*
+| | |
+|---|---|
+| ![Why FERNme](explanation%20of%20fern/IMG_7794.PNG)<br/>**Why FERNme** — adaptive local memory instead of expensive RAG/vector retrieval in the loop. | ![Seven core principles](explanation%20of%20fern/IMG_7796.PNG)<br/>**Core principles** — near-zero-LLM, deterministic-first, Hebbian, fuzzy, memory cards, action-aware, user-owned. |
+| ![How memory grows](explanation%20of%20fern/IMG_7797.PNG)<br/>**How memory grows** — new event → connect → strengthen → decay → update the card. | ![Fuzzy Hebbian graph](explanation%20of%20fern/IMG_7799.PNG)<br/>**Fuzzy Hebbian graph** — sparse, weighted (0–9) edges for users, preferences, topics, and goals. |
+| ![The LLM gate](explanation%20of%20fern/IMG_7784.PNG)<br/>**The LLM gate** — an exception, not the default; most events are handled deterministically. | ![Memory card](explanation%20of%20fern/IMG_7802.PNG)<br/>**Memory card** — bounded, interpretable, token-minimal context for the agent. |
+| ![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)<br/>**Action-aware learning** — good outcomes strengthen connections, bad outcomes weaken them. | ![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)<br/>**Architecture** — ingestion bridge → vocabulary → fuzzy graph → memory card → agent, with LLM fallback only when uncertain. |
 
 ## 🚀 Quickstart
 
@@ -214,7 +209,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 91 tests (engine, store, supernode, safety, auth…)
+pytest -q                               # 119 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -228,6 +223,29 @@ python -m fernme.api.mcp_server                               # MCP server for a
 ```
 
 > 🗄 **Storage:** defaults to `~/.fernme/fernme.db` (SQLite). For production use `PostgresStore` — same interface, tested against a real Postgres 16. Keep SQLite off cloud-synced folders.
+
+---
+
+## Minimal API example
+
+```python
+from fernme.service import FernService
+
+svc = FernService(db_path=":memory:")
+svc.consent("shop.example", "elena", True)
+
+svc.observe(
+    "shop.example",
+    "elena",
+    "chat",
+    {
+        "tags": ["pref:concise", "pref:oat_milk"],
+        "text": "Elena prefers concise answers and oat milk.",
+    },
+)
+
+print(svc.card("shop.example", "elena")["wire"])
+```
 
 ---
 
@@ -254,7 +272,7 @@ python -m fernme.api.mcp_server                               # MCP server for a
 
 ## 🔬 How FERNme compares
 
-FERNme is a **different category** from conversational memories — it's a per-user *preference* graph evaluated by *actions*, not a QA memory. Don't benchmark it on LoCoMo; that's the wrong axis.
+FERNme is a **different category** from conversational memories — it is a user-owned personalization graph evaluated by *actions*, not a transcript store optimized for QA recall. Don't benchmark it only on LoCoMo; that's the wrong axis.
 
 | | 🌿 FERNme | Mem0 | Zep/Graphiti | Letta | MemOS |
 |---|:--:|:--:|:--:|:--:|:--:|
@@ -270,13 +288,14 @@ FERNme is a **different category** from conversational memories — it's a per-u
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (91 tests):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, and the full results suite above.
+✅ **Done & tested (119 passing, 2 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, and the full results suite above.
+
+🆕 **New, opt-in (not yet validated):** resolution/temperature decay layer — implemented and unit-tested, **off by default** (`resolution=False`). It is not in the results suite above; its efficacy (vs. the current flat decay) still needs the control-vs-treatment harness before any quality claim.
 
 🚧 **Still open (genuinely needs the outside world):**
 - A **real-human per-site pilot** — only live users close the loop a simulator can't.
 - The **Mem0 (LLM) head-to-head** — harness wired; run locally with `OPENAI_API_KEY`.
 - **Embeddings** for context→attribute matching; offline LLM catalog enrichment for messy inputs.
-- **Desktop & mobile surfaces** — the engine is substrate-agnostic; web ingestion ships today, desktop/mobile adapters are on the roadmap. The user-owned **supernode** is the bridge that assembles them, with consent, into one cross-surface profile.
 
 > Every claim above is backed by a test or a reproducible experiment. Where a result is simulated, it says so — a simulator proves the *mechanism*, not real-world behavior.
 
@@ -294,7 +313,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       91 tests   ·   *_demo.py walkthroughs
+tests/       119 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---
@@ -305,4 +324,5 @@ Apache-2.0, © 2026 Acquilab Inc. — see [LICENSE](LICENSE) and [NOTICE](NOTICE
 If you use FERNme in research, please cite it via [CITATION.cff](CITATION.cff).
 
 <div align="center">
-<su
+<sub>Research preview. Benchmarks are synthetic or LLM-authored unless stated otherwise.</sub>
+</div>
