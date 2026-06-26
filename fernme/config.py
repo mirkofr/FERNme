@@ -19,9 +19,15 @@ class Config:
     floor: float = 1.0        # drop edges below this after decay
     bl_decay: float = 0.5     # ACT-R base-level decay exponent d
     # --- salience (emotional/behavioral significance -> slower forgetting) ---
-    salience_beta: float = 0.0    # 0 = OFF (no change). >0: high-salience edges decay slower
+    salience_beta: float = 0.5    # 0 = OFF (old decay behavior); >0: salient edges decay slower
     salience_neg: float = 0.5     # dislikes (negative edges) get this salience floor
     salience_decay: float = 0.25  # salience itself fades at lam*this (scars heal, slowly)
+    salience_identity: float = 0.8        # floor for identity-namespace facts
+    salience_w_intensity: float = 0.6     # arousal weight for emotional salience
+    salience_w_moodmag: float = 0.4       # absolute mood weight
+    salience_intensity_norm: float = 3.0  # intensity value that maps to about 1.0
+    salience_card_boost: float = 0.5      # salience lift in compact-card ranking
+    identity_sticky: bool = True          # identity facts persist until superseded
 
     # --- resolution / temperature decay (resolution.py); OFF by default ---
     resolution: bool = False

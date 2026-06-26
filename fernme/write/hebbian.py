@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 from ..core.graph import UserGraph, AssocGraph, Event, Edge
 from ..config import Config, DEFAULT
 from .. import resolution as _resolution
+from ..identity import is_identity_attr
 
 
 def _saturating_bump(w: float, rate: float, mag: float, w_max: float) -> float:
@@ -57,6 +58,11 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
     for attr, e in ug.edges.items():
         if e.source == "override":
             continue
+        sticky_identity = (
+            cfg.identity_sticky
+            and e.source != "superseded"
+            and is_identity_attr(attr)
+        )
         dt = max(0.0, now - e.last_reinforced)
         if cfg.resolution:
             edge_ctx = dict(ctx or {})
@@ -68,6 +74,8 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
         e.weight = e.weight * math.exp(-lam_eff * dt)
         e.salience = e.salience * math.exp(-cfg.lam * cfg.salience_decay * dt)
         e.fast = e.fast * math.exp(-cfg.lam_fast * dt)   # fast lane fades much quicker
+        if sticky_identity:
+            e.weight = max(e.weight, cfg.floor)
         e.last_reinforced = now            # reset clock -> safe to call periodically
         if e.weight < cfg.floor:
             dropped.append(attr)

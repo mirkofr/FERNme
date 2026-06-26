@@ -10,6 +10,14 @@ from ..prior.population import PopulationPrior
 from ..config import Config, DEFAULT
 from .activation import spread
 
+
+CARD_EXCLUDE_NS = {"style", "mood", "mood_ema", "mood_prev"}
+
+
+def _namespace(attr: str) -> str:
+    base = attr.lstrip("!")
+    return base.split(":", 1)[0] if ":" in base else base
+
 try:
     import tiktoken
     _ENC = tiktoken.get_encoding("cl100k_base")
@@ -28,11 +36,14 @@ def compile_card(ug: UserGraph, assoc: AssocGraph, seeds: List[str], now: float,
     # score = activation * idf (rare attrs earn slots); only stored attrs eligible
     scored = []
     for attr, e in ug.edges.items():
+        if e.source == "superseded" or _namespace(attr) in CARD_EXCLUDE_NS:
+            continue
         idf = prior.idf(attr) if prior else 1.0
         a = act.get(attr, 0.0)
         real = 0 if e.source == "guessed" else 1
         fast_boost = cfg.beta_fast * (e.fast / cfg.w_max)   # recent context lifts ranking
-        scored.append((attr, (real, a * (idf + 1.0) + fast_boost), e))
+        salience_boost = cfg.salience_card_boost * e.salience
+        scored.append((attr, (real, a * (idf + 1.0) + fast_boost + salience_boost), e))
     scored.sort(key=lambda x: x[1], reverse=True)
     top = scored[: cfg.top_n]
 
@@ -47,7 +58,8 @@ def compile_card(ug: UserGraph, assoc: AssocGraph, seeds: List[str], now: float,
         if isinstance(v, float) and v.is_integer():
             return str(int(v))
         return str(v)
-    num = " ".join(f"{k}:{_fmt(v)}" for k, v in ug.numeric.items())
+    clean_numeric = {k: v for k, v in ug.numeric.items() if not k.startswith("mood")}
+    num = " ".join(f"{k}:{_fmt(v)}" for k, v in clean_numeric.items())
     wire = f"user:{ug.user} | " + " ".join(parts) + (f" | {num}" if num else "")
     return {"wire": wire, "tokens": estimate_tokens(wire), "links": links,
-            "numeric": dict(ug.numeric)}
+            "numeric": clean_numeric}

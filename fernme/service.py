@@ -19,9 +19,14 @@ from . import confidence as _confidence
 from . import curation as _curation
 from . import glossary as _glossary
 from .vocabulary import Vocabulary
+from .identity import is_identity_attr
 from dataclasses import replace as _replace
 from .triggers import due_reorders, fading_favorites
 import os
+
+
+def _clamp01(x: float) -> float:
+    return max(0.0, min(1.0, float(x)))
 
 
 def default_db_path() -> str:
@@ -69,16 +74,29 @@ class FernService:
             raise ConsentError(f"no consent on record for {site}/{user}")
 
     # ---------- write path ----------
-    def _salience_of(self, payload: Dict, mapped) -> Dict:
+    def _salience_of(self, payload: Dict, mapped, style_state: Dict = None) -> Dict:
         """Behavioral significance per attribute (no LLM): explicit intensity/rating in
-        the payload. Negative edges get a floor in the write rule; outcomes add salience."""
+        the payload, emotional arousal in the text, and identity floors. Negative
+        edges get a floor in the write rule; outcomes add salience."""
         s0 = payload.get("intensity")
         if isinstance(s0, (int, float)):
-            s0 = max(0.0, min(1.0, float(s0)))
+            s0 = _clamp01(s0)
         else:
             r = payload.get("rating")
-            s0 = max(0.0, min(1.0, abs(float(r) - 3.0) / 2.0)) if isinstance(r, (int, float)) else 0.0
-        return {attr: s0 for attr, _ in mapped} if s0 > 0 else {}
+            s0 = _clamp01(abs(float(r) - 3.0) / 2.0) if isinstance(r, (int, float)) else 0.0
+        if style_state:
+            norm = max(float(self.cfg.salience_intensity_norm), 1e-9)
+            s_emotion = _clamp01(
+                self.cfg.salience_w_intensity * min(1.0, float(style_state["intensity"]) / norm)
+                + self.cfg.salience_w_moodmag * abs(float(style_state["mood"]))
+            )
+            s0 = max(s0, s_emotion)
+
+        salience = {attr: s0 for attr, _ in mapped} if s0 > 0 else {}
+        for attr, _ in mapped:
+            if is_identity_attr(attr):
+                salience[attr] = max(salience.get(attr, 0.0), self.cfg.salience_identity)
+        return salience
 
     def observe(self, site: str, user: str, type: str, payload: Dict,
                 ts: float = 0.0) -> Dict:
@@ -107,16 +125,17 @@ class FernService:
         if self.track_style and payload.get("text"):
             st = _style.analyze(payload["text"])
             if st["style_tags"]:
-                payload["tags"] = sanitize_tags(list(payload.get("tags", [])) + st["style_tags"])
+                payload["style_tags"] = sanitize_tags(st["style_tags"])
                 ev = Event(site, user, ts, type, payload)
-                mapped = map_event(ev, self.catalog)
         if self.vocabulary is not None:           # ingestion bridge: canonicalize tags
             mapped = [(c, m) for (a, m) in mapped if (c := self.vocabulary.canonical(a))]
+        ev.attrs = mapped
         # snapshot existing memory BEFORE the write, for conflict/authority checks
         existing_snapshot = ({a: _replace(e) for a, e in ug.edges.items()}
                              if self.cfg.curation else {})
         new_source = payload.get("source", "known")
-        observe(ug, ag, ev, mapped, self.cfg, salience=self._salience_of(payload, mapped))
+        observe(ug, ag, ev, mapped, self.cfg,
+                salience=self._salience_of(payload, mapped, st))
         questions, superseded = ([], [])
         if self.cfg.curation:
             questions, superseded = self._curate(site, user, ug, mapped, new_source,
@@ -340,7 +359,13 @@ class FernService:
         Domain-agnostic: works for support, tutoring, booking, sales, anything."""
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
-        tags = [a for a in ug.edges if a.startswith("style:")]
+        tags = []
+        seen = set()
+        for ev in self.store.recall(site, user, limit=20):
+            for tag in ev["payload"].get("style_tags", []):
+                if tag not in seen:
+                    tags.append(tag)
+                    seen.add(tag)
         mood = float(ug.numeric.get("mood_ema", 0.0) or 0.0)
         prev = float(ug.numeric.get("mood_prev", mood) or mood)
         trend = round(mood - prev, 3)

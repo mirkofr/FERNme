@@ -20,7 +20,8 @@ def test_pure_extracts_no_content_and_no_llm():
     wire = svc.card("s", "u")["wire"]
     assert svc.llm_calls == 0
     assert "organic" not in wire and "dairy" not in wire   # content not understood
-    assert "style:" in wire                                 # but style is (key-less)
+    assert "style:" not in wire
+    assert svc.style_card("s", "u")["style"]                # but guidance still works
 
 
 def test_gated_fires_only_on_novelty():

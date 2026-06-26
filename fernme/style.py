@@ -3,9 +3,9 @@ baseline — works in ANY domain (support, tutoring, booking, healthcare, sales)
 A small model can replace analyze() later for higher accuracy; the storage and
 mood-trend logic stay the same.
 
-Output feeds two things: (1) style attribute tags that live in the normal graph,
+Output feeds two things: (1) transient style tags stored with recent events,
 (2) a mood EMA + trend the agent uses to adapt tone and notice when someone's
-mood is sliding."""
+mood is sliding. Style tags are not durable graph edges."""
 from __future__ import annotations
 import math, re
 from typing import Dict, List
