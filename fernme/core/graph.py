@@ -16,6 +16,10 @@ class Edge:
     fast: float = 0.0            # fast-timescale component (recent context); decays quickly
     salience: float = 0.0        # 0..1 significance: high salience -> slower forgetting
     provenance: str = "inferred" # stated | inferred
+    change_count: int = 0        # stated/override supersessions counted for volatility learning
+    first_seen_ts: Optional[float] = None
+    last_changed_ts: Optional[float] = None
+    last_change_counted_ts: Optional[float] = None
 
     def wire_weight(self, w_max: float = 9.0) -> int:
         return max(0, min(int(round(self.weight)), int(w_max)))

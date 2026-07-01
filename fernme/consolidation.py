@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS consolidation_runs(
 EDGE_COLUMNS = (
     "site", "user", "attr", "weight", "confidence", "source",
     "last_reinforced", "hits", "fast", "salience", "provenance",
+    "change_count", "first_seen_ts", "last_changed_ts", "last_change_counted_ts",
+)
+EDGE_INSERT_SQL = (
+    "INSERT INTO user_edges(site,user,attr,weight,confidence,source,"
+    "last_reinforced,hits,fast,salience,provenance,change_count,"
+    "first_seen_ts,last_changed_ts,last_change_counted_ts) "
+    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 )
 HISTORY_COLUMNS = ("site", "user", "attr", "ts")
 ASSOC_COLUMNS = ("site", "a", "b", "weight")
@@ -89,14 +96,15 @@ def _edge_to_row(site: str, user: str, attr: str, edge: Edge) -> Tuple:
     return (
         site, user, attr, float(edge.weight), float(edge.confidence), edge.source,
         float(edge.last_reinforced), int(edge.hits), float(edge.fast),
-        float(edge.salience), edge.provenance,
+        float(edge.salience), edge.provenance, int(edge.change_count or 0),
+        edge.first_seen_ts, edge.last_changed_ts, edge.last_change_counted_ts,
     )
 
 
 def _replace_user_graph(conn, ug: UserGraph) -> None:
     conn.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
     conn.executemany(
-        "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        EDGE_INSERT_SQL,
         [_edge_to_row(ug.site, ug.user, attr, edge)
          for attr, edge in ug.edges.items()],
     )
@@ -201,11 +209,38 @@ def _merge_edges(edges: Sequence[Edge]) -> Edge:
         fast=sum(float(e.fast) for e in edges),
         salience=max((float(e.salience) for e in edges), default=0.0),
         provenance="stated" if any(e.provenance == "stated" for e in edges) else "inferred",
+        change_count=sum(int(e.change_count or 0) for e in edges),
+        first_seen_ts=min(
+            (float(e.first_seen_ts) for e in edges if e.first_seen_ts is not None),
+            default=None,
+        ),
+        last_changed_ts=max(
+            (float(e.last_changed_ts) for e in edges if e.last_changed_ts is not None),
+            default=None,
+        ),
+        last_change_counted_ts=max(
+            (
+                float(e.last_change_counted_ts)
+                for e in edges
+                if e.last_change_counted_ts is not None
+            ),
+            default=None,
+        ),
     )
 
 
+def _edge_default(column: str):
+    if column == "provenance":
+        return "inferred"
+    if column == "change_count":
+        return 0
+    if column in {"first_seen_ts", "last_changed_ts", "last_change_counted_ts"}:
+        return None
+    raise KeyError(column)
+
+
 def _edge_snapshot_values(row: Dict) -> Tuple:
-    return tuple(row.get(c, "inferred") if c == "provenance" else row[c]
+    return tuple(row[c] if c in row else _edge_default(c)
                  for c in EDGE_COLUMNS)
 
 
@@ -280,6 +315,10 @@ def _apply_user_groups(store: SQLiteStore, groups: Sequence[MergeGroup]) -> None
                     fast=0.0,
                     salience=old.salience,
                     provenance=old.provenance,
+                    change_count=old.change_count,
+                    first_seen_ts=old.first_seen_ts,
+                    last_changed_ts=old.last_changed_ts,
+                    last_change_counted_ts=old.last_change_counted_ts,
                 )
         _replace_user_graph(store._conn, ug)
 
@@ -391,7 +430,7 @@ def undo_consolidation(db_path: str | Path, run_id: str) -> Dict:
                 args,
             )
             conn.executemany(
-                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                EDGE_INSERT_SQL,
                 [_edge_snapshot_values(r) for r in user_snapshot["user_edges"]],
             )
             conn.executemany(

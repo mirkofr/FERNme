@@ -84,6 +84,14 @@ class Config:
     verify_age_halflives: float = 1.5          # inferred facts verify sooner
     verify_age_halflives_stated: float = 3.0   # stated facts are trusted longer
     verify_conflict_threshold: float = 0.5      # high polarity conflict verifies immediately
+    # Option B: per-edge learned volatility. Default off until validation passes.
+    learned_volatility: bool = False
+    learned_volatility_prior_strength: float = 3.0
+    learned_min_change_interval: float = 14.0
+    learned_min_multiplier: float = 0.2
+    learned_max_multiplier: float = 10.0
+    learned_min_half_life: float = 3.0
+    learned_max_half_life: float = 7300.0
 
     @property
     def species_decay(self) -> dict:

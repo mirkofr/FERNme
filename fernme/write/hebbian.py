@@ -25,10 +25,12 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
         e = ug.edges.get(attr)
         if e is None:
             e = Edge(weight=0.0, source="known", last_reinforced=event.ts,
-                     provenance=incoming_provenance)
+                     provenance=incoming_provenance, first_seen_ts=event.ts)
             ug.edges[attr] = e
         elif e.source == "guessed":
             e.weight = 0.0; e.hits = 0; e.fast = 0.0   # shed borrowed prior
+        if e.first_seen_ts is None:
+            e.first_seen_ts = event.ts
         if incoming_provenance == "stated":
             e.provenance = "stated"
         e.weight = _saturating_bump(e.weight, cfg.alpha, mag, cfg.w_max)

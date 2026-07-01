@@ -78,10 +78,14 @@ def _create_pre_entity_schema_db(path):
 def _dump_graph_tables(path):
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
+    edge_cols = (
+        "site,user,attr,weight,confidence,source,last_reinforced,hits,"
+        "fast,salience,provenance"
+    )
     try:
         return {
             "user_edges": [dict(r) for r in conn.execute(
-                "SELECT * FROM user_edges ORDER BY site,user,attr")],
+                f"SELECT {edge_cols} FROM user_edges ORDER BY site,user,attr")],
             "user_history": [dict(r) for r in conn.execute(
                 "SELECT * FROM user_history ORDER BY site,user,attr,ts")],
             "assoc_edges": [dict(r) for r in conn.execute(

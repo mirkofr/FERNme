@@ -1,0 +1,6594 @@
+{
+  "control": {
+    "k": 5,
+    "methods": [
+      "fern_pure",
+      "fern_entities",
+      "recency",
+      "frequency",
+      "bm25"
+    ],
+    "metrics": [
+      "recall_at_k",
+      "precision_at_k",
+      "stale_recall_rate",
+      "action_quality",
+      "token_estimate",
+      "llm_calls"
+    ],
+    "mode": "synthetic-eval-harness",
+    "regimes": [
+      "static",
+      "abrupt_drift",
+      "gradual_drift",
+      "staleness",
+      "contextual",
+      "fragmented_entity",
+      "outcome"
+    ],
+    "rows": [
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 144.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 36.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 36.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 895.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 103.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 53.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.2,
+        "recall_at_k": 1.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 41.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 36.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 25.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 173.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 895.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 69.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 53.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 44.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 41.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 86.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.75,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 920.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 69.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 35.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 35.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 88.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 41.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 26.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 86.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 895.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.375,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.6666666666666666,
+        "token_estimate": 69.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 35.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 47.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.2,
+        "recall_at_k": 1.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 37.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 24.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 26.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 144.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 968.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 103.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 53.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 46.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.2,
+        "recall_at_k": 1.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 38.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 38.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 25.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 86.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 871.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 103.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 70.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      }
+    ],
+    "schema_version": 1,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "summary": {
+      "abrupt_drift": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.2,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.2,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.25,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 907.333333,
+            "sd": 30.597749
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.125
+          },
+          "stale_recall_rate": {
+            "mean": 0.416667,
+            "sd": 0.117851
+          },
+          "token_estimate": {
+            "mean": 40.833333,
+            "sd": 4.524624
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.125
+          },
+          "stale_recall_rate": {
+            "mean": 0.416667,
+            "sd": 0.117851
+          },
+          "token_estimate": {
+            "mean": 40.833333,
+            "sd": 4.524624
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.233333,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.233333,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.291667,
+            "sd": 0.093169
+          },
+          "stale_recall_rate": {
+            "mean": 0.958333,
+            "sd": 0.093169
+          },
+          "token_estimate": {
+            "mean": 29.333333,
+            "sd": 0.745356
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.666667,
+            "sd": 0.942809
+          }
+        }
+      },
+      "contextual": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 842.0,
+            "sd": 0.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.144338
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 42.5,
+            "sd": 0.5
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.144338
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 42.5,
+            "sd": 0.5
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "recall_at_k": {
+            "mean": 0.583333,
+            "sd": 0.117851
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.5,
+            "sd": 0.5
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.433333,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.433333,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.541667,
+            "sd": 0.093169
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.5,
+            "sd": 0.957427
+          }
+        }
+      },
+      "fragmented_entity": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 90.0,
+            "sd": 0.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.1,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.1,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.5,
+            "sd": 0.5
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 43.833333,
+            "sd": 3.02306
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 47.666667,
+            "sd": 0.942809
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 31.0,
+            "sd": 0.0
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 30.166667,
+            "sd": 1.771691
+          }
+        }
+      },
+      "gradual_drift": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.479167,
+            "sd": 0.046585
+          },
+          "stale_recall_rate": {
+            "mean": 0.388889,
+            "sd": 0.124226
+          },
+          "token_estimate": {
+            "mean": 86.0,
+            "sd": 17.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 48.666667,
+            "sd": 0.471405
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 48.666667,
+            "sd": 0.471405
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.5625,
+            "sd": 0.0625
+          },
+          "stale_recall_rate": {
+            "mean": 0.166667,
+            "sd": 0.166667
+          },
+          "token_estimate": {
+            "mean": 32.5,
+            "sd": 0.5
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.5625,
+            "sd": 0.0625
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 31.0,
+            "sd": 0.57735
+          }
+        }
+      },
+      "outcome": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 60.0,
+            "sd": 0.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 30.0,
+            "sd": 0.0
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 30.0,
+            "sd": 0.0
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.0,
+            "sd": 0.0
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.0,
+            "sd": 0.0
+          }
+        }
+      },
+      "staleness": {
+        "bm25": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 58.666667,
+            "sd": 16.559656
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 36.666667,
+            "sd": 2.748737
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 36.666667,
+            "sd": 2.748737
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.571429,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.25,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 31.833333,
+            "sd": 0.372678
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 32.0,
+            "sd": 0.57735
+          }
+        }
+      },
+      "static": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 119.833333,
+            "sd": 35.187198
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 38.0,
+            "sd": 1.154701
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 41.666667,
+            "sd": 0.745356
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.958333,
+            "sd": 0.093169
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 26.833333,
+            "sd": 0.372678
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "recall_at_k": {
+            "mean": 0.583333,
+            "sd": 0.117851
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 25.666667,
+            "sd": 1.105542
+          }
+        }
+      }
+    }
+  },
+  "learned_volatility_synthetic": {
+    "cold_start_delta": [
+      0.0,
+      0.0
+    ],
+    "directional_success": [
+      1.0,
+      0.0
+    ],
+    "fast_age_halflives_learned": [
+      1.1065005577725122,
+      0.028739612683475677
+    ],
+    "fast_age_halflives_prior": [
+      0.8042727025616732,
+      0.019388109880305582
+    ],
+    "fast_half_life_learned": [
+      149.3199288519636,
+      4.776362770748113
+    ],
+    "fast_half_life_prior": [
+      200.0,
+      0.0
+    ],
+    "stable_age_halflives_learned": [
+      1.0,
+      0.0
+    ],
+    "stable_age_halflives_prior": [
+      4.79050125632137,
+      0.009079360212171006
+    ],
+    "stable_half_life_learned": [
+      958.100251264274,
+      1.8158720424342343
+    ],
+    "stable_half_life_prior": [
+      200.0,
+      0.0
+    ]
+  },
+  "treatment": {
+    "k": 5,
+    "methods": [
+      "fern_pure",
+      "fern_entities",
+      "recency",
+      "frequency",
+      "bm25"
+    ],
+    "metrics": [
+      "recall_at_k",
+      "precision_at_k",
+      "stale_recall_rate",
+      "action_quality",
+      "token_estimate",
+      "llm_calls"
+    ],
+    "mode": "synthetic-eval-harness",
+    "regimes": [
+      "static",
+      "abrupt_drift",
+      "gradual_drift",
+      "staleness",
+      "contextual",
+      "fragmented_entity",
+      "outcome"
+    ],
+    "rows": [
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 144.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 36.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 36.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 0,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 895.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 0,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 103.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 53.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.2,
+        "recall_at_k": 1.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 0,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 41.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 36.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 25.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 173.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 1,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 895.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 1,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 69.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 53.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 44.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 1,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 41.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 86.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.75,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 2,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 920.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 2,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 69.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 35.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 35.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 88.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 2,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 41.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 39.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 26.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 86.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 3,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 895.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.375,
+        "regime": "gradual_drift",
+        "seed": 3,
+        "stale_recall_rate": 0.6666666666666666,
+        "token_estimate": 69.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 35.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 47.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.2,
+        "recall_at_k": 1.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 3,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 37.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 24.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 26.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 144.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 4,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 968.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 4,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 103.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 40.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 33.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 53.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 43.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 46.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.2,
+        "recall_at_k": 1.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 38.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 4,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 38.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 25.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 27.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "static",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 86.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.4,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.4,
+        "recall_at_k": 0.5,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.5,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.2,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.2,
+        "recall_at_k": 0.25,
+        "regime": "abrupt_drift",
+        "seed": 5,
+        "stale_recall_rate": 1.0,
+        "token_estimate": 871.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 49.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.625,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5,
+        "regime": "gradual_drift",
+        "seed": 5,
+        "stale_recall_rate": 0.3333333333333333,
+        "token_estimate": 103.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 34.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 32.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.8,
+        "recall_at_k": 0.5714285714285714,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.25,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 1.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 1.0,
+        "recall_at_k": 0.7142857142857143,
+        "regime": "staleness",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 70.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 42.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 29.0
+      },
+      {
+        "action_quality": 0.6,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.6,
+        "recall_at_k": 0.75,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.8,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.8,
+        "recall_at_k": 1.0,
+        "regime": "contextual",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 842.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 48.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 45.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 31.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "fragmented_entity",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 90.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_pure",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.5,
+        "llm_calls": 0.0,
+        "method": "fern_entities",
+        "precision_at_k": 0.5,
+        "recall_at_k": 0.5,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 30.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "recency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "frequency",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 28.0
+      },
+      {
+        "action_quality": 0.0,
+        "llm_calls": 0.0,
+        "method": "bm25",
+        "precision_at_k": 0.0,
+        "recall_at_k": 0.0,
+        "regime": "outcome",
+        "seed": 5,
+        "stale_recall_rate": 0.0,
+        "token_estimate": 60.0
+      }
+    ],
+    "schema_version": 1,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "summary": {
+      "abrupt_drift": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.2,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.2,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.25,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 907.333333,
+            "sd": 30.597749
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.125
+          },
+          "stale_recall_rate": {
+            "mean": 0.416667,
+            "sd": 0.117851
+          },
+          "token_estimate": {
+            "mean": 40.833333,
+            "sd": 4.524624
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.125
+          },
+          "stale_recall_rate": {
+            "mean": 0.416667,
+            "sd": 0.117851
+          },
+          "token_estimate": {
+            "mean": 40.833333,
+            "sd": 4.524624
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.233333,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.233333,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.291667,
+            "sd": 0.093169
+          },
+          "stale_recall_rate": {
+            "mean": 0.958333,
+            "sd": 0.093169
+          },
+          "token_estimate": {
+            "mean": 29.333333,
+            "sd": 0.745356
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.666667,
+            "sd": 0.942809
+          }
+        }
+      },
+      "contextual": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 842.0,
+            "sd": 0.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.144338
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 42.5,
+            "sd": 0.5
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.11547
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.144338
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 42.5,
+            "sd": 0.5
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "recall_at_k": {
+            "mean": 0.583333,
+            "sd": 0.117851
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.5,
+            "sd": 0.5
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.433333,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.433333,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.541667,
+            "sd": 0.093169
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.5,
+            "sd": 0.957427
+          }
+        }
+      },
+      "fragmented_entity": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 90.0,
+            "sd": 0.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.1,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.1,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.5,
+            "sd": 0.5
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 43.833333,
+            "sd": 3.02306
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 47.666667,
+            "sd": 0.942809
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 31.0,
+            "sd": 0.0
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 30.166667,
+            "sd": 1.771691
+          }
+        }
+      },
+      "gradual_drift": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.479167,
+            "sd": 0.046585
+          },
+          "stale_recall_rate": {
+            "mean": 0.388889,
+            "sd": 0.124226
+          },
+          "token_estimate": {
+            "mean": 86.0,
+            "sd": 17.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 48.666667,
+            "sd": 0.471405
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.625,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 48.666667,
+            "sd": 0.471405
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.5625,
+            "sd": 0.0625
+          },
+          "stale_recall_rate": {
+            "mean": 0.166667,
+            "sd": 0.166667
+          },
+          "token_estimate": {
+            "mean": 32.5,
+            "sd": 0.5
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.9,
+            "sd": 0.1
+          },
+          "recall_at_k": {
+            "mean": 0.5625,
+            "sd": 0.0625
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 31.0,
+            "sd": 0.57735
+          }
+        }
+      },
+      "outcome": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 60.0,
+            "sd": 0.0
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 30.0,
+            "sd": 0.0
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.5,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 30.0,
+            "sd": 0.0
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.0,
+            "sd": 0.0
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 28.0,
+            "sd": 0.0
+          }
+        }
+      },
+      "staleness": {
+        "bm25": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 58.666667,
+            "sd": 16.559656
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 36.666667,
+            "sd": 2.748737
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 36.666667,
+            "sd": 2.748737
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.571429,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.25,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 31.833333,
+            "sd": 0.372678
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.714286,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 32.0,
+            "sd": 0.57735
+          }
+        }
+      },
+      "static": {
+        "bm25": {
+          "action_quality": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.8,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 1.0,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 119.833333,
+            "sd": 35.187198
+          }
+        },
+        "fern_entities": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 38.0,
+            "sd": 1.154701
+          }
+        },
+        "fern_pure": {
+          "action_quality": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.6,
+            "sd": 0.0
+          },
+          "recall_at_k": {
+            "mean": 0.75,
+            "sd": 0.0
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 41.666667,
+            "sd": 0.745356
+          }
+        },
+        "frequency": {
+          "action_quality": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.766667,
+            "sd": 0.074536
+          },
+          "recall_at_k": {
+            "mean": 0.958333,
+            "sd": 0.093169
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 26.833333,
+            "sd": 0.372678
+          }
+        },
+        "recency": {
+          "action_quality": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "llm_calls": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "precision_at_k": {
+            "mean": 0.466667,
+            "sd": 0.094281
+          },
+          "recall_at_k": {
+            "mean": 0.583333,
+            "sd": 0.117851
+          },
+          "stale_recall_rate": {
+            "mean": 0.0,
+            "sd": 0.0
+          },
+          "token_estimate": {
+            "mean": 25.666667,
+            "sd": 1.105542
+          }
+        }
+      }
+    }
+  }
+}

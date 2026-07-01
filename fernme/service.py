@@ -65,6 +65,45 @@ def _conflict_for_edge(ug: UserGraph, attr: str, cfg: Config) -> float:
     )
 
 
+def _record_learned_change(ug: UserGraph, old_attr: str, new_attr: str,
+                           new_source: str, ts: float, cfg: Config) -> None:
+    """Update per-slot volatility stats from an authoritative supersession."""
+    if new_source not in {"stated", "override"}:
+        return
+    old = ug.edges.get(old_attr)
+    new = ug.edges.get(new_attr)
+    if old is None or new is None:
+        return
+    first = old.first_seen_ts
+    if first is None:
+        first = old.last_changed_ts if old.last_changed_ts is not None else old.last_reinforced
+    last_change = old.last_changed_ts if old.last_changed_ts is not None else first
+    last_counted = old.last_change_counted_ts
+    count = int(old.change_count or 0)
+    min_interval = max(float(getattr(cfg, "learned_min_change_interval", 14.0)), 0.0)
+    enough_since_count = last_counted is None or (float(ts) - float(last_counted)) >= min_interval
+    enough_since_change = last_change is None or (float(ts) - float(last_change)) >= min_interval
+    if enough_since_count and enough_since_change:
+        count += 1
+        last_change = float(ts)
+        last_counted = float(ts)
+    if new.first_seen_ts is not None:
+        first = min(float(first), float(new.first_seen_ts))
+    if int(new.change_count or 0) > count:
+        count = int(new.change_count or 0)
+        last_change = new.last_changed_ts
+        last_counted = new.last_change_counted_ts
+    elif int(new.change_count or 0) == count and new.last_change_counted_ts is not None:
+        if last_counted is None or float(new.last_change_counted_ts) > float(last_counted):
+            last_change = new.last_changed_ts
+            last_counted = new.last_change_counted_ts
+    for edge in (old, new):
+        edge.first_seen_ts = first
+        edge.change_count = count
+        edge.last_changed_ts = last_change
+        edge.last_change_counted_ts = last_counted
+
+
 def default_db_path() -> str:
     """Local, non-cloud-synced path. SQLite on iCloud/Dropbox/OneDrive corrupts."""
     return os.environ.get("FERNME_DB") or os.path.join(
@@ -213,6 +252,8 @@ class FernService:
             for r in _curation.review(attr, new_source, ts, existing, importance=imp,
                                       ask_threshold=self.cfg.curation_ask_threshold):
                 if r.action == "supersede" and r.old_attr in ug.edges:
+                    if getattr(self.cfg, "learned_volatility", False):
+                        _record_learned_change(ug, r.old_attr, attr, new_source, ts, self.cfg)
                     old = ug.edges[r.old_attr]
                     old.weight = min(old.weight, self.cfg.floor)  # demote below recall
                     old.source = "superseded"

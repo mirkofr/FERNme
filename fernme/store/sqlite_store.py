@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, user TEXT, attr TEXT, weight REAL, confidence REAL,
   source TEXT, last_reinforced REAL, hits INTEGER, fast REAL DEFAULT 0, salience REAL DEFAULT 0,
   provenance TEXT NOT NULL DEFAULT 'inferred',
+  change_count INTEGER DEFAULT 0, first_seen_ts REAL, last_changed_ts REAL,
+  last_change_counted_ts REAL,
   PRIMARY KEY(site, user, attr));
 CREATE TABLE IF NOT EXISTS user_numeric(
   site TEXT, user TEXT, key TEXT, value TEXT,
@@ -102,13 +104,18 @@ class SQLiteStore:
         """Add columns introduced after a DB was first created (CREATE TABLE IF NOT
         EXISTS never alters an existing table). Keeps old DBs forward-compatible."""
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(user_edges)")}
-        for col in ("fast", "salience"):
+        migrations = {
+            "fast": "REAL DEFAULT 0",
+            "salience": "REAL DEFAULT 0",
+            "provenance": "TEXT NOT NULL DEFAULT 'inferred'",
+            "change_count": "INTEGER DEFAULT 0",
+            "first_seen_ts": "REAL",
+            "last_changed_ts": "REAL",
+            "last_change_counted_ts": "REAL",
+        }
+        for col, decl in migrations.items():
             if col not in cols:
-                self._conn.execute("ALTER TABLE user_edges ADD COLUMN %s REAL DEFAULT 0" % col)
-        if "provenance" not in cols:
-            self._conn.execute(
-                "ALTER TABLE user_edges ADD COLUMN provenance TEXT NOT NULL DEFAULT 'inferred'"
-            )
+                self._conn.execute(f"ALTER TABLE user_edges ADD COLUMN {col} {decl}")
 
     # ---- consent ----
     def set_consent(self, site: str, user: str, granted: bool, ts: float = 0.0):
@@ -129,11 +136,18 @@ class SQLiteStore:
         ug = UserGraph(site, user)
         for r in self._conn.execute(
                 "SELECT * FROM user_edges WHERE site=? AND user=?", (site, user)):
-            ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
-                                       r["last_reinforced"], r["hits"],
-                                       r["fast"] if "fast" in r.keys() else 0.0,
-                                       r["salience"] if "salience" in r.keys() else 0.0,
-                                       r["provenance"] if "provenance" in r.keys() else "inferred")
+            keys = r.keys()
+            ug.edges[r["attr"]] = Edge(
+                r["weight"], r["confidence"], r["source"],
+                r["last_reinforced"], r["hits"],
+                r["fast"] if "fast" in keys else 0.0,
+                r["salience"] if "salience" in keys else 0.0,
+                r["provenance"] if "provenance" in keys and r["provenance"] else "inferred",
+                int(r["change_count"] or 0) if "change_count" in keys else 0,
+                r["first_seen_ts"] if "first_seen_ts" in keys else None,
+                r["last_changed_ts"] if "last_changed_ts" in keys else None,
+                r["last_change_counted_ts"] if "last_change_counted_ts" in keys else None,
+            )
         for r in self._conn.execute(
                 "SELECT key,value FROM user_numeric WHERE site=? AND user=?", (site, user)):
             v = r["value"]
@@ -154,10 +168,14 @@ class SQLiteStore:
             c = self._conn
             c.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany(
-                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO user_edges(site,user,attr,weight,confidence,source,"
+                "last_reinforced,hits,fast,salience,provenance,change_count,"
+                "first_seen_ts,last_changed_ts,last_change_counted_ts) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                  e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
-                 for a, e in ug.edges.items()])
+                  e.last_reinforced, e.hits, e.fast, e.salience, e.provenance,
+                  e.change_count, e.first_seen_ts, e.last_changed_ts,
+                  e.last_change_counted_ts) for a, e in ug.edges.items()])
             c.execute("DELETE FROM user_numeric WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany("INSERT INTO user_numeric VALUES(?,?,?,?)",
                           [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])

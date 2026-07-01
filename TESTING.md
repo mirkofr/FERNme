@@ -179,11 +179,12 @@ what it's confident about and on what evidence.
 The case we **do not** solve today: a *slow* fact that goes stale with **no
 contradiction and no new evidence** — someone changes jobs and never mentions it.
 Nothing conflicts, so age-only verify stays off by default. FERNme can flag
-genuine contradictions and retain permanent facts, but it cannot reliably detect
-silent staleness in a fact that produces no signal.
+genuine contradictions, retain permanent facts, and optionally learn a personal
+staleness prior from past stated changes. It still cannot reliably detect silent
+staleness in a fact that produces no signal.
 If §3.2 or §4 shows FERNme confidently acting on a stale slow-fact, that's
-expected — and exactly the report we want, because the next design problem is
-learned per-edge volatility or outside corroboration.
+expected — and exactly the report we want, because true silent-change detection
+needs outside corroboration.
 
 ---
 

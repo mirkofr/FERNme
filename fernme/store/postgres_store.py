@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, "user" TEXT, attr TEXT, weight DOUBLE PRECISION, confidence DOUBLE PRECISION,
   source TEXT, last_reinforced DOUBLE PRECISION, hits INT, fast DOUBLE PRECISION DEFAULT 0,
   salience DOUBLE PRECISION DEFAULT 0, provenance TEXT NOT NULL DEFAULT 'inferred',
+  change_count INT DEFAULT 0, first_seen_ts DOUBLE PRECISION,
+  last_changed_ts DOUBLE PRECISION, last_change_counted_ts DOUBLE PRECISION,
   PRIMARY KEY(site, "user", attr));
 CREATE TABLE IF NOT EXISTS user_numeric(
   site TEXT, "user" TEXT, key TEXT, value TEXT,
@@ -88,11 +90,17 @@ class PostgresStore:
         self._lock = threading.Lock()
         self._conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
         self._conn.execute(SCHEMA)
-        for col in ("fast", "salience"):   # forward-compat for DBs created before these columns
-            self._conn.execute("ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS %s DOUBLE PRECISION DEFAULT 0" % col)
-        self._conn.execute(
-            "ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'inferred'"
-        )
+        migrations = {
+            "fast": "DOUBLE PRECISION DEFAULT 0",
+            "salience": "DOUBLE PRECISION DEFAULT 0",
+            "provenance": "TEXT NOT NULL DEFAULT 'inferred'",
+            "change_count": "INT DEFAULT 0",
+            "first_seen_ts": "DOUBLE PRECISION",
+            "last_changed_ts": "DOUBLE PRECISION",
+            "last_change_counted_ts": "DOUBLE PRECISION",
+        }
+        for col, decl in migrations.items():
+            self._conn.execute(f"ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS {col} {decl}")
 
     def _q(self, sql, args=()):
         return self._conn.execute(sql, args)
@@ -112,9 +120,12 @@ class PostgresStore:
     def load_user(self, site, user) -> UserGraph:
         ug = UserGraph(site, user)
         for r in self._q('SELECT * FROM user_edges WHERE site=%s AND "user"=%s', (site, user)).fetchall():
-            ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
-                                       r["last_reinforced"], r["hits"], r.get("fast", 0.0),
-                                       r.get("salience", 0.0), r.get("provenance", "inferred"))
+            ug.edges[r["attr"]] = Edge(
+                r["weight"], r["confidence"], r["source"],
+                r["last_reinforced"], r["hits"], r.get("fast", 0.0),
+                r.get("salience", 0.0), r.get("provenance") or "inferred",
+                int(r.get("change_count") or 0), r.get("first_seen_ts"),
+                r.get("last_changed_ts"), r.get("last_change_counted_ts"))
         for r in self._q('SELECT key,value FROM user_numeric WHERE site=%s AND "user"=%s', (site, user)).fetchall():
             v = r["value"]
             try:
@@ -129,9 +140,15 @@ class PostgresStore:
     def save_user(self, ug: UserGraph):
         with self._lock, self._conn.cursor() as c:
             c.execute('DELETE FROM user_edges WHERE site=%s AND "user"=%s', (ug.site, ug.user))
-            c.executemany('INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            c.executemany('INSERT INTO user_edges(site,"user",attr,weight,confidence,'
+                          'source,last_reinforced,hits,fast,salience,provenance,'
+                          'change_count,first_seen_ts,last_changed_ts,'
+                          'last_change_counted_ts) '
+                          'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                           [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                            e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
+                            e.last_reinforced, e.hits, e.fast, e.salience,
+                            e.provenance, e.change_count, e.first_seen_ts,
+                            e.last_changed_ts, e.last_change_counted_ts)
                            for a, e in ug.edges.items()])
             c.execute('DELETE FROM user_numeric WHERE site=%s AND "user"=%s', (ug.site, ug.user))
             c.executemany('INSERT INTO user_numeric VALUES(%s,%s,%s,%s)',

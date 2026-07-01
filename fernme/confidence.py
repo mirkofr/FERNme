@@ -19,7 +19,7 @@ def compute(edge, now, cfg, taxonomy_match=None, outcome_success=None, conflict=
             attr=None):
     evidence = 1.0 - math.exp(-cfg.gamma * edge.hits)                 # weak if 1 obs
     dt = max(0.0, now - edge.last_reinforced)
-    lam = (_resolution.confidence_lambda(attr, cfg)
+    lam = (_resolution.confidence_lambda(attr, cfg, edge, now)
            if getattr(cfg, "volatility_confidence", False) and attr is not None
            else cfg.lam)
     recency = math.exp(-lam * dt)                                      # stale -> low

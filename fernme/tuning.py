@@ -19,7 +19,7 @@ from .eval.drift import _clean_catalog, _prefs, _items, _topk, _prec, HALF1, HAL
 
 def _score(lam: float, drift: bool, seeds: int = 2, n_old: int = 60,
            n_new: int = 25, k: int = 5, users: int = 15) -> float:
-    cfg = replace(DEFAULT, lam=lam, floor=0.5)
+    cfg = replace(DEFAULT, resolution=False, lam=lam, floor=0.5)
     out = []
     for seed in range(seeds):
         rng = random.Random(seed); cat_d = _clean_catalog(seed); cat = Catalog(cat_d)

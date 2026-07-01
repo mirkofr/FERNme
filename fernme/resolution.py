@@ -18,6 +18,7 @@ import math
 from typing import Mapping
 
 from .config import Config, DEFAULT
+from . import curation as _curation
 
 
 PERMANENT_NAMESPACES = {
@@ -138,8 +139,64 @@ def volatility_lambda(attr: str, cfg: Config = DEFAULT) -> float:
     return math.log(2.0) / half_life_days(attr, cfg)
 
 
-def confidence_lambda(attr: str, cfg: Config = DEFAULT) -> float:
+def learned_half_life_days(attr: str, edge, now: float | None,
+                           cfg: Config = DEFAULT,
+                           prior: float | None = None) -> float:
+    """Personalized half-life from observed stated changes plus censoring.
+
+    This is a staleness prior, not silent-change detection. If no learned stats
+    exist (old DB rows), behavior falls back to the class prior.
+    """
+    prior = half_life_days(attr, cfg) if prior is None else float(prior)
+    if (not getattr(cfg, "learned_volatility", False)) or edge is None:
+        return prior
+    if _namespace(attr) not in _curation.SINGLE_VALUE_SLOTS:
+        return prior
+    first = getattr(edge, "first_seen_ts", None)
+    count = int(getattr(edge, "change_count", 0) or 0)
+    if first is None and count <= 0:
+        return prior
+    if now is None:
+        now = getattr(edge, "last_reinforced", first if first is not None else 0.0)
+    ref = getattr(edge, "last_changed_ts", None)
+    if ref is None:
+        ref = first
+    censor_age = max(0.0, float(now) - float(ref)) if ref is not None else 0.0
+    if count <= 0:
+        observed = max(prior, censor_age)
+    else:
+        span = max(0.0, float(now) - float(first if first is not None else ref))
+        observed = span / max(float(count), 1.0)
+        if count <= 1:
+            observed = max(observed, censor_age)
+    k = max(float(getattr(cfg, "learned_volatility_prior_strength", 3.0)), 0.0)
+    w = float(count) / (float(count) + k) if count > 0 else 0.0
+    blended = (1.0 - w) * prior + w * observed
+    if count <= 0:
+        blended = max(blended, observed)
+    min_mult = float(getattr(cfg, "learned_min_multiplier", 0.2))
+    max_mult = float(getattr(cfg, "learned_max_multiplier", 10.0))
+    lo = max(float(getattr(cfg, "learned_min_half_life", 3.0)), prior * min_mult)
+    hi = min(float(getattr(cfg, "learned_max_half_life", 7300.0)), prior * max_mult)
+    return _clamp(blended, lo, max(lo, hi))
+
+
+def effective_half_life_days(attr: str, edge=None, now: float | None = None,
+                             cfg: Config = DEFAULT) -> float:
+    prior = half_life_days(attr, cfg)
+    return learned_half_life_days(attr, edge, now, cfg, prior)
+
+
+def effective_volatility_lambda(attr: str, edge=None, now: float | None = None,
+                                cfg: Config = DEFAULT) -> float:
+    return math.log(2.0) / effective_half_life_days(attr, edge, now, cfg)
+
+
+def confidence_lambda(attr: str, cfg: Config = DEFAULT, edge=None,
+                      now: float | None = None) -> float:
     """Recency rate for trust. Middle classes may not be more trusting than flat."""
+    if getattr(cfg, "learned_volatility", False) and edge is not None:
+        return effective_volatility_lambda(attr, edge, now, cfg)
     species = species_of(attr)
     table = getattr(cfg, "confidence_half_lives", {}) or {}
     if species in table:
@@ -154,14 +211,15 @@ def confidence_lambda(attr: str, cfg: Config = DEFAULT) -> float:
 def lambda_eff(attr: str, edge, ctx: Mapping | None = None,
                conflict: float = 0.0, cfg: Config = DEFAULT) -> float:
     """Effective decay rate for one edge when resolution decay is enabled."""
+    now = _ctx(ctx, "now", None)
     if edge.source == "superseded":
-        return cfg.lam * species_multiplier(attr, cfg)
+        return effective_volatility_lambda(attr, edge, now, cfg)
     temp = temperature(attr, edge, conflict, cfg, ctx)
     # Current-context facts should not become long-lived just because evidence is
     # explicit; stated-vs-inferred trust belongs in verify thresholds.
     if species_of(attr) == "volatile":
         temp = 1.0
-    return cfg.lam * temp * species_multiplier(attr, cfg)
+    return temp * effective_volatility_lambda(attr, edge, now, cfg)
 
 
 def needs_verify(attr: str, edge, now: float, cfg: Config = DEFAULT,
@@ -183,7 +241,7 @@ def needs_verify(attr: str, edge, now: float, cfg: Config = DEFAULT,
             "confidence": conf_value,
         }
     dt = max(0.0, float(now) - float(edge.last_reinforced))
-    half_life = half_life_days(attr, cfg)
+    half_life = effective_half_life_days(attr, edge, now, cfg)
     age = dt / max(half_life, 1e-12)
     if max(0.0, float(conflict or 0.0)) >= cfg.verify_conflict_threshold:
         return {
