@@ -37,3 +37,6 @@ paper/*.toc
 paper/*.fls
 paper/*.fdb_latexmk
 paper/*.synctex.gz
+
+CODEX_RULES.md
+volatility_spec.md
