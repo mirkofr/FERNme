@@ -39,6 +39,7 @@ paper/*.fls
 paper/*.fdb_latexmk
 paper/*.synctex.gz
 
+# local agent/internal working files
 CODEX_RULES.md
 volatility_spec.md
 option_b_spec.md
