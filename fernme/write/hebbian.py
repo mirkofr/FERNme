@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 from ..core.graph import UserGraph, AssocGraph, Event, Edge
 from ..config import Config, DEFAULT
 from .. import resolution as _resolution
-from ..identity import is_identity_attr
+from ..identity import is_permanent_attr
 
 
 def _saturating_bump(w: float, rate: float, mag: float, w_max: float) -> float:
@@ -15,18 +15,22 @@ def _saturating_bump(w: float, rate: float, mag: float, w_max: float) -> float:
 
 def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
             mapped: List[Tuple[str, float]], cfg: Config = DEFAULT,
-            salience=None) -> None:
+            salience=None, provenance: str = "inferred") -> None:
     """Apply one event to the user graph + shared association graph.
     Crucially: this function calls no LLM and does no vector search."""
     active = mapped
+    incoming_provenance = "stated" if provenance in {"stated", "override"} else "inferred"
     # 1) strengthen user -> attr
     for attr, mag in active:
         e = ug.edges.get(attr)
         if e is None:
-            e = Edge(weight=0.0, source="known", last_reinforced=event.ts)
+            e = Edge(weight=0.0, source="known", last_reinforced=event.ts,
+                     provenance=incoming_provenance)
             ug.edges[attr] = e
         elif e.source == "guessed":
             e.weight = 0.0; e.hits = 0; e.fast = 0.0   # shed borrowed prior
+        if incoming_provenance == "stated":
+            e.provenance = "stated"
         e.weight = _saturating_bump(e.weight, cfg.alpha, mag, cfg.w_max)
         e.fast = _saturating_bump(e.fast, cfg.alpha_fast, mag, cfg.w_max)
         e.hits += 1
@@ -58,10 +62,10 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
     for attr, e in ug.edges.items():
         if e.source == "override":
             continue
-        sticky_identity = (
+        sticky_permanent = (
             cfg.identity_sticky
             and e.source != "superseded"
-            and is_identity_attr(attr)
+            and is_permanent_attr(attr)
         )
         dt = max(0.0, now - e.last_reinforced)
         if cfg.resolution:
@@ -74,7 +78,7 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
         e.weight = e.weight * math.exp(-lam_eff * dt)
         e.salience = e.salience * math.exp(-cfg.lam * cfg.salience_decay * dt)
         e.fast = e.fast * math.exp(-cfg.lam_fast * dt)   # fast lane fades much quicker
-        if sticky_identity:
+        if sticky_permanent:
             e.weight = max(e.weight, cfg.floor)
         e.last_reinforced = now            # reset clock -> safe to call periodically
         if e.weight < cfg.floor:

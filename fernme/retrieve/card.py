@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 from ..core.graph import UserGraph, AssocGraph
 from ..prior.population import PopulationPrior
 from ..config import Config, DEFAULT
+from .. import resolution as _resolution
+from .. import curation as _curation
 from .activation import spread
 
 
@@ -17,6 +19,18 @@ CARD_EXCLUDE_NS = {"style", "mood", "mood_ema", "mood_prev"}
 def _namespace(attr: str) -> str:
     base = attr.lstrip("!")
     return base.split(":", 1)[0] if ":" in base else base
+
+
+def _conflict_for(ug: UserGraph, attr: str, cfg: Config) -> float:
+    edge = ug.edges.get(attr)
+    if edge is None:
+        return 0.0
+    return max(
+        (_curation.conflict_score(attr, edge, other, other_edge, cfg.w_max)
+         for other, other_edge in ug.edges.items()
+         if other != attr and edge.last_reinforced < other_edge.last_reinforced),
+        default=0.0,
+    )
 
 try:
     import tiktoken
@@ -51,9 +65,19 @@ def compile_card(ug: UserGraph, assoc: AssocGraph, seeds: List[str], now: float,
     links = []
     for attr, score, e in top:
         mark = "*" if e.confidence >= cfg.conf_known else "?"  # known vs guessed
-        parts.append(f"{attr}:{e.wire_weight(cfg.w_max)}{mark}")
-        links.append({"attr": attr, "w": e.wire_weight(cfg.w_max),
-                      "known": e.confidence >= cfg.conf_known})
+        verify = (
+            _resolution.needs_verify(attr, e, now, cfg,
+                                     conflict=_conflict_for(ug, attr, cfg))["verify"]
+            if getattr(cfg, "volatility_confidence", False)
+            else False
+        )
+        parts.append(f"{attr}:{e.wire_weight(cfg.w_max)}{mark}"
+                     + ("~verify" if verify else ""))
+        link = {"attr": attr, "w": e.wire_weight(cfg.w_max),
+                "known": e.confidence >= cfg.conf_known}
+        if verify:
+            link["verify"] = True
+        links.append(link)
     def _fmt(v):
         if isinstance(v, float) and v.is_integer():
             return str(int(v))

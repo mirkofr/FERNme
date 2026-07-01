@@ -128,6 +128,37 @@ def detect(new_attr: str, existing: Iterable[str]) -> List[tuple]:
     return out
 
 
+def conflict_kind(a: str, b: str) -> str:
+    """Return the genuine conflict kind for two attrs, or "" if they can coexist."""
+    if a == b:
+        return ""
+    a_base, b_base = a.lstrip("!"), b.lstrip("!")
+    a_neg, b_neg = a.startswith("!"), b.startswith("!")
+    a_ns, b_ns = namespace(a), namespace(b)
+    # Direct negation of the same value is a real contradiction; liking many
+    # topics is fine, but liking and disliking the same topic is not.
+    if a_base == b_base and a_neg != b_neg:
+        return "polarity"
+    if (not a_neg and not b_neg and a_ns in SINGLE_VALUE_SLOTS
+            and a_ns == b_ns and value(a) != value(b)):
+        return "same-slot"
+    if b in CONFLICT_MAP.get(a, set()) or b_base in CONFLICT_MAP.get(a_base, set()):
+        return "semantic"
+    return ""
+
+
+def conflict_score(a: str, a_edge, b: str, b_edge, w_max: float = 9.0) -> float:
+    """Score only genuine contradictions, preferring stated/override evidence."""
+    kind = conflict_kind(a, b)
+    if not kind:
+        return 0.0
+    strength = min(1.0, max(float(a_edge.weight), float(b_edge.weight)) / max(float(w_max), 1e-12))
+    a_stated = getattr(a_edge, "provenance", "inferred") == "stated" or a_edge.source == "override"
+    b_stated = getattr(b_edge, "provenance", "inferred") == "stated" or b_edge.source == "override"
+    authority = 1.0 if (a_stated or b_stated) else 0.6
+    return strength * authority
+
+
 def resolve(new_source: str, new_ts: float, old_source: str, old_ts: float) -> str:
     """Decide the action for one conflict. The trust-critical rule lives here:
     inferred can NEVER silently override explicit -> it escalates (ask)."""

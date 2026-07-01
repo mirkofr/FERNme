@@ -1,9 +1,14 @@
-"""Identity namespaces shared by write and service layers."""
+"""Durability namespaces shared by write and service layers."""
 
-IDENTITY_NS = {
-    "name", "role", "employer", "company", "affiliation", "position", "origin",
-    "city", "birthday", "nationality", "lang", "domain",
+PERMANENT_NS = {
+    "name", "birthday", "origin", "nationality", "lang", "allergy", "health",
 }
+
+SLOW_IDENTITY_NS = {
+    "role", "employer", "company", "affiliation", "position", "city", "domain",
+}
+
+IDENTITY_NS = PERMANENT_NS | SLOW_IDENTITY_NS
 
 
 def namespace(attr: str) -> str:
@@ -13,3 +18,7 @@ def namespace(attr: str) -> str:
 
 def is_identity_attr(attr: str) -> bool:
     return namespace(attr) in IDENTITY_NS
+
+
+def is_permanent_attr(attr: str) -> bool:
+    return namespace(attr) in PERMANENT_NS

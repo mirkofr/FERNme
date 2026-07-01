@@ -11,9 +11,10 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-119%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-139%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.3%20research%20preview-7f77dd.svg)](#-honest-status)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
 
 *Cheap to write · flat to read · interpretable by design · owned by the user*
 
@@ -47,10 +48,10 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 | | |
 |---|---|
 | 🪶 **Zero-LLM writes** | Memory updates are arithmetic on a graph — **0 LLM calls per interaction** vs. ~2 for extraction-based memory. No write-time cost, no write-time hallucination. |
-| 📉 **Flat token cost forever** | The prompt card holds **~25 tokens** whether it's a visitor's first day or fifth year. A full-history baseline is **77× larger** by 120 interactions. |
-| 🧠 **Strong in every regime** | Ties a frequency counter on static recall, **beats it 0.72 → 0.13 on drift**, and **wins on context** (0.62 → 0.51). Decay + spreading activation unify stability and adaptivity. |
+| 📉 **Flat token cost forever** | The prompt card holds **~25 tokens** whether it's a visitor's first day or fifth year. A full-history baseline is **77.4× larger** by 120 interactions. |
+| 🧠 **Strong in every regime** | Ties a frequency counter on static recall, **beats it 0.718 → 0.128 on drift**, and **wins on context** (0.617 → 0.513). Class-targeted volatility retention + spreading activation preserve permanent facts without giving stale tastes too much inertia. |
 | 🪟 **Glass-box & user-owned** | Every preference is visible and editable. People fix what's wrong, delete everything, or export it. Privacy becomes a feature, not a liability. |
-| 🏬 **Built for outcomes** | Evaluated by **conversion**, not QA. A simulated storefront shows **+16% conversion lift** vs. non-personalized recommendations. |
+| 🏬 **Built for outcomes** | Evaluated by **conversion**, not QA. A simulated storefront shows **+17% conversion lift** vs. non-personalized recommendations. |
 | 🧩 **User-owned supernode** | Sign in across sites → your memories assemble like Lego into one profile **you control**, default-deny, sensitive data walled off. Not surveillance — the mirror image of it. |
 | 🎚 **Cost/quality dial** | One engine, a `memory_mode` switch: free key-less `pure` by default, opt-in `gated`/`offline` LLM enrichment when you need Mem0-grade nuance — pay only for the compute you use. |
 | 🔐 **Verifiable & unlearnable** | Every action is logged in a tamper-evident HMAC chain the user can replay to detect any alteration; `forget_everywhere` wipes the profile **and** unlearns the person from the population prior — provable right-to-be-forgotten. |
@@ -87,23 +88,23 @@ engine is solid; the extraction quality is the agent's.)*
 
 ### Cost, recall, and Pareto (synthetic, multi-seed)
 
-> Reproduce: `python -m fernme.eval.cost_variance` · `... quality` · `... drift` · `... context` · `... ablation` · `... pilot`
+> Reproduce: `python -m fernme.eval.cost_variance` · `... quality` · `... drift` · `... context` · `... retention` · `... ablation` · `... pilot`
 
 **Cost** — per-turn memory tokens vs. profile size (5 seeds):
 
 | metric | FERNme | baseline |
 |---|---|---|
-| card size | **24.9 ± 0.5 tokens** (flat) | full history grows linearly |
-| at 120 interactions | **1×** | **77× ± 1.3** larger |
+| card size | **25.1 ± 0.6 tokens** (flat) | full history grows linearly |
+| at 120 interactions | **1×** | **77.4× ± 1.3** larger |
 | LLM calls per write | **0** | ~2 (extraction memory) |
 
 **Recall quality** — precision@5 vs. ground-truth preferences (5 seeds × 40 users):
 
 | regime | 🌿 FERNme | frequency | recency |
 |---|:---:|:---:|:---:|
-| static recall | 0.74 | 0.74 | 0.47 |
-| **drift** (taste shifts) | **0.72** ✅ | 0.13 ❌ | 0.59 |
-| **context** (precision@3) | **0.62** ✅ | 0.51 (blind) | — |
+| static recall | 0.739 | 0.739 | 0.465 |
+| **drift** (taste shifts) | **0.718** ✅ | 0.128 ❌ | 0.586 |
+| **context** (precision@3) | **0.617** ✅ | 0.513 (blind) | — |
 
 > **The headline:** FERNme is the *only* method strong everywhere. Frequency can't forget (fails drift); recency is noisy (fails static). FERNme's decay + spreading activation get both.
 
@@ -125,7 +126,7 @@ at 1–2 orders of magnitude less cost.** (Modeled assumptions; shape is the poi
 
 ![Cost/quality Pareto — FERNme+gated/offline on the efficient knee](docs/cost_quality_pareto.png)
 
-**Simulated outcome pilot** — fake storefront, learn-from-behavior shoppers: **+16% relative conversion lift** over a popularity baseline; tied at visit 1 (cold start), pulling ahead as it learns, recovering through a mid-pilot taste drift.
+**Simulated outcome pilot** — fake storefront, learn-from-behavior shoppers: **+17% relative conversion lift** over a popularity baseline; tied at visit 1 (cold start), pulling ahead as it learns, recovering through a mid-pilot taste drift.
 
 ---
 
@@ -209,11 +210,12 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 119 passing, 2 skipped
+pytest -q                               # 138 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
-python -m fernme.eval.pilot               # +16% simulated conversion lift
+python -m fernme.eval.retention           # permanent facts persist while stale volatile facts fade
+python -m fernme.eval.pilot               # +17% simulated conversion lift
 
 # run it live
 FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077   # REST API (docs at /docs)
@@ -288,14 +290,17 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (119 passing, 2 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, and the full results suite above.
+✅ **Done & tested (139 passing, 2 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, and the full results suite above.
 
-🆕 **New, opt-in (not yet validated):** resolution/temperature decay layer — implemented and unit-tested, **off by default** (`resolution=False`). It is not in the results suite above; its efficacy (vs. the current flat decay) still needs the control-vs-treatment harness before any quality claim.
+🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
+
+🆕 **Verify scope:** contradiction-scoped verify is on for genuine single-value-slot conflicts and marks only the older side of the contradiction. Synthetic R5 eval: contradicted-stale verify precision **1.000**, recall **1.000**, nag **0.000**, with **0.959 +/- 0.156** conflict pairs/user. The perfect contradicted-stale score is by construction, so it validates wiring, not real-world conflict-detector quality. Confidence separates "keep it" from "trust it"; stale-high-confidence-wrong improves in the fixture (**0.070 -> 0.004**) because middle-class confidence no longer decays slower than flat.
 
 🚧 **Still open (genuinely needs the outside world):**
 - A **real-human per-site pilot** — only live users close the loop a simulator can't.
 - The **Mem0 (LLM) head-to-head** — harness wired; run locally with `OPENAI_API_KEY`.
 - **Embeddings** for context→attribute matching; offline LLM catalog enrichment for messy inputs.
+- **Silent staleness verify** -- age-only verify remains off by default. In the synthetic sweep, the best age-only point was still weak (precision **0.461**, recall **0.651**, nag **0.214**), so silent-stale detection needs the next milestone: learned per-edge volatility or outside corroboration.
 
 > Every claim above is backed by a test or a reproducible experiment. Where a result is simulated, it says so — a simulator proves the *mechanism*, not real-world behavior.
 
@@ -313,7 +318,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       119 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       139 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

@@ -1,8 +1,16 @@
-"""Resolution-derived decay.
+"""Resolution-derived decay and volatility reliability.
 
 This module is intentionally pure: no I/O, no storage, no LLM calls. It turns
 existing edge metadata into a resolution score, then into a temperature that can
 modulate decay when the feature flag is enabled.
+
+Volatility is orthogonal to semantic categories: it describes how quickly a
+kind of fact tends to go stale. A high-conflict edge verifies immediately,
+because contradiction is an uncertainty signal before action. Age-only verify is
+off by default because synthetic R3 evaluation showed it cannot separate silent
+staleness from old-but-true facts well enough yet. Provenance is currently an
+in-memory Edge field only; rows loaded from existing stores default to inferred
+until Option B adds a storage migration.
 """
 from __future__ import annotations
 
@@ -12,11 +20,18 @@ from typing import Mapping
 from .config import Config, DEFAULT
 
 
-FACT_NAMESPACES = {"employer", "city", "role", "name", "origin", "timezone", "company"}
-PROJECT_NAMESPACES = {"project", "deadline", "milestone"}
-HABIT_NAMESPACES = {"habit", "cadence"}
+PERMANENT_NAMESPACES = {
+    "name", "birthday", "origin", "nationality", "lang", "allergy",
+    "health", "milestone", "event",
+}
+SLOW_NAMESPACES = {
+    "employer", "company", "city", "role", "position", "affiliation",
+    "status", "domain", "timezone",
+}
+PREFERENCE_NAMESPACES = {"pref", "likes", "diet", "food", "value", "goal"}
+HABIT_NAMESPACES = {"habit", "cadence", "activity", "tool"}
+VOLATILE_NAMESPACES = {"project", "deadline", "context", "traveling"}
 STYLE_NAMESPACES = {"mood", "style"}
-PREFERENCE_NAMESPACES = {"pref", "likes", "diet", "food"}
 
 
 def _clamp(x: float, lo: float, hi: float) -> float:
@@ -25,22 +40,24 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 def _namespace(attr: str) -> str:
     base = attr.lstrip("!")
-    return base.split(":", 1)[0] if ":" in base else "attr"
+    return base.split(":", 1)[0] if ":" in base else base
 
 
 def species_of(attr: str) -> str:
-    """Map a namespaced attribute to coarse memory physics."""
+    """Map a namespaced attribute to volatility class."""
     ns = _namespace(attr)
-    if ns in FACT_NAMESPACES:
-        return "fact"
-    if ns in PROJECT_NAMESPACES:
-        return "project"
-    if ns in HABIT_NAMESPACES:
-        return "habit"
-    if ns in STYLE_NAMESPACES:
-        return "style"
+    if ns in PERMANENT_NAMESPACES:
+        return "permanent"
+    if ns in SLOW_NAMESPACES:
+        return "slow"
     if ns in PREFERENCE_NAMESPACES or attr.startswith("!"):
         return "preference"
+    if ns in HABIT_NAMESPACES:
+        return "habit"
+    if ns in VOLATILE_NAMESPACES or ns.startswith("current_"):
+        return "volatile"
+    if ns in STYLE_NAMESPACES:
+        return "style"
     return "association"
 
 
@@ -63,7 +80,11 @@ def resolution(attr: str, edge, ctx: Mapping | None = None,
     scores = []
 
     weights.append(cfg.res_w_explicit)
-    scores.append(1.0 if edge.source in {"override", "stated"} else 0.0)
+    explicit = (
+        edge.source in {"override", "stated"}
+        or getattr(edge, "provenance", "inferred") == "stated"
+    )
+    scores.append(1.0 if explicit else 0.0)
 
     weights.append(cfg.res_w_repeated)
     scores.append(1.0 if edge.hits >= cfg.res_repeat_hits else 0.0)
@@ -90,17 +111,105 @@ def temperature(attr: str, edge, conflict: float = 0.0,
 
 
 def species_multiplier(attr: str, cfg: Config = DEFAULT) -> float:
+    species = species_of(attr)
+    half_lives = getattr(cfg, "volatility_half_lives", {}) or {}
+    if species in half_lives:
+        return (math.log(2.0) / max(float(cfg.lam), 1e-12)
+                / max(float(half_lives[species]), 1e-12))
     table = getattr(cfg, "species_decay", {}) or {}
     try:
-        return float(table.get(species_of(attr), 1.0))
+        return float(table.get(species, 1.0))
     except AttributeError:
         return 1.0
+
+
+def half_life_days(attr: str, cfg: Config = DEFAULT) -> float:
+    """Return the target half-life in days for an attr's volatility class."""
+    species = species_of(attr)
+    table = getattr(cfg, "volatility_half_lives", {}) or {}
+    if species in table:
+        return max(float(table[species]), 1e-12)
+    mult = max(species_multiplier(attr, cfg), 1e-12)
+    return math.log(2.0) / max(float(cfg.lam) * mult, 1e-12)
+
+
+def volatility_lambda(attr: str, cfg: Config = DEFAULT) -> float:
+    """Decay rate implied by the volatility half-life alone."""
+    return math.log(2.0) / half_life_days(attr, cfg)
+
+
+def confidence_lambda(attr: str, cfg: Config = DEFAULT) -> float:
+    """Recency rate for trust. Middle classes may not be more trusting than flat."""
+    species = species_of(attr)
+    table = getattr(cfg, "confidence_half_lives", {}) or {}
+    if species in table:
+        lam = math.log(2.0) / max(float(table[species]), 1e-12)
+    else:
+        lam = volatility_lambda(attr, cfg)
+    if species in {"slow", "preference", "habit", "association", "style"}:
+        lam = max(lam, float(cfg.lam))
+    return lam
 
 
 def lambda_eff(attr: str, edge, ctx: Mapping | None = None,
                conflict: float = 0.0, cfg: Config = DEFAULT) -> float:
     """Effective decay rate for one edge when resolution decay is enabled."""
-    return cfg.lam * temperature(attr, edge, conflict, cfg, ctx) * species_multiplier(attr, cfg)
+    if edge.source == "superseded":
+        return cfg.lam * species_multiplier(attr, cfg)
+    temp = temperature(attr, edge, conflict, cfg, ctx)
+    # Current-context facts should not become long-lived just because evidence is
+    # explicit; stated-vs-inferred trust belongs in verify thresholds.
+    if species_of(attr) == "volatile":
+        temp = 1.0
+    return cfg.lam * temp * species_multiplier(attr, cfg)
+
+
+def needs_verify(attr: str, edge, now: float, cfg: Config = DEFAULT,
+                 confidence: float | None = None, conflict: float = 0.0) -> dict:
+    """Return a deterministic reliability signal for agent-side verification."""
+    conf_value = edge.confidence if confidence is None else confidence
+    if not getattr(cfg, "volatility_confidence", False):
+        return {
+            "verify": False,
+            "reason": "verify disabled",
+            "age_halflives": 0.0,
+            "confidence": conf_value,
+        }
+    if edge.source == "override":
+        return {
+            "verify": False,
+            "reason": "locked override",
+            "age_halflives": 0.0,
+            "confidence": conf_value,
+        }
+    dt = max(0.0, float(now) - float(edge.last_reinforced))
+    half_life = half_life_days(attr, cfg)
+    age = dt / max(half_life, 1e-12)
+    if max(0.0, float(conflict or 0.0)) >= cfg.verify_conflict_threshold:
+        return {
+            "verify": True,
+            "reason": f"conflict: {float(conflict):.2f}, {species_of(attr)} fact",
+            "age_halflives": age,
+            "confidence": conf_value,
+        }
+    stated = getattr(edge, "provenance", "inferred") == "stated" or edge.source == "stated"
+    threshold = cfg.verify_age_halflives_stated if stated else cfg.verify_age_halflives
+    if not getattr(cfg, "verify_age_enabled", False):
+        return {
+            "verify": False,
+            "reason": f"fresh: {age:.1f} half-lives, age-only verify disabled",
+            "age_halflives": age,
+            "confidence": conf_value,
+        }
+    verify = age >= threshold
+    species = species_of(attr)
+    prefix = "stale" if verify else "fresh"
+    return {
+        "verify": verify,
+        "reason": f"{prefix}: {age:.1f} half-lives, {species} fact",
+        "age_halflives": age,
+        "confidence": conf_value,
+    }
 
 
 def phase(attr: str, edge, cfg: Config = DEFAULT,

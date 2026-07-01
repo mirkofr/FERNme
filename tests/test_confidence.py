@@ -12,7 +12,7 @@ def _svc(**kw):
 def test_strong_recent_evidence_acts():
     svc = _svc(); svc.consent("s", "u", True)
     for t in range(8):
-        svc.observe("s", "u", "v", {"tags": ["organic"]}, ts=t)
+        svc.observe("s", "u", "v", {"tags": ["organic"], "source": "stated"}, ts=t)
     res = svc.confidence("s", "u", "organic", now=8)      # lots of recent evidence
     assert 0.0 <= res["confidence"] <= 1.0
     assert res["gate"] == "act"

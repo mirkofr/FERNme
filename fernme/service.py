@@ -18,6 +18,7 @@ from . import audit as _audit_mod
 from . import confidence as _confidence
 from . import curation as _curation
 from . import glossary as _glossary
+from . import resolution as _resolution
 from .vocabulary import Vocabulary
 from .identity import is_identity_attr
 from dataclasses import replace as _replace
@@ -27,6 +28,18 @@ import os
 
 def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
+
+
+def _conflict_for_edge(ug: UserGraph, attr: str, cfg: Config) -> float:
+    edge = ug.edges.get(attr)
+    if edge is None:
+        return 0.0
+    return max(
+        (_curation.conflict_score(attr, edge, other, other_edge, cfg.w_max)
+         for other, other_edge in ug.edges.items()
+         if other != attr and edge.last_reinforced < other_edge.last_reinforced),
+        default=0.0,
+    )
 
 
 def default_db_path() -> str:
@@ -135,7 +148,8 @@ class FernService:
                              if self.cfg.curation else {})
         new_source = payload.get("source", "known")
         observe(ug, ag, ev, mapped, self.cfg,
-                salience=self._salience_of(payload, mapped, st))
+                salience=self._salience_of(payload, mapped, st),
+                provenance=new_source)
         questions, superseded = ([], [])
         if self.cfg.curation:
             questions, superseded = self._curate(site, user, ug, mapped, new_source,
@@ -222,7 +236,8 @@ class FernService:
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
         ug.edges[attr] = Edge(weight=float(weight), confidence=1.0,
-                              source="override", last_reinforced=now_or_zero(ug, attr))
+                              source="override", last_reinforced=now_or_zero(ug, attr),
+                              provenance="stated")
         self.store.save_user(ug)
         self._audit(site, user, "edit", {"attr": attr, "weight": weight})
         return {"attr": attr, "weight": weight, "source": "override"}
@@ -407,7 +422,7 @@ class FernService:
         events = self.store.recall(site, user, limit=100000)
         return _glossary.assemble(events, auto=auto)
 
-    def why(self, site: str, user: str, attr: str) -> Dict:
+    def why(self, site: str, user: str, attr: str, now: float = 0.0) -> Dict:
         """Explainability (#8): the evidence behind a stored attribute."""
         self._require_consent(site, user)
         obs = good = bad = 0; first = last = None
@@ -421,8 +436,24 @@ class FernService:
             else:
                 obs += 1
             ts = e["ts"]; first = ts if first is None else min(first, ts); last = ts if last is None else max(last, ts)
-        return {"attr": attr, "observations": obs, "good_outcomes": good,
-                "bad_outcomes": bad, "first_seen": first, "last_seen": last}
+        out = {"attr": attr, "observations": obs, "good_outcomes": good,
+               "bad_outcomes": bad, "first_seen": first, "last_seen": last}
+        if getattr(self.cfg, "volatility_confidence", False):
+            ug = self.store.load_user(site, user)
+            edge = ug.edges.get(attr)
+            if edge is not None:
+                conflict = _conflict_for_edge(ug, attr, self.cfg)
+                conf = _confidence.compute(edge, now, self.cfg, attr=attr,
+                                           conflict=conflict)
+                detail = _resolution.needs_verify(attr, edge, now, self.cfg, conf,
+                                                  conflict=conflict)
+                out.update({
+                    "confidence": round(conf, 3),
+                    "verify": bool(detail["verify"]),
+                    "age_halflives": round(detail["age_halflives"], 3),
+                    "verify_reason": detail["reason"],
+                })
+        return out
 
     def triggers(self, site: str, user: str, now: float) -> Dict:
         """Proactive nudges: due reorders + fading favorites."""
@@ -529,13 +560,19 @@ class FernService:
             c, conflict = 0.0, 0.0
             g = _confidence.gate(c, self.cfg, importance)
         else:
-            neg = ug.edges.get("!" + attr)   # conflict: a negative counterpart = a flip
-            conflict = conflict or (min(1.0, neg.weight / self.cfg.w_max) if neg else 0.0)
-            c = _confidence.compute(e, now, self.cfg, taxonomy_match, outcome_success, conflict)
+            conflict = conflict or _conflict_for_edge(ug, attr, self.cfg)
+            c = _confidence.compute(e, now, self.cfg, taxonomy_match, outcome_success,
+                                    conflict, attr=attr)
             g = _confidence.gate(c, self.cfg, importance)
         if g == "ask" and self._ask_count.get((site, user), 0) >= self.cfg.ask_budget:
             g = "observe"        # out of ask budget -> don't pester
-        return {"confidence": round(c, 3), "gate": g, "conflict": round(conflict, 3)}
+        out = {"confidence": round(c, 3), "gate": g, "conflict": round(conflict, 3)}
+        if getattr(self.cfg, "volatility_confidence", False) and e is not None:
+            detail = _resolution.needs_verify(attr, e, now, self.cfg, c,
+                                              conflict=conflict)
+            out["verify"] = bool(detail["verify"])
+            out["age_halflives"] = round(detail["age_halflives"], 3)
+        return out
 
     def record_ask(self, site: str, user: str):
         self._ask_count[(site, user)] = self._ask_count.get((site, user), 0) + 1

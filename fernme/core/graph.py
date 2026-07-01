@@ -10,11 +10,12 @@ from typing import Dict, List, Tuple, Optional
 class Edge:
     weight: float = 0.0          # continuous 0..w_max internally; rounded on the wire
     confidence: float = 0.0      # 0..1, drives verify-vs-act gating
-    source: str = "known"        # known | guessed | override
+    source: str = "known"        # known | guessed | override | superseded
     last_reinforced: float = 0.0 # day index of last reinforcement
     hits: int = 0                # independent observations
     fast: float = 0.0            # fast-timescale component (recent context); decays quickly
     salience: float = 0.0        # 0..1 significance: high salience -> slower forgetting
+    provenance: str = "inferred" # stated | inferred; in-memory until the next DB migration
 
     def wire_weight(self, w_max: float = 9.0) -> int:
         return max(0, min(int(round(self.weight)), int(w_max)))

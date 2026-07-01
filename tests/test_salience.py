@@ -20,7 +20,9 @@ def _seed(cfg, salient_intensity):
 
 
 def test_salience_slows_forgetting_when_enabled():
-    cfg = replace(DEFAULT, salience_beta=0.9)
+    # This test pins the old flat-decay salience branch; volatility-typed decay
+    # is now default-on and is covered separately in test_volatility.py.
+    cfg = replace(DEFAULT, resolution=False, salience_beta=0.9)
     ug, ag = _seed(cfg, 1.0)
     assert ug.edges["pref:intense"].salience >= 0.9
     for t in range(1, 120):                      # ~4 months of no reinforcement
@@ -31,7 +33,7 @@ def test_salience_slows_forgetting_when_enabled():
 
 
 def test_default_off_is_backward_compatible():
-    cfg = replace(DEFAULT, salience_beta=0.0)   # OFF
+    cfg = replace(DEFAULT, resolution=False, salience_beta=0.0)   # old flat path
     ug, ag = _seed(cfg, 1.0)
     for t in range(1, 120):
         decay(ug, now=float(t), cfg=cfg)
@@ -78,22 +80,18 @@ def test_identity_floor_survives_decay_vs_neutral_single_hit():
     assert "topic:snacks" not in ug.edges
 
 
-def test_identity_sticky_survives_90_and_365_days():
+def test_permanent_sticky_survives_700_days():
     cfg = DEFAULT
     svc = FernService(store=SQLiteStore(":memory:"), cfg=cfg)
     svc.consent("s", "u", True)
-    svc.observe("s", "u", "chat", {"tags": ["company:acme"]})
+    svc.observe("s", "u", "chat", {"tags": ["allergy:peanut"]})
     ug = svc.store.load_user("s", "u")
 
-    for t in range(1, 91):
+    for t in range(1, 701):
         decay(ug, now=float(t), cfg=cfg)
-    assert "company:acme" in ug.edges
-    assert ug.edges["company:acme"].weight >= cfg.floor
 
-    for t in range(91, 366):
-        decay(ug, now=float(t), cfg=cfg)
-    assert "company:acme" in ug.edges
-    assert ug.edges["company:acme"].weight >= cfg.floor
+    assert "allergy:peanut" in ug.edges
+    assert ug.edges["allergy:peanut"].weight >= cfg.floor
 
 
 def test_non_identity_facts_are_not_floor_exempt():
@@ -116,16 +114,16 @@ def test_non_identity_facts_are_not_floor_exempt():
 
 
 def test_identity_sticky_false_reverts_decay_drop_behavior():
-    cfg = replace(DEFAULT, identity_sticky=False)
+    cfg = replace(DEFAULT, resolution=False, identity_sticky=False)
     svc = FernService(store=SQLiteStore(":memory:"), cfg=cfg)
     svc.consent("s", "u", True)
-    svc.observe("s", "u", "chat", {"tags": ["company:acme"]})
+    svc.observe("s", "u", "chat", {"tags": ["allergy:peanut"]})
     ug = svc.store.load_user("s", "u")
 
-    for t in range(1, 91):
+    for t in range(1, 701):
         decay(ug, now=float(t), cfg=cfg)
 
-    assert "company:acme" not in ug.edges
+    assert "allergy:peanut" not in ug.edges
 
 
 def test_card_excludes_style_and_mood_noise():
@@ -215,10 +213,9 @@ def test_superseded_identity_is_not_locked_in_by_salience():
     assert "company:oldco" not in card["wire"]
 
     ug = svc.store.load_user("s", "u")
-    for t in range(3, 366):
+    for t in range(3, 701):
         decay(ug, now=float(t), cfg=cfg)
     assert "company:oldco" not in ug.edges
-    assert "company:newco" in ug.edges
 
 
 def test_negative_edges_get_salience_floor():

@@ -35,7 +35,7 @@ class GraphIn(BaseModel):
     site: str; user: Optional[str] = None
 
 class WhyIn(BaseModel):
-    site: str; user: str; attr: str
+    site: str; user: str; attr: str; now: float = 0.0
 
 class MemoryGraphIn(BaseModel):
     person: str
@@ -110,7 +110,7 @@ def recall(b: RecallIn): return _guard(svc.recall, b.site, b.user, b.type, b.con
 def edit(b: EditIn): return _guard(svc.edit, b.site, b.user, b.attr, b.weight)
 
 @app.post("/why")
-def why(b: WhyIn): return _guard(svc.why, b.site, b.user, b.attr)
+def why(b: WhyIn): return _guard(svc.why, b.site, b.user, b.attr, b.now)
 
 @app.post("/export")
 def export(b: UserRef): return _guard(svc.export, b.site, b.user)

@@ -12,12 +12,26 @@ never optimized inside a write.
 from __future__ import annotations
 import math
 
+from . import resolution as _resolution
 
-def compute(edge, now, cfg, taxonomy_match=None, outcome_success=None, conflict=0.0):
+
+def compute(edge, now, cfg, taxonomy_match=None, outcome_success=None, conflict=0.0,
+            attr=None):
     evidence = 1.0 - math.exp(-cfg.gamma * edge.hits)                 # weak if 1 obs
-    recency = math.exp(-cfg.lam * max(0.0, now - edge.last_reinforced))  # stale -> low
-    taxonomy = taxonomy_match if taxonomy_match is not None else (
-        0.4 if edge.source == "guessed" else 1.0)                    # clean map -> high
+    dt = max(0.0, now - edge.last_reinforced)
+    lam = (_resolution.confidence_lambda(attr, cfg)
+           if getattr(cfg, "volatility_confidence", False) and attr is not None
+           else cfg.lam)
+    recency = math.exp(-lam * dt)                                      # stale -> low
+    if taxonomy_match is not None:
+        taxonomy = taxonomy_match
+    elif getattr(cfg, "volatility_confidence", False):
+        # Trust recency is handled separately from retention half-lives. Keep the
+        # taxonomy default stable for persisted known edges; borrowed prior guesses
+        # remain low-taxonomy.
+        taxonomy = 0.4 if edge.source == "guessed" else 1.0
+    else:
+        taxonomy = 0.4 if edge.source == "guessed" else 1.0            # clean map -> high
     consistency = max(0.0, 1.0 - conflict)                           # A->B flip -> low
     outcome = 0.5 if outcome_success is None else outcome_success    # neutral default
     c = (cfg.w_evidence * evidence + cfg.w_consistency * consistency
