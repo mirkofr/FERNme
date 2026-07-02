@@ -142,7 +142,18 @@ class FernService:
                 payload["style_tags"] = sanitize_tags(st["style_tags"])
                 ev = Event(site, user, ts, type, payload)
         if self.vocabulary is not None:           # ingestion bridge: canonicalize tags
-            mapped = [(c, m) for (a, m) in mapped if (c := self.vocabulary.canonical(a))]
+            merged, alias_map = {}, {}
+            for attr, mag in mapped:
+                canonical, alias = self.vocabulary.resolve(attr)
+                if not canonical:
+                    continue
+                merged[canonical] = max(float(mag), merged.get(canonical, 0.0))
+                if alias:
+                    alias_map[alias] = canonical
+            mapped = list(merged.items())
+            if alias_map:
+                payload["aliases"] = alias_map
+                ev = Event(site, user, ts, type, payload)
         ev.attrs = mapped
         # snapshot existing memory BEFORE the write, for conflict/authority checks
         existing_snapshot = ({a: _replace(e) for a, e in ug.edges.items()}
