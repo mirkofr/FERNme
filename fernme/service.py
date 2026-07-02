@@ -541,6 +541,8 @@ class FernService:
             uid = "user:" + u
             nodes[uid] = {"id": uid, "label": u, "kind": "user", "size": 9}
             for attr, e in ug.edges.items():
+                if e.source == "superseded":
+                    continue
                 neg = attr.startswith("!"); base = attr.lstrip("!")
                 ns = base.split(":", 1)[0] if ":" in base else "attr"
                 n = nodes.setdefault(base, {"id": base, "label": base, "kind": ns, "size": 0,
