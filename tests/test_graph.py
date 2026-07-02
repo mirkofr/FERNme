@@ -59,6 +59,21 @@ def test_node_size_tracks_strength():
     assert hiking["size"] > 0
 
 
+def test_graph_includes_hierarchy_without_removing_flat_view():
+    s = FernService(store=SQLiteStore(":memory:"))
+    s.store.set_consent("demo.com", "ana", True)
+    s.observe("demo.com", "ana", "view", {
+        "tags": ["person:mrs-reyes", "project:orbit-newmarket", "connection:helped-connect-orbitlabs"]
+    })
+
+    g = s.graph("demo.com", "ana")
+    assert "nodes" in g and "edges" in g
+    assert "hierarchy" in g
+    anchors = {n["id"] for n in g["hierarchy"]["anchors"]}
+    assert {"person:mrs-reyes", "project:orbit-newmarket"} <= anchors
+    assert g["hierarchy"]["assignments"]["connection:helped-connect-orbitlabs"] in anchors
+
+
 def test_memory_graph_is_cross_surface():
     """One owner, memories assembled across surfaces (web + pc + phone) with provenance."""
     s = FernService(store=SQLiteStore(":memory:"))

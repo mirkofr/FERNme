@@ -25,12 +25,12 @@ DEFAULT_CATEGORY = "facts"
 # namespace -> category. Extend freely; unknown namespaces fall back to DEFAULT_CATEGORY.
 _NS_TO_CAT = {
     "value": "values", "goal": "values", "pref": "values",
-    "rel": "people",
+    "rel": "people", "person": "people", "relationship": "people",
     "name": "facts", "nickname": "facts", "birthday": "facts", "city": "facts",
     "origin": "facts", "field": "facts", "study": "facts", "email": "facts",
     "employer": "facts", "role": "facts", "status": "facts", "metric": "facts",
-    "project": "facts", "health": "facts", "domain": "facts", "context": "facts",
-    "github": "facts",
+    "project": "facts", "company": "facts", "org": "facts", "health": "facts",
+    "domain": "facts", "context": "facts", "github": "facts",
     "topic": "knowledge", "tech": "knowledge", "concept": "knowledge",
     "fact": "knowledge", "lesson": "knowledge", "insight": "knowledge",
     "comparison": "knowledge",

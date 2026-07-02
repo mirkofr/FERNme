@@ -1,204 +1,202 @@
 <!doctype html><html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>FERNme — your memory</title>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FERNme memory map</title>
 <style>
-  :root{--bg:#faf9f5;--surf:#fff;--bd:rgba(0,0,0,.12);--tx:#1a1a18;--mut:#6b6a64;
-        --teal:#0f6e56;--amber:#a8690b;--info:#185fa5;--violet:#6d4bb0;--danger:#a32d2d;--owner:#2a2a27;}
-  @media(prefers-color-scheme:dark){:root{--bg:#1b1a18;--surf:#262523;--bd:rgba(255,255,255,.14);
-        --tx:#ecebe6;--mut:#a3a29a;--teal:#5dcaa5;--amber:#efa838;--info:#6fb0ef;--violet:#b79cf0;
-        --danger:#f09595;--owner:#ecebe6;}}
-  *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--tx)}
-  body{display:flex;flex-direction:column;overflow:hidden}
-  header{padding:11px 16px;border-bottom:.5px solid var(--bd);background:var(--surf);
-         display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:3}
-  h1{font-size:16px;font-weight:600;margin:0 12px 0 0}
-  h1 span{color:var(--mut);font-weight:400;font-size:12px;margin-left:6px}
-  label.fl{font-size:12px;color:var(--mut)}
-  select,button{font-size:13px;padding:6px 9px;border:.5px solid var(--bd);border-radius:8px;
-        background:var(--surf);color:var(--tx)}
-  button{cursor:pointer;font-weight:500}button:hover{background:var(--bg)}
-  .grow{flex:1}
-  #stage{flex:1;position:relative;overflow:hidden}
-  canvas{display:block;width:100%;height:100%}
-  .panel{position:absolute;background:var(--surf);border:.5px solid var(--bd);border-radius:10px;
-         padding:11px 13px;font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,.10);max-width:250px}
-  #legend{left:14px;bottom:14px;color:var(--mut);line-height:1.85}
-  #legend b{color:var(--tx);font-weight:600;display:block;margin:7px 0 3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-  #legend b:first-child{margin-top:0}
-  .sw{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:2px;margin-right:6px}
-  .ndot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:6px}
-  #tip{display:none;pointer-events:none;z-index:5;line-height:1.5}
-  #tip .t{font-weight:600;word-break:break-all}
-  #tip .m{color:var(--mut)}
-  #stats{right:14px;top:14px;color:var(--mut);text-align:right;line-height:1.7}
-  #stats b{color:var(--tx);font-size:15px}
-</style></head>
-<body>
+:root{--bg:#0e1116;--surf:#161b22;--bd:rgba(255,255,255,.11);--tx:#e7e9ee;--mut:#8b93a1;--owner:#f5f7fa;--danger:#f0708a}
+*{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+html,body{margin:0;height:100%;background:#0e1116;color:var(--tx);overflow:hidden}
+body{display:flex;flex-direction:column}
+header{padding:10px 14px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;border-bottom:.5px solid var(--bd);background:rgba(16,19,24,.96);z-index:4}
+h1{font-size:15px;margin:0 8px 0 0}h1 span{font-size:12px;color:var(--mut);font-weight:400;margin-left:7px}
+input,button{font-size:12px;padding:6px 9px;border:.5px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx)}
+button{cursor:pointer;font-weight:600}button:hover,button.on{background:#23425c;border-color:#3a6a93;color:#cfe6ff}
+.grow{flex:1}.hint{font-size:12px;color:var(--mut)}
+#stage{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+.panel{position:absolute;background:rgba(22,27,34,.94);border:.5px solid var(--bd);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+#tip{display:none;pointer-events:none;z-index:6;padding:8px 11px;font-size:12px;max-width:290px;line-height:1.5}
+#tip .t{font-weight:700;word-break:break-word}#tip .m{color:var(--mut);margin-top:2px}
+#legend{left:14px;bottom:14px;padding:11px 13px;font-size:12px;color:var(--mut);line-height:1.8;z-index:5}
+#legend .sw{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:7px}
+#stats{right:14px;top:14px;padding:10px 12px;font-size:12px;color:var(--mut);line-height:1.7;text-align:right}
+#stats b{color:var(--tx);font-size:15px}
+</style></head><body>
 <header>
-  <h1>FERNme<span>your memory</span></h1>
-  <label class="fl">Focus</label>
-  <select id="focus"><option value="all">All surfaces</option></select>
-  <input id="person" placeholder="your FERN id" style="font-size:13px;padding:6px 9px;border:.5px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx);width:150px"/>
-  <input id="base" placeholder="http://localhost:8077" style="font-size:13px;padding:6px 9px;border:.5px solid var(--bd);border-radius:8px;background:var(--surf);color:var(--tx);width:170px"/>
+  <h1>FERNme<span>memory map</span></h1>
+  <input id="site" placeholder="site" value="demo.com"/>
+  <input id="user" placeholder="user (optional)" value="ana"/>
+  <input id="base" placeholder="http://localhost:8077"/>
   <button id="load">Load</button>
-  <button id="replay" title="reshuffle layout">Replay</button>
-  <button id="freeze">Pause</button>
+  <button id="fit">Fit</button>
+  <button id="hier" class="on">Hierarchy</button>
+  <button id="known" class="on">Known only</button>
   <span class="grow"></span>
-  <span class="fl" id="msg">one memory · focus by surface</span>
+  <span class="hint" id="msg">click anchors to expand/collapse, toggle hierarchy for flat view</span>
 </header>
 <div id="stage">
   <canvas id="c"></canvas>
-  <div id="stats" class="panel"></div>
   <div id="tip" class="panel"></div>
-  <div id="legend" class="panel">
-    <b>nodes</b>
-    <span class="ndot" style="background:var(--owner)"></span>you<br/>
-    <span class="ndot" style="background:var(--mut)"></span>surface (site · PC · phone)<br/>
-    <span class="ndot" style="background:var(--teal)"></span>memory · colored by surface · size = strength<br/>
-    <b>links</b>
-    <span class="sw" style="background:var(--mut)"></span>known preference<br/>
-    <span class="sw" style="background:var(--mut);opacity:.45"></span>inferred (guessed)<br/>
-    <span class="sw" style="background:var(--danger)"></span>dislike / avoid<br/>
-    <span class="sw" style="background:var(--info);opacity:.5"></span>where it was learned
-  </div>
+  <div id="stats" class="panel"></div>
+  <div id="legend" class="panel"></div>
 </div>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-const SAMPLE = {"nodes": [{"id": "you", "label": "you", "kind": "owner", "size": 11}, {"id": "surf:shop", "label": "shop.com", "kind": "surface", "surf": "shop", "family": "web", "size": 7}, {"id": "surf:support", "label": "support.io", "kind": "surface", "surf": "support", "family": "web", "size": 7}, {"id": "surf:pc", "label": "PC \u00b7 desktop", "kind": "surface", "surf": "pc", "family": "pc", "size": 7}, {"id": "surf:phone", "label": "Phone \u00b7 iOS", "kind": "surface", "surf": "phone", "family": "phone", "size": 7}, {"id": "p:oat-milk", "label": "oat-milk", "kind": "pref", "size": 8, "surfaces": ["shop", "phone"], "color": "--teal", "negative": false}, {"id": "p:single-origin beans", "label": "single-origin beans", "kind": "pref", "size": 6, "surfaces": ["shop"], "color": "--teal", "negative": false}, {"id": "p:vanilla", "label": "vanilla", "kind": "pref", "size": 4, "surfaces": ["shop"], "color": "--teal", "negative": false}, {"id": "p:dairy", "label": "dairy", "kind": "pref", "size": 6, "surfaces": ["shop"], "color": "--teal", "negative": true}, {"id": "p:concise replies", "label": "concise replies", "kind": "pref", "size": 7, "surfaces": ["support", "pc"], "color": "--info", "negative": false}, {"id": "p:email over chat", "label": "email over chat", "kind": "pref", "size": 5, "surfaces": ["support"], "color": "--info", "negative": false}, {"id": "p:patient when rushed", "label": "patient when rushed", "kind": "pref", "size": 3, "surfaces": ["support"], "color": "--info", "negative": false}, {"id": "p:dark mode", "label": "dark mode", "kind": "pref", "size": 9, "surfaces": ["pc", "phone"], "color": "--amber", "negative": false}, {"id": "p:keyboard shortcuts", "label": "keyboard shortcuts", "kind": "pref", "size": 6, "surfaces": ["pc"], "color": "--amber", "negative": false}, {"id": "p:python", "label": "python", "kind": "pref", "size": 7, "surfaces": ["pc"], "color": "--amber", "negative": false}, {"id": "p:mornings", "label": "mornings", "kind": "pref", "size": 5, "surfaces": ["phone"], "color": "--violet", "negative": false}, {"id": "p:quiet notifications", "label": "quiet notifications", "kind": "pref", "size": 4, "surfaces": ["phone"], "color": "--violet", "negative": false}, {"id": "p:running", "label": "running", "kind": "pref", "size": 6, "surfaces": ["phone", "shop"], "color": "--violet", "negative": false}], "edges": [{"source": "you", "target": "p:oat-milk", "weight": 8, "known": true, "negative": false}, {"source": "p:oat-milk", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "p:oat-milk", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:single-origin beans", "weight": 6, "known": true, "negative": false}, {"source": "p:single-origin beans", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "you", "target": "p:vanilla", "weight": 4, "known": false, "negative": false}, {"source": "p:vanilla", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "you", "target": "p:dairy", "weight": 6, "known": true, "negative": true}, {"source": "p:dairy", "target": "surf:shop", "surface": "shop", "prov": true}, {"source": "you", "target": "p:concise replies", "weight": 7, "known": true, "negative": false}, {"source": "p:concise replies", "target": "surf:support", "surface": "support", "prov": true}, {"source": "p:concise replies", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "you", "target": "p:email over chat", "weight": 5, "known": true, "negative": false}, {"source": "p:email over chat", "target": "surf:support", "surface": "support", "prov": true}, {"source": "you", "target": "p:patient when rushed", "weight": 3, "known": false, "negative": false}, {"source": "p:patient when rushed", "target": "surf:support", "surface": "support", "prov": true}, {"source": "you", "target": "p:dark mode", "weight": 9, "known": true, "negative": false}, {"source": "p:dark mode", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "p:dark mode", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:keyboard shortcuts", "weight": 6, "known": true, "negative": false}, {"source": "p:keyboard shortcuts", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "you", "target": "p:python", "weight": 7, "known": true, "negative": false}, {"source": "p:python", "target": "surf:pc", "surface": "pc", "prov": true}, {"source": "you", "target": "p:mornings", "weight": 5, "known": true, "negative": false}, {"source": "p:mornings", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:quiet notifications", "weight": 4, "known": false, "negative": false}, {"source": "p:quiet notifications", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "you", "target": "p:running", "weight": 6, "known": true, "negative": false}, {"source": "p:running", "target": "surf:phone", "surface": "phone", "prov": true}, {"source": "p:running", "target": "surf:shop", "surface": "shop", "prov": true}], "surfaces": [{"key": "shop", "label": "shop.com", "family": "web", "color": "--teal"}, {"key": "support", "label": "support.io", "family": "web", "color": "--info"}, {"key": "pc", "label": "PC \u00b7 desktop", "family": "pc", "color": "--amber"}, {"key": "phone", "label": "Phone \u00b7 iOS", "family": "phone", "color": "--violet"}]};
-let DATA = {nodes:[],edges:[],surfaces:[]};
-const $=id=>document.getElementById(id);
-const cv=$("c"), ctx=cv.getContext("2d");
-const DPR=Math.max(1,window.devicePixelRatio||1);
-let W=0,H=0,nodes=[],links=[],byId={},frozen=false,hover=null,raf=0,focus="all";
-let view={x:0,y:0,k:1},drag=null,pan=null;
-const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim()||n;
-
-function resize(){const r=cv.getBoundingClientRect();W=Math.max(50,r.width);H=Math.max(50,r.height);
-  cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
-window.addEventListener('resize',()=>{resize();});
-
-// focus dropdown
-function fillFocus(){const sel=$("focus");sel.innerHTML='<option value="all">All surfaces</option>';
-  DATA.surfaces.forEach(s=>{const o=document.createElement('option');o.value=s.key;o.textContent=s.label;sel.appendChild(o);});
-  focus="all";}
-$("focus").onchange=e=>{focus=e.target.value;};
-
-function build(){
-  byId={};
-  nodes=DATA.nodes.map(n=>{
-    const o={...n,
-      x:(n.kind==="owner"?W/2:W/2+(Math.random()-.5)*360),
-      y:(n.kind==="owner"?H/2:H/2+(Math.random()-.5)*300),
-      vx:0,vy:0,
-      r:n.kind==="owner"?15:n.kind==="surface"?10:4+Math.min(11,(n.size||0)*1.1)};
-    byId[n.id]=o;return o;});
-  links=DATA.edges.map(e=>({...e,s:byId[e.source],t:byId[e.target]})).filter(l=>l.s&&l.t);
-  view={x:0,y:0,k:1};
-  $("stats").innerHTML=`<b>${DATA.nodes.filter(n=>n.kind==="pref").length}</b> memories<br/>`+
-    `<b>${DATA.surfaces.length}</b> surfaces`;
-  if(!raf) tick();
-}
-function active(n){ if(focus==="all")return true;
-  if(n.kind==="owner")return true;
-  if(n.kind==="surface")return n.surf===focus;
-  if(n.kind==="pref")return (n.surfaces||[]).includes(focus);
-  return true;}
-function lactive(l){ if(focus==="all")return true;
-  if(l.prov) return l.surface===focus;
-  return active(l.t); }
-
-function tick(){ if(!frozen) step(); paint(); raf=requestAnimationFrame(tick); }
-function step(){
-  const rep=1700,cx=W/2,cy=H/2;
-  for(const a of nodes){
-    if(a.kind==="owner"){a.vx+=(cx-a.x)*0.05;a.vy+=(cy-a.y)*0.05;}
-    else{a.vx+=(cx-a.x)*0.0014;a.vy+=(cy-a.y)*0.0014;}
+const SAMPLE={
+  cats:[
+    {key:"people",label:"People",color:"#185fa5"},
+    {key:"facts",label:"Facts & identity",color:"#0f6e56"},
+    {key:"knowledge",label:"Knowledge & ideas",color:"#2a8c9e"}
+  ],
+  nodes:[
+    {id:"person:avery-quinn",label:"avery quinn",kind:"person",cat:"people",category:"people",size:5,known:true,color:"#185fa5"},
+    {id:"company:atlas-partners",label:"atlas partners",kind:"company",cat:"facts",category:"facts",size:6,known:true,color:"#0f6e56"},
+    {id:"role:associate",label:"associate",kind:"role",cat:"facts",category:"facts",size:2,known:true,color:"#0f6e56"},
+    {id:"topic:startup-support",label:"startup support",kind:"topic",cat:"knowledge",category:"knowledge",size:3,known:true,color:"#2a8c9e"}
+  ],
+  edges:[
+    {source:"person:avery-quinn",target:"company:atlas-partners",weight:4,assoc:true},
+    {source:"person:avery-quinn",target:"role:associate",weight:3,assoc:true},
+    {source:"company:atlas-partners",target:"topic:startup-support",weight:2,assoc:true}
+  ],
+  hierarchy:{
+    anchors:[
+      {id:"person:avery-quinn",label:"avery quinn",kind:"person",cat:"people",category:"people",size:6,known:true,color:"#185fa5",child_count:1},
+      {id:"company:atlas-partners",label:"atlas partners",kind:"company",cat:"facts",category:"facts",size:6,known:true,color:"#0f6e56",child_count:1}
+    ],
+    subnodes:[
+      {id:"role:associate",label:"associate",kind:"role",cat:"facts",category:"facts",size:2,known:true,color:"#0f6e56",parent:"person:avery-quinn"},
+      {id:"topic:startup-support",label:"startup support",kind:"topic",cat:"knowledge",category:"knowledge",size:3,known:true,color:"#2a8c9e",parent:"company:atlas-partners"}
+    ],
+    edges:[{source:"person:avery-quinn",target:"company:atlas-partners",weight:6,aggregated:true}],
+    expanded_edges:[
+      {source:"person:avery-quinn",target:"role:associate",parentSource:"person:avery-quinn",parentTarget:"person:avery-quinn",weight:3},
+      {source:"company:atlas-partners",target:"topic:startup-support",parentSource:"company:atlas-partners",parentTarget:"company:atlas-partners",weight:2}
+    ]
+  },
+  stats:{attributes:4,edges:3}
+};
+let DATA=SAMPLE, nodes=[], links=[], byId={}, adj={}, W=0, H=0, view=d3.zoomIdentity;
+let hover=null, hierarchyOn=true, knownOnly=true, expanded=new Set(), focusAnchor=null, sim=null, zoom=null;
+const cv=document.getElementById("c"), ctx=cv.getContext("2d"), DPR=Math.max(1,devicePixelRatio||1), $=id=>document.getElementById(id);
+function norm(data){
+  const cats=data.cats||data.categories||[];
+  const cmap={}; cats.forEach(c=>cmap[c.key]=c);
+  (data.nodes||[]).forEach(n=>{n.cat=n.cat||n.category||"facts"; n.color=n.color||(cmap[n.cat]&&cmap[n.cat].color)||"#8b93a1";});
+  if(data.hierarchy){
+    [...(data.hierarchy.anchors||[]),...(data.hierarchy.subnodes||[])].forEach(n=>{n.cat=n.cat||n.category||"facts"; n.color=n.color||(cmap[n.cat]&&cmap[n.cat].color)||"#8b93a1";});
   }
-  for(let i=0;i<nodes.length;i++){const a=nodes[i];
-    for(let j=i+1;j<nodes.length;j++){const b=nodes[j];
-      let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||0.01;if(d2>140000)continue;
-      const d=Math.sqrt(d2),f=rep/d2;dx/=d;dy/=d;
-      a.vx+=dx*f*0.02;a.vy+=dy*f*0.02;b.vx-=dx*f*0.02;b.vy-=dy*f*0.02;}}
-  for(const l of links){const a=l.s,b=l.t;
-    const want=l.prov?70:l.t.kind==="surface"?70:96, w=l.prov?0.01:0.02;
-    let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||.01,f=(d-want)*w/d;
-    if(a!==drag&&a.kind!=="owner"){a.vx+=dx*f;a.vy+=dy*f;}
-    if(b!==drag&&b.kind!=="owner"){b.vx-=dx*f;b.vy-=dy*f;}}
-  for(const n of nodes){if(n===drag)continue;n.vx*=0.85;n.vy*=0.85;n.x+=n.vx;n.y+=n.vy;}
+  data.cats=cats.length?cats:[{key:"facts",label:"Facts & identity",color:"#0f6e56"}];
+  return data;
 }
-function T(x,y){return [x*view.k+view.x,y*view.k+view.y];}
+function catColor(k){const c=(DATA.cats||[]).find(x=>x.key===k);return c?c.color:"#8b93a1";}
+function resize(){const r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0)}
+function visibleGraph(){
+  if(hierarchyOn&&DATA.hierarchy){
+    const anchors=(DATA.hierarchy.anchors||[]).map(n=>({...n,anchor:true,known:n.known!==false}));
+    const visibleAnchors=new Set(anchors.map(n=>n.id));
+    const visible=new Set(visibleAnchors);
+    const subs=(DATA.hierarchy.subnodes||[]).filter(n=>expanded.has(n.parent)).map(n=>({...n,anchor:false}));
+    subs.forEach(n=>visible.add(n.id));
+    return {
+      nodes:[...anchors.filter(n=>visibleAnchors.has(n.id)),...subs],
+      edges:[...(DATA.hierarchy.edges||[]),...(DATA.hierarchy.expanded_edges||[]).filter(e=>visible.has(e.source)&&visible.has(e.target))]
+    };
+  }
+  return {nodes:DATA.nodes||[], edges:DATA.edges||[]};
+}
+function build(){
+  const vg=visibleGraph();
+  const ns=vg.nodes.filter(n=>!knownOnly||n.known||n.anchor||expanded.has(n.parent));
+  const keep=new Set(ns.map(n=>n.id));
+  nodes=ns.map(n=>({...n,r:(n.anchor?8:5)+Math.sqrt(n.size||1)*(n.anchor?2.6:2.1),x:W/2+(Math.random()-.5)*380,y:H/2+(Math.random()-.5)*300}));
+  byId={}; nodes.forEach(n=>byId[n.id]=n);
+  links=vg.edges.filter(e=>keep.has(e.source)&&keep.has(e.target)).map(e=>({source:e.source,target:e.target,weight:e.weight,aggregated:e.aggregated,cross:e.cross}));
+  adj={}; links.forEach(l=>{(adj[l.source]=adj[l.source]||new Set()).add(l.target);(adj[l.target]=adj[l.target]||new Set()).add(l.source)});
+  start();
+  $("stats").innerHTML=`<b>${nodes.length}</b> visible nodes<br/><b>${links.length}</b> visible links`;
+}
+function start(){
+  if(sim)sim.stop();
+  sim=d3.forceSimulation(nodes)
+    .force("charge",d3.forceManyBody().strength(d=>d.anchor?-95:-55))
+    .force("link",d3.forceLink(links).id(d=>d.id).distance(d=>d.aggregated?120:58).strength(.22))
+    .force("collide",d3.forceCollide().radius(d=>d.r+4).strength(.9))
+    .force("x",d3.forceX(W/2).strength(.04))
+    .force("y",d3.forceY(H/2).strength(.04))
+    .on("tick",paint);
+}
+function T(x,y){return [x*view.k+view.x,y*view.k+view.y]}
+function related(n){return hover&&(n===hover||(adj[hover.id]&&adj[hover.id].has(n.id)))}
 function paint(){
   ctx.clearRect(0,0,W,H);
   for(const l of links){
-    const on=lactive(l), [x1,y1]=T(l.s.x,l.s.y),[x2,y2]=T(l.t.x,l.t.y);
-    let col,wd,al;
-    if(l.prov){col=css(DATA.surfaces.find(s=>s.key===l.surface).color);wd=0.8;al=0.4;}
-    else if(l.negative){col=css('--danger');wd=0.9+0.5*(l.weight||1);al=0.8;}
-    else if(l.known){col=css('--mut');wd=0.8+0.55*(l.weight||1);al=0.75;}
-    else {col=css('--mut');wd=0.7+0.4*(l.weight||1);al=0.4;}
-    ctx.globalAlpha=on?Math.min(0.95,al):0.06;
-    ctx.strokeStyle=col;ctx.lineWidth=Math.max(0.7,wd)*view.k;
-    ctx.setLineDash((!l.known&&!l.prov&&!l.negative)?[3,3]:[]);
+    const s=typeof l.source==="string"?byId[l.source]:l.source, t=typeof l.target==="string"?byId[l.target]:l.target;
+    if(!s||!t)continue;
+    const [x1,y1]=T(s.x,s.y),[x2,y2]=T(t.x,t.y), lit=hover&&(s===hover||t===hover), dim=hover&&!lit;
+    ctx.strokeStyle=l.cross?`rgba(231,233,238,${dim?0.05:0.35})`:`rgba(139,147,161,${lit?0.8:(dim?0.05:0.28)})`;
+    ctx.lineWidth=(lit?1.8:(l.aggregated?1.2:.8))*Math.min(1.5,view.k);
+    ctx.setLineDash(l.cross?[5,4]:[]);
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
   }
-  ctx.setLineDash([]);ctx.globalAlpha=1;
-  ctx.font=Math.round(11*view.k)+"px -apple-system,Segoe UI,Roboto,sans-serif";ctx.textBaseline="middle";
+  ctx.setLineDash([]);
   for(const n of nodes){
-    const on=active(n),[x,y]=T(n.x,n.y),r=n.r*view.k;
-    let c = n.kind==="owner"?css('--owner'): n.kind==="surface"?css(DATA.surfaces.find(s=>s.key===n.surf).color): css(n.color);
-    ctx.globalAlpha=on?(hover&&hover!==n&&!isNbr(n)?0.55:1):0.12;
-    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();
-    if(n.kind==="surface"){ctx.lineWidth=1.5*view.k;ctx.strokeStyle=css('--surf');ctx.stroke();}
-    if(n.kind==="pref"&&n.negative){ctx.lineWidth=2*view.k;ctx.strokeStyle=css('--danger');ctx.stroke();}
-    ctx.globalAlpha=on?1:0.2;
-    const show = n.kind!=="pref" || n.r>7 || hover===n || (hover&&isNbr(n)) || (focus!=="all"&&on);
-    if(show){ctx.fillStyle=n.kind==="owner"?css('--tx'):css('--tx');
-      const lab=(n.negative?"no ":"")+(n.label.length>24?n.label.slice(0,22)+"…":n.label);
-      ctx.font=(n.kind==="owner"?"600 ":"")+Math.round((n.kind==="owner"?13:11)*view.k)+"px -apple-system,Segoe UI,Roboto,sans-serif";
-      ctx.fillText(lab,x+r+4,y);}
+    const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.75,view.k)), dim=hover&&!related(n);
+    ctx.globalAlpha=dim?0.25:1;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=n.color||catColor(n.cat);ctx.fill();
+    if(n.anchor&&expanded.has(n.id)){ctx.lineWidth=2.4;ctx.strokeStyle="#fff";ctx.stroke()}
+    if(n.negative){ctx.lineWidth=1.8;ctx.strokeStyle="var(--danger)";ctx.stroke()}
+    ctx.globalAlpha=1;
+    if(n.anchor||n.parent||n.size>=4||n===hover){
+      ctx.fillStyle="rgba(231,233,238,.94)";ctx.font="11px -apple-system,Segoe UI";ctx.textBaseline="middle";
+      const lab=(n.negative?"!":"")+(n.label||n.id);
+      ctx.fillText(lab.length>28?lab.slice(0,26)+"...":lab,x+r+5,y);
+    }
   }
-  ctx.globalAlpha=1;
 }
-function isNbr(n){if(!hover)return false;for(const l of links){if((l.s===hover&&l.t===n)||(l.t===hover&&l.s===n))return true;}return false;}
-function at(mx,my){let best=null,bd=1e9;for(const n of nodes){const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my);
-  if(d<Math.max(9,n.r*view.k+4)&&d<bd){bd=d;best=n;}}return best;}
-function deg(n){let c=0;for(const l of links)if((l.s===n||l.t===n)&&!l.prov)c++;return c;}
-function esc(s){return (s||"").replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
-cv.addEventListener('mousemove',e=>{const mx=e.offsetX,my=e.offsetY;
-  if(drag){drag.x=(mx-view.x)/view.k;drag.y=(my-view.y)/view.k;drag.vx=drag.vy=0;return;}
-  if(pan){view.x=pan.vx+(mx-pan.mx);view.y=pan.vy+(my-pan.my);return;}
-  const n=at(mx,my);hover=n;const tip=$("tip");
-  if(n){cv.style.cursor="grab";let h="";
-    if(n.kind==="owner")h=`<div class="t">you</div><div class="m">your memory across all surfaces</div>`;
-    else if(n.kind==="surface")h=`<div class="t">${esc(n.label)}</div><div class="m">surface · ${links.filter(l=>l.prov&&l.t===n).length} memories learned here</div>`;
-    else h=`<div class="t">${n.negative?'avoid: ':''}${esc(n.label)}</div><div class="m">strength ${(n.size||0)}/9 · ${(n.surfaces||[]).map(k=>DATA.surfaces.find(s=>s.key===k).label).join(', ')}</div>`;
-    tip.innerHTML=h;tip.style.display="block";tip.style.left=Math.min(W-255,mx+14)+"px";tip.style.top=Math.min(H-70,my+14)+"px";
-  }else{cv.style.cursor="default";tip.style.display="none";}});
-cv.addEventListener('mousedown',e=>{const n=at(e.offsetX,e.offsetY);
-  if(n){drag=n;cv.style.cursor="grabbing";}else pan={mx:e.offsetX,my:e.offsetY,vx:view.x,vy:view.y};});
-window.addEventListener('mouseup',()=>{drag=null;pan=null;});
-cv.addEventListener('wheel',e=>{e.preventDefault();const f=e.deltaY<0?1.12:0.89,mx=e.offsetX,my=e.offsetY;
-  const nx=(mx-view.x)/view.k,ny=(my-view.y)/view.k;view.k=Math.max(0.3,Math.min(4,view.k*f));
-  view.x=mx-nx*view.k;view.y=my-ny*view.k;},{passive:false});
+function nodeAt(mx,my){let best=null,bd=1e9;for(const n of nodes){const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my),rr=Math.max(9,n.r*view.k+5);if(d<rr&&d<bd){best=n;bd=d}}return best}
+cv.addEventListener("mousemove",e=>{
+  hover=nodeAt(e.offsetX,e.offsetY);cv.style.cursor=hover?"pointer":"grab";
+  const tip=$("tip");
+  if(hover){
+    tip.style.display="block";
+    tip.innerHTML=`<div class="t">${hover.label||hover.id}</div><div class="m">${hover.kind||hover.cat} - strength ${hover.size||1}${hover.anchor?` - ${hover.child_count||0} tucked tags`:''}</div>`;
+    tip.style.left=Math.min(W-305,e.offsetX+14)+"px";tip.style.top=Math.min(H-70,e.offsetY+14)+"px";
+  }else tip.style.display="none";
+  paint();
+});
+cv.addEventListener("click",e=>{
+  const n=nodeAt(e.offsetX,e.offsetY);
+  if(n&&hierarchyOn&&n.anchor){
+    if(expanded.has(n.id)){expanded.delete(n.id);focusAnchor=null}else{expanded.add(n.id);focusAnchor=n.id}
+    build();
+  }
+});
+zoom=d3.zoom().scaleExtent([.25,5]).on("zoom",ev=>{view=ev.transform;paint()});
+d3.select(cv).call(zoom);
+function fit(){
+  if(!nodes.length)return;
+  const minx=d3.min(nodes,n=>n.x),maxx=d3.max(nodes,n=>n.x),miny=d3.min(nodes,n=>n.y),maxy=d3.max(nodes,n=>n.y);
+  const k=Math.min(W/((maxx-minx||1)+140),H/((maxy-miny||1)+140),2);
+  const tx=W/2-k*(minx+maxx)/2,ty=H/2-k*(miny+maxy)/2;
+  d3.select(cv).transition().duration(450).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(k));
+}
+function legend(){ $("legend").innerHTML="<b style='color:var(--tx)'>categories</b><br/>"+DATA.cats.map(c=>`<span class="sw" style="background:${c.color}"></span>${c.label}`).join("<br/>");}
 async function load(){
   const base=($("base").value||location.origin||"").replace(/\/+$/,"");
-  const person=$("person").value.trim();
-  if(!person){$("msg").textContent="enter your FERN id";return;}
-  $("msg").textContent="loading…";
+  const site=$("site").value.trim(), user=$("user").value.trim();
+  if(!site){$("msg").textContent="enter a site";return}
+  $("msg").textContent="loading...";
   try{
-    const r=await fetch(base+"/memory-graph",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({person})});
-    const d=await r.json();
-    if(!r.ok) throw new Error(d.detail||("HTTP "+r.status));
-    if(!d.nodes.length){$("msg").textContent="no memory yet for "+person;DATA={nodes:[],edges:[],surfaces:[]};fillFocus();build();return;}
-    DATA=d;fillFocus();build();
-    $("msg").textContent=d.stats.memories+" memories · "+d.stats.surfaces+" surfaces";
-  }catch(e){$("msg").textContent="couldn't load: "+e.message+" — showing sample";DATA=SAMPLE;fillFocus();build();}
+    const r=await fetch(base+"/graph-data",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({site,user:user||null,hierarchy:true})});
+    const d=await r.json(); if(!r.ok)throw new Error(d.detail||("HTTP "+r.status));
+    DATA=norm(d); expanded.clear(); legend(); build(); setTimeout(fit,650);
+    $("msg").textContent=`${d.stats.attributes} memories, ${d.stats.edges} links`;
+  }catch(e){DATA=norm(SAMPLE); expanded.clear(); legend(); build(); $("msg").textContent="could not load: "+e.message+"; showing sample";}
 }
-$("load").onclick=load;
-$("replay").onclick=build;
-$("freeze").onclick=()=>{frozen=!frozen;$("freeze").textContent=frozen?"Resume":"Pause";};
-resize();
-if(location.protocol!=="file:"){$("base").value=location.origin;}
-DATA=SAMPLE;fillFocus();build();  // sample shown until you Load your own
-</script>
-</body></html>
+$("load").onclick=load;$("fit").onclick=fit;
+$("hier").onclick=()=>{hierarchyOn=!hierarchyOn;$("hier").classList.toggle("on",hierarchyOn);expanded.clear();build();setTimeout(fit,500)};
+$("known").onclick=()=>{knownOnly=!knownOnly;$("known").classList.toggle("on",knownOnly);build();setTimeout(fit,500)};
+addEventListener("resize",()=>{resize();sim&&sim.alpha(.25).restart();paint()});
+resize();DATA=norm(SAMPLE);legend();build();setTimeout(fit,650);
+if(location.protocol!=="file:")$("base").value=location.origin;
+</script></body></html>

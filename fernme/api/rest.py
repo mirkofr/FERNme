@@ -32,7 +32,7 @@ def ui():
     return FileResponse(_UI)
 
 class GraphIn(BaseModel):
-    site: str; user: Optional[str] = None
+    site: str; user: Optional[str] = None; hierarchy: bool = True
 
 class WhyIn(BaseModel):
     site: str; user: str; attr: str; now: float = 0.0
@@ -46,7 +46,7 @@ def graph_ui():
 
 @app.post("/graph-data")
 def graph_data(b: GraphIn):
-    return _guard(svc.graph, b.site, b.user)
+    return _guard(svc.graph, b.site, b.user, hierarchy=b.hierarchy)
 
 @app.post("/memory-graph")
 def memory_graph(b: MemoryGraphIn):

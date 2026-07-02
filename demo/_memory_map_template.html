@@ -38,9 +38,10 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 <header>
   <h1>FERNme<span>__OWNER__'s memory</span></h1>
   <button class="btn" id="fit">Fit view</button>
+  <button class="btn on" id="hier">Hierarchy</button>
   <button class="btn on" id="known">Known only</button>
   <span class="grow"></span>
-  <span class="hint">click a node to inspect · hover to trace links · scroll to zoom · drag to pan</span>
+  <span class="hint">click anchors to expand/collapse · click tags to inspect · scroll to zoom · drag to pan</span>
 </header>
 <div id="stage">
   <canvas id="c"></canvas>
@@ -54,7 +55,8 @@ const DATA=__DATA__;
 
 const cv=document.getElementById("c"),ctx=cv.getContext("2d"),DPR=Math.max(1,devicePixelRatio||1);
 const $=i=>document.getElementById(i);
-let W=0,H=0,view=d3.zoomIdentity,hover=null,selected=null,knownOnly=true;
+let W=0,H=0,view=d3.zoomIdentity,hover=null,selected=null,knownOnly=true,hierarchyOn=!!DATA.hierarchy;
+let expanded=new Set(),expandSeeds={},focusAnchor=null;
 const CAT={}; DATA.cats.forEach(c=>CAT[c.key]=c);
 function catColor(k){return (CAT[k]&&CAT[k].color)||"#8b93a1";}
 
@@ -62,16 +64,60 @@ function catColor(k){return (CAT[k]&&CAT[k].color)||"#8b93a1";}
 const owner={id:"__owner__",label:"__OWNER__",owner:true,r:15,cat:null};
 let nodes=[], links=[], byId={}, adj={};
 function build(){
-  const ns=DATA.nodes.filter(n=>!knownOnly||n.known);
+  const prev=byId||{};
+  let sourceNodes, sourceEdges;
+  if(hierarchyOn&&DATA.hierarchy){
+    const anchors=DATA.hierarchy.anchors.map(n=>({...n,anchor:true,known:n.known!==false,cat:n.cat||n.category||"facts",color:n.color||catColor(n.cat||n.category)}));
+    let visibleAnchors=new Set(anchors.map(n=>n.id));
+    if(focusAnchor){
+      visibleAnchors=new Set([focusAnchor]);
+      DATA.hierarchy.edges.forEach(e=>{if(e.source===focusAnchor)visibleAnchors.add(e.target);if(e.target===focusAnchor)visibleAnchors.add(e.source);});
+    }
+    const visible=new Set(visibleAnchors);
+    const subs=DATA.hierarchy.subnodes.filter(n=>expanded.has(n.parent)&&(!focusAnchor||n.parent===focusAnchor)).map(n=>({...n,anchor:false,cat:n.cat||n.category||"facts",color:n.color||catColor(n.cat||n.category)}));
+    subs.forEach(n=>visible.add(n.id));
+    sourceNodes=[...anchors.filter(n=>visibleAnchors.has(n.id)),...subs];
+    sourceEdges=[
+      ...DATA.hierarchy.edges.filter(e=>visible.has(e.source)&&visible.has(e.target)),
+      ...DATA.hierarchy.expanded_edges.filter(e=>visible.has(e.source)&&visible.has(e.target)&&(expanded.has(e.parentSource)||expanded.has(e.parentTarget)))
+    ];
+  }else{
+    sourceNodes=DATA.nodes;
+    sourceEdges=DATA.edges;
+  }
+  const ns=sourceNodes.filter(n=>!knownOnly||n.known||n.anchor||(hierarchyOn&&expanded.has(n.parent)));
   const keep=new Set(ns.map(n=>n.id));
-  nodes=[owner, ...ns.map(n=>({...n,r:4+Math.sqrt(n.size||1)*2.4}))];
+  const siblings={}; ns.forEach(n=>{if(n.parent)(siblings[n.parent]=siblings[n.parent]||[]).push(n.id);});
+  const focusChildren=focusAnchor?(siblings[focusAnchor]||[]):[], focusNeighborIds=focusAnchor?ns.filter(n=>n.anchor&&n.id!==focusAnchor).map(n=>n.id):[];
+  nodes=[...(focusAnchor?[]:[owner]), ...ns.map(n=>{
+    const old=prev[n.id], parent=n.parent&&prev[n.parent], seed=n.parent&&expandSeeds[n.parent];
+    let x=old&&old.x, y=old&&old.y;
+    let fx=null, fy=null;
+    if(focusAnchor&&n.id===focusAnchor){x=W/2;y=H/2;fx=x;fy=y;}
+    else if(focusAnchor&&n.parent===focusAnchor){
+      const i=Math.max(0,focusChildren.indexOf(n.id)), total=Math.max(1,focusChildren.length);
+      const a=-Math.PI/2+i*2*Math.PI/total, ring=110+Math.min(190,total*2.8);
+      x=W/2+Math.cos(a)*ring; y=H/2+Math.sin(a)*ring; fx=x; fy=y;
+    }else if(focusAnchor&&n.anchor){
+      const i=Math.max(0,focusNeighborIds.indexOf(n.id)), total=Math.max(1,focusNeighborIds.length);
+      const a=-Math.PI/2+i*2*Math.PI/total, ring=Math.min(W,H)*0.34;
+      x=W/2+Math.cos(a)*ring; y=H/2+Math.sin(a)*ring; fx=x; fy=y;
+    }else if((x==null||y==null)&&n.parent&&(parent||seed)){
+      const sib=siblings[n.parent]||[], i=Math.max(0,sib.indexOf(n.id)), total=Math.max(1,sib.length);
+      const a=-Math.PI/2+i*2*Math.PI/total, ring=70+Math.min(120,total*2.2);
+      const cx=(parent&&parent.x)||(seed&&seed.x)||W/2, cy=(parent&&parent.y)||(seed&&seed.y)||H/2;
+      x=cx+Math.cos(a)*ring; y=cy+Math.sin(a)*ring;
+    }
+    if(x==null||y==null){x=n.kind==="owner"?W/2:W/2+(Math.random()-.5)*360;y=n.kind==="owner"?H/2:H/2+(Math.random()-.5)*300;}
+    return {...n,r:(n.anchor?7:5)+Math.sqrt(n.size||1)*(n.anchor?2.8:2.4),x,y,fx,fy};
+  })];
   byId={}; nodes.forEach(n=>byId[n.id]=n);
-  links=DATA.edges.filter(e=>keep.has(e.source)&&keep.has(e.target))
-                  .map(e=>({source:e.source,target:e.target,weight:e.weight}));
+  links=sourceEdges.filter(e=>keep.has(e.source)&&keep.has(e.target))
+                   .map(e=>({source:e.source,target:e.target,weight:e.weight,aggregated:e.aggregated,cross:e.cross}));
   // owner links to the strongest node per category so it sits central + connected
   const strongest={};
   ns.forEach(n=>{ if(!strongest[n.cat]||n.size>strongest[n.cat].size) strongest[n.cat]=n; });
-  Object.values(strongest).forEach(n=>links.push({source:"__owner__",target:n.id,weight:3,owner:true}));
+  if(!focusAnchor)Object.values(strongest).forEach(n=>links.push({source:"__owner__",target:n.id,weight:3,owner:true}));
   adj={}; links.forEach(l=>{const s=l.source.id||l.source,t=l.target.id||l.target;(adj[s]=adj[s]||new Set()).add(t);(adj[t]=adj[t]||new Set()).add(s);});
 }
 
@@ -112,9 +158,11 @@ function paint(){
     const dim=foc&&!lit;
     const col=l.owner?"255,255,255":hexToRgb(catColor(s.owner?t.cat:s.cat));
     ctx.strokeStyle=`rgba(${col},${lit?0.85:(dim?0.03:0.16)})`;
-    ctx.lineWidth=(lit?1.6:0.6)*Math.min(1.5,view.k);
+    ctx.lineWidth=(lit?1.6:(l.aggregated?1.0:0.6))*Math.min(1.5,view.k);
+    ctx.setLineDash(l.cross?[5,4]:[]);
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
   }
+  ctx.setLineDash([]);
   // nodes
   for(const n of nodes){
     if(n.x==null)continue;
@@ -129,7 +177,8 @@ function paint(){
     } else {
       ctx.shadowColor=n.color;ctx.shadowBlur=(focused||n===foc)?16:7;
       ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=n.color;ctx.fill();ctx.shadowBlur=0;
-      if(n===selected){ctx.lineWidth=2.5;ctx.strokeStyle="#fff";ctx.stroke();}
+      if(n.anchor&&expanded.has(n.id)){ctx.lineWidth=2.5;ctx.strokeStyle="#fff";ctx.stroke();}
+      else if(n===selected){ctx.lineWidth=2.5;ctx.strokeStyle="#fff";ctx.stroke();}
       else if(n.negative){ctx.lineWidth=1.6;ctx.strokeStyle="var(--danger)";ctx.strokeStyle="#f0708a";ctx.stroke();}
     }
     ctx.globalAlpha=1;
@@ -138,7 +187,7 @@ function paint(){
   ctx.textAlign="left";ctx.textBaseline="middle";
   for(const n of nodes){
     if(n.owner)continue;
-    const show=n===hover||n===selected||nb(n)||nbSel(n)||(n.size>=4&&view.k>=0.85)||view.k>=2.2;
+  const show=n===hover||n===selected||nb(n)||nbSel(n)||n.parent||(n.size>=4&&view.k>=0.85)||view.k>=2.2;
     if(!show)continue;
     const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.7,view.k));
     ctx.fillStyle="rgba(231,233,238,.92)";ctx.font="11px -apple-system,Segoe UI";
@@ -149,16 +198,27 @@ function paint(){
 function hexToRgb(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)].join(',');}
 
 // ---- interaction ----
-function nodeAt(mx,my){let best=null,bd=1e9;for(const n of nodes){if(n.x==null)continue;const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my),rr=Math.max(8,n.r*view.k+5);if(d<rr&&d<bd){bd=d;best=n;}}return best;}
+function nodeAt(mx,my){let best=null,bd=1e9;for(const n of nodes){if(n.x==null)continue;const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my),rr=Math.max(8,n.r*view.k+5);
+  const lab=((n.negative?"!":"")+(n.label||"")).slice(0,26), lx=x+rr+4, ly=y-9, lw=Math.max(38,lab.length*7);
+  const inLabel=mx>=lx&&mx<=lx+lw&&my>=ly&&my<=ly+18;
+  if((d<rr||inLabel)&&d<bd){bd=d;best=n;}}return best;}
 cv.addEventListener("mousemove",e=>{
   const mx=e.offsetX,my=e.offsetY,n=nodeAt(mx,my),tip=$("tip");
   hover=n;cv.style.cursor=n?"pointer":"grab";
-  if(n&&!n.owner){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+n.label}</div><div class="m">${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9</div>`;
+  if(n&&!n.owner){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+n.label}</div><div class="m">${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9${n.anchor?` · ${n.child_count||0} tucked tags`:''}</div>`;
     tip.style.left=Math.min(W-270,mx+14)+"px";tip.style.top=Math.min(H-60,my+14)+"px";}
   else tip.style.display="none";
   paint();
 });
-cv.addEventListener("click",e=>{const n=nodeAt(e.offsetX,e.offsetY);if(n&&!n.owner)inspect(n);else closeInsp();});
+cv.addEventListener("click",e=>{
+  const n=nodeAt(e.offsetX,e.offsetY);
+  if(n&&!n.owner&&hierarchyOn&&n.anchor){
+    if(focusAnchor===n.id){expanded.clear();expandSeeds={};focusAnchor=null;}
+    else{expanded.clear();expandSeeds={};expanded.add(n.id);expandSeeds[n.id]={x:n.x,y:n.y};focusAnchor=n.id;}
+    closeInsp();start();return;
+  }
+  if(n&&!n.owner)inspect(n);else closeInsp();
+});
 
 const zoom=d3.zoom().scaleExtent([0.2,6]).on("zoom",ev=>{view=ev.transform;paint();});
 d3.select(cv).call(zoom);
@@ -170,9 +230,10 @@ function fit(){
   d3.select(cv).transition().duration(500).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(k));
 }
 $("fit").onclick=fit;
-$("known").onclick=()=>{knownOnly=!knownOnly;$("known").classList.toggle("on",knownOnly);start();setTimeout(fit,700);};
+$("hier").onclick=()=>{hierarchyOn=!hierarchyOn;$("hier").classList.toggle("on",hierarchyOn);expanded.clear();expandSeeds={};focusAnchor=null;start();setTimeout(fit,700);};
+$("known").onclick=()=>{knownOnly=!knownOnly;$("known").classList.toggle("on",knownOnly);start();if(!focusAnchor)setTimeout(fit,700);};
 $("ix").onclick=closeInsp;
-addEventListener("keydown",e=>{if(e.key==="Escape")closeInsp();});
+addEventListener("keydown",e=>{if(e.key==="Escape"){expanded.clear();expandSeeds={};focusAnchor=null;closeInsp();start();}});
 function closeInsp(){selected=null;$("insp").classList.remove("open");paint();}
 
 function strengthWord(s){return s>=7?"very strong":s>=4?"strong":s>=2?"moderate":"weak/tentative";}
@@ -188,6 +249,7 @@ function inspect(n){
     (n.gloss?`<div class="kv"><div class="k">What it means</div><div class="v">${n.gloss}</div></div>`:'')+
     (n.context?`<div class="kv"><div class="k">Context</div><div class="box">${n.context}</div></div>`:'')+
     `<div class="kv"><div class="k">Strength</div><div class="bar"><i style="width:${(n.size/9*100)}%;background:${c.color}"></i></div><div class="v" style="margin-top:5px">${(n.size||0)} / 9</div></div>`+
+    (n.anchor?`<div class="kv"><div class="k">Nested tags</div><div class="v">${n.child_count||0}</div></div>`:'')+
     `<div class="kv"><div class="k">Confidence</div><div class="v">${conf}%<span class="tag ${n.known?'known':'guess'}">${n.known?'known':'tentative'}</span></div></div>`+
     `<div class="kv"><div class="k">Why FERNme remembers this</div><div class="box">${why}</div></div>`+
     `<div class="kv"><div class="k">Connected memories (${conn.length})</div><div class="links">`+

@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 from .core.graph import UserGraph, AssocGraph, Event, Edge
 from .write import Catalog, map_event, observe, decay
 from .categories import category_of, CATEGORIES
+from .hierarchy import build_hierarchy
 from .retrieve.card import compile_card
 from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
@@ -512,7 +513,8 @@ class FernService:
         self.store.save_user(ug)
         return {"pruned": len(pruned), "remaining": ug.n_edges()}
 
-    def graph(self, site: str, user: str = None, assoc_floor: float = 2.0) -> Dict:
+    def graph(self, site: str, user: str = None, assoc_floor: float = 2.0,
+              hierarchy: bool = True) -> Dict:
         """Memory as nodes + edges for visualization. user=None -> whole site
         (all consented users + shared attributes); user set -> that user's subgraph."""
         if user is not None:
@@ -544,9 +546,13 @@ class FernService:
         for (a, b), w in ag.edges.items():
             if a in present and b in present and w >= assoc_floor:
                 edges.append({"source": a, "target": b, "weight": round(w, 1), "assoc": True})
-        return {"nodes": list(nodes.values()), "edges": edges, "categories": CATEGORIES,
-                "stats": {"users": sum(1 for v in nodes.values() if v["kind"] == "user"),
-                          "attributes": len(present), "edges": len(edges)}}
+        out = {"nodes": list(nodes.values()), "edges": edges,
+               "categories": CATEGORIES, "cats": CATEGORIES,
+               "stats": {"users": sum(1 for v in nodes.values() if v["kind"] == "user"),
+                         "attributes": len(present), "edges": len(edges)}}
+        if hierarchy:
+            out["hierarchy"] = build_hierarchy(out)
+        return out
 
     def confidence(self, site: str, user: str, attr: str, now: float = 0.0,
                    taxonomy_match=None, outcome_success=None, conflict: float = 0.0,
