@@ -8,7 +8,7 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Persisted edge provenance (`stated`/`inferred`) in SQLite and Postgres stores,
   including migration defaults and consolidation snapshot/undo preservation.
 - Added deterministic structured-field extraction at capture ingest for email,
-  tel, URL, handle, and ISO-date payload retention.
+  phone, URL, handle, and ISO-date payload retention.
 
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 

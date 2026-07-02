@@ -265,7 +265,7 @@ print(svc.card("shop.example", "elena")["wire"])
   novel free text. *This is the product-critical layer — and the foundation a future
   recursive/region organization would group on.*
 - **Structured-field capture** — regex-only contact/date extraction keeps email,
-  tel, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
+  phone, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
 - **The Cabinet** — append-only event log with `recall()` for specific facts.
 - **Edge provenance** — persisted `stated`/`inferred` authority metadata on graph
   edges across SQLite, Postgres, and consolidation undo.
@@ -303,7 +303,7 @@ zero-LLM writes intact; it is new infrastructure for v0.4 and not yet validated 
 an end-user entity capability.
 
 🆕 **Structured-field ingest:** the capture pipeline now retains deterministic
-email, tel, URL, handle, and ISO-date extractions in event payloads before tag
+email, phone, URL, handle, and ISO-date extractions in event payloads before tag
 extraction. These values are stored as raw Cabinet data only; Phase 3 will decide
 how entity fields consume them.
 

@@ -10,15 +10,15 @@ from fernme.store.sqlite_store import SQLiteStore
 
 
 def _email(local="dana"):
-    return local + chr(64) + "example.test"
+    return local + "@example.test"
 
 
 def _handle(name="dana_ops"):
-    return chr(64) + name
+    return "@" + name
 
 
-def _tel_field():
-    return "ph" + "one"
+def _phone_field():
+    return "phone"
 
 
 def test_extract_structured_contact_fields_are_regex_only():
@@ -30,7 +30,7 @@ def test_extract_structured_contact_fields_are_regex_only():
     fields = extract_structured(text)
 
     assert ("email", _email()) in fields
-    assert (_tel_field(), "+1 (555) 010-2222") in fields
+    assert (_phone_field(), "+1 (555) 010-2222") in fields
     assert ("url", "https://example.test/brief") in fields
     assert ("handle", _handle()) in fields
     assert ("iso-date", "2026-07-03") in fields
@@ -38,7 +38,7 @@ def test_extract_structured_contact_fields_are_regex_only():
 
 def test_extract_structured_caps_count_and_value_length():
     many = " ".join(_email(f"user{i}") for i in range(20))
-    too_long = "a" * 129 + chr(64) + "example.test"
+    too_long = "a" * 129 + "@example.test"
 
     fields = extract_structured(many + " " + too_long)
 
@@ -76,7 +76,7 @@ def _assert_pipeline_retains_structured_payload(adapter_name):
 
     assert event["payload"]["structured"] == [
         ["email", _email()],
-        [_tel_field(), "+44 20 7946 0958"],
+        [_phone_field(), "+44 20 7946 0958"],
     ]
     assert _email() in event["payload"]["text"]
     assert _email() not in result["stored_attrs"]

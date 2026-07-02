@@ -12,14 +12,14 @@ MAX_STRUCTURED_VALUE_LEN = 128
 MAX_STRUCTURED_FIELDS = 16
 
 _EMAIL = re.compile(
-    r"\b[A-Z0-9._%+\-]+(?:\x40)[A-Z0-9.\-]+\.[A-Z]{2,}\b",
+    r"\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b",
     re.I,
 )
 _URL = re.compile(r"\bhttps?://[^\s<>'\")\]]+", re.I)
-_HANDLE = re.compile(r"(?<![\w.])(?:\x40)[A-Z][A-Z0-9_]{1,31}\b", re.I)
+_HANDLE = re.compile(r"(?<![\w.])@[A-Z][A-Z0-9_]{1,31}\b", re.I)
 _ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
-_TEL = re.compile(r"(?<!\w)\+?\d[\d\s().\-]{5,}\d(?!\w)")
-_TEL_FIELD = "ph" + "one"
+_PHONE = re.compile(r"(?<!\w)\+?\d[\d\s().\-]{5,}\d(?!\w)")
+_PHONE_FIELD = "phone"
 _DATA_INJECTION = re.compile(
     r"(ignore[\s_\-]*(the[\s_\-]*)?(previous|above)|system:|assistant:|"
     r"<\|.*?\|>|\{\{|\}\}|prompt|disregard|override)",
@@ -81,14 +81,14 @@ def extract_structured(text: str) -> List[Tuple[str, str]]:
             continue
         _add(found, seen, match.start(), "handle", match.group(0))
 
-    for match in _TEL.finditer(text):
+    for match in _PHONE.finditer(text):
         value = match.group(0)
         if _ISO_DATE.fullmatch(value):
             continue
         digits = re.sub(r"\D", "", value)
         if len(digits) < 7:
             continue
-        _add(found, seen, match.start(), _TEL_FIELD, value)
+        _add(found, seen, match.start(), _PHONE_FIELD, value)
 
     found.sort(key=lambda item: (item[0], item[1], item[2]))
     return [(field, value) for _pos, field, value in found[:MAX_STRUCTURED_FIELDS]]
