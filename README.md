@@ -160,6 +160,7 @@ on dimensions single-user, vendor-owned, recall-optimized systems **structurally
 | 9 | **Communication-style & mood memory** | ✅ built + tested |
 | 2 | **Outcome-learning for any goal** (reinforce on results) | ✅ built + tested |
 | 8 | **Explainable provenance** (`why`) | ✅ built + tested |
+| - | **Persisted edge provenance** (`stated` vs `inferred`) | 🆕 new, opt-in, not yet validated |
 | 1 | **Private collective priors** (network-effect cold-start; k-anonymity + bounded-mean DP) | ✅ built + tested |
 | 4 | **Verifiable, cryptographic data ownership** (tamper-evident HMAC chain, cascading unlearning) | ✅ built + tested |
 | 7 | **Multi-timescale memory** (fast context vs. slow identity) | ✅ built + tested |
@@ -264,6 +265,8 @@ print(svc.card("shop.example", "elena")["wire"])
   novel free text. *This is the product-critical layer — and the foundation a future
   recursive/region organization would group on.*
 - **The Cabinet** — append-only event log with `recall()` for specific facts.
+- **Edge provenance** — persisted `stated`/`inferred` authority metadata on graph
+  edges across SQLite, Postgres, and consolidation undo.
 - **Supernode** (`supernode.py` + `auth.py`) — user-owned cross-site profile, built by **sign-in** (verified token → opaque person id), default-deny scoped views, sensitive categories walled off.
 - **Proactive triggers** — due-to-reorder + fading-favorite nudges.
 - **Safety** — event tags treated as untrusted data: injection-pattern dropping, size/value caps.
@@ -290,7 +293,12 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (139 passing, 2 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, and the full results suite above.
+✅ **Done & tested (157 passing, 3 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, and the full results suite above.
+
+🆕 **Entity-layer groundwork:** edge provenance now survives SQLite/Postgres
+round-trips and consolidation snapshot/undo flows. This keeps deterministic,
+zero-LLM writes intact; it is new infrastructure for v0.4 and not yet validated as
+an end-user entity capability.
 
 🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
 
@@ -318,7 +326,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       139 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       157 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

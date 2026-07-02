@@ -2,6 +2,12 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [0.4.0-unreleased] — entity layer groundwork
+
+### Added
+- Persisted edge provenance (`stated`/`inferred`) in SQLite and Postgres stores,
+  including migration defaults and consolidation snapshot/undo preservation.
+
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 
 ### Added

@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS consents(
   PRIMARY KEY(site, "user"));
 CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, "user" TEXT, attr TEXT, weight DOUBLE PRECISION, confidence DOUBLE PRECISION,
-  source TEXT, last_reinforced DOUBLE PRECISION, hits INT, fast DOUBLE PRECISION DEFAULT 0, salience DOUBLE PRECISION DEFAULT 0,
+  source TEXT, last_reinforced DOUBLE PRECISION, hits INT, fast DOUBLE PRECISION DEFAULT 0,
+  salience DOUBLE PRECISION DEFAULT 0, provenance TEXT NOT NULL DEFAULT 'inferred',
   PRIMARY KEY(site, "user", attr));
 CREATE TABLE IF NOT EXISTS user_numeric(
   site TEXT, "user" TEXT, key TEXT, value TEXT,
@@ -52,6 +53,9 @@ class PostgresStore:
         self._conn.execute(SCHEMA)
         for col in ("fast", "salience"):   # forward-compat for DBs created before these columns
             self._conn.execute("ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS %s DOUBLE PRECISION DEFAULT 0" % col)
+        self._conn.execute(
+            "ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'inferred'"
+        )
 
     def _q(self, sql, args=()):
         return self._conn.execute(sql, args)
@@ -72,7 +76,8 @@ class PostgresStore:
         ug = UserGraph(site, user)
         for r in self._q('SELECT * FROM user_edges WHERE site=%s AND "user"=%s', (site, user)).fetchall():
             ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
-                                       r["last_reinforced"], r["hits"], r.get("fast", 0.0), r.get("salience", 0.0))
+                                       r["last_reinforced"], r["hits"], r.get("fast", 0.0),
+                                       r.get("salience", 0.0), r.get("provenance", "inferred"))
         for r in self._q('SELECT key,value FROM user_numeric WHERE site=%s AND "user"=%s', (site, user)).fetchall():
             v = r["value"]
             try:
@@ -87,9 +92,10 @@ class PostgresStore:
     def save_user(self, ug: UserGraph):
         with self._lock, self._conn.cursor() as c:
             c.execute('DELETE FROM user_edges WHERE site=%s AND "user"=%s', (ug.site, ug.user))
-            c.executemany('INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            c.executemany('INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                           [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                            e.last_reinforced, e.hits, e.fast, e.salience) for a, e in ug.edges.items()])
+                            e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
+                           for a, e in ug.edges.items()])
             c.execute('DELETE FROM user_numeric WHERE site=%s AND "user"=%s', (ug.site, ug.user))
             c.executemany('INSERT INTO user_numeric VALUES(%s,%s,%s,%s)',
                           [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
