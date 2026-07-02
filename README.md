@@ -264,6 +264,8 @@ print(svc.card("shop.example", "elena")["wire"])
   concept never drifts across months. Deterministic by default; gated-LLM only for
   novel free text. *This is the product-critical layer — and the foundation a future
   recursive/region organization would group on.*
+- **Structured-field capture** — regex-only contact/date extraction keeps email,
+  tel, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
 - **The Cabinet** — append-only event log with `recall()` for specific facts.
 - **Edge provenance** — persisted `stated`/`inferred` authority metadata on graph
   edges across SQLite, Postgres, and consolidation undo.
@@ -293,12 +295,17 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (157 passing, 3 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, and the full results suite above.
+✅ **Done & tested (163 passing, 3 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, and the full results suite above.
 
 🆕 **Entity-layer groundwork:** edge provenance now survives SQLite/Postgres
 round-trips and consolidation snapshot/undo flows. This keeps deterministic,
 zero-LLM writes intact; it is new infrastructure for v0.4 and not yet validated as
 an end-user entity capability.
+
+🆕 **Structured-field ingest:** the capture pipeline now retains deterministic
+email, tel, URL, handle, and ISO-date extractions in event payloads before tag
+extraction. These values are stored as raw Cabinet data only; Phase 3 will decide
+how entity fields consume them.
 
 🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
 
@@ -326,7 +333,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       157 passing, 3 skipped   ·   *_demo.py walkthroughs
+tests/       163 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---
