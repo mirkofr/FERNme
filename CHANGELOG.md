@@ -17,6 +17,8 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   compact card enrichment, card token estimates, and one-hop stated relation pull.
 - Added fictional entity-layer acceptance fixtures covering commerce and
   non-commerce research/family scenarios.
+- Added `python -m fernme.eval.entities`, a reproducible synthetic micro-eval for
+  the A2 alias-fragmentation dilution effect with entity aggregation off vs. on.
 
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 

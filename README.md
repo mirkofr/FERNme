@@ -11,9 +11,9 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-194%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-195%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
-[![Status](https://img.shields.io/badge/status-v0.3%20research%20preview-7f77dd.svg)](#-honest-status)
+[![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
 
 *Cheap to write · flat to read · interpretable by design · owned by the user*
@@ -26,7 +26,7 @@
 
 ## ✨ The one-paragraph pitch
 
-Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* for *many* people, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the goal is). It starts where agents already act today — websites — and builds a user-owned personalization model the person can inspect and control. Each user is a sparse, fuzzily-weighted node in a per-site graph; edges update by a **Hebbian co-occurrence rule with zero LLM calls**, retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct what agents use to personalize, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
+Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* for *many* people, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the goal is). It starts where agents already act today — websites — and builds a user-owned personalization model the person can inspect and control. Each user is a sparse, fuzzily-weighted node in a per-site graph; the graph now also supports opt-in typed entities with labeled, Hebbian-weighted relations — who people are and how they connect — while still keeping zero LLM calls in the write path. Retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct what agents use to personalize, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
 
 ---
 
@@ -50,6 +50,7 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 | 🪶 **Zero-LLM writes** | Memory updates are arithmetic on a graph — **0 LLM calls per interaction** vs. ~2 for extraction-based memory. No write-time cost, no write-time hallucination. |
 | 📉 **Flat token cost forever** | The prompt card holds **~25 tokens** whether it's a visitor's first day or fifth year. A full-history baseline is **77.4× larger** by 120 interactions. |
 | 🧠 **Strong in every regime** | Ties a frequency counter on static recall, **beats it 0.718 → 0.128 on drift**, and **wins on context** (0.617 → 0.513). Class-targeted volatility retention + spreading activation preserve permanent facts without giving stale tastes too much inertia. |
+| 🧬 **Typed people & relations** | Entities with aliases, contact fields, and labeled relations (`ceo_of`, `family_of`, ...) strengthened Hebbian-style; deterministic path queries; opt-in and byte-identical when off. |
 | 🪟 **Glass-box & user-owned** | Every preference is visible and editable. People fix what's wrong, delete everything, or export it. Privacy becomes a feature, not a liability. |
 | 🏬 **Built for outcomes** | Evaluated by **conversion**, not QA. A simulated storefront shows **+17% conversion lift** vs. non-personalized recommendations. |
 | 🧩 **User-owned supernode** | Sign in across sites → your memories assemble like Lego into one profile **you control**, default-deny, sensitive data walled off. Not surveillance — the mirror image of it. |
@@ -69,6 +70,8 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 > **Honest scope:** the numbers below are on **synthetic or LLM-authored** data, not real
 > users. They validate the *mechanism* and surface failures; a real-human pilot is the
 > pending next step. The Mem0 (LLM) head-to-head needs an API key and is not yet run.
+> Entity-layer validation is currently acceptance-fixture and micro-eval only; a
+> real-profile entity benchmark is pending.
 
 ### On LLM-authored people (closest to real, agentic ingestion)
 A sample of 16 of 92 third-person profiles (ChatGPT-authored), read as **prose only** and
@@ -88,7 +91,7 @@ engine is solid; the extraction quality is the agent's.)*
 
 ### Cost, recall, and Pareto (synthetic, multi-seed)
 
-> Reproduce: `python -m fernme.eval.cost_variance` · `... quality` · `... drift` · `... context` · `... retention` · `... ablation` · `... pilot`
+> Reproduce: `python -m fernme.eval.cost_variance` · `... quality` · `... drift` · `... context` · `... retention` · `... ablation` · `... pilot` · `... entities`
 
 **Cost** — per-turn memory tokens vs. profile size (5 seeds):
 
@@ -109,6 +112,10 @@ engine is solid; the extraction quality is the agent's.)*
 > **The headline:** FERNme is the *only* method strong everywhere. Frequency can't forget (fails drift); recency is noisy (fails static). FERNme's decay + spreading activation get both.
 
 **Cold-start ablation** — population prior gives **+0.06 precision@5 at turns 1–3**, washing out by turn 10 (a real but modest, cold-start-only benefit).
+
+**Typed-entity A2 micro-eval** (`python -m fernme.eval.entities`) — synthetic,
+fictional alias-fragmentation fixture. It reports the rank of a fragmented person
+entity with `entity_aggregation` off vs. on; no real-profile claims yet.
 
 **Cost / quality Pareto** (`python -m fernme.eval.pareto`) — measured FERNme recall &
 tokens, modeled LLM nuance & price (assumptions in-file). Per 1,000 interactions:
@@ -160,7 +167,7 @@ on dimensions single-user, vendor-owned, recall-optimized systems **structurally
 | 9 | **Communication-style & mood memory** | ✅ built + tested |
 | 2 | **Outcome-learning for any goal** (reinforce on results) | ✅ built + tested |
 | 8 | **Explainable provenance** (`why`) | ✅ built + tested |
-| - | **Persisted edge provenance** (`stated` vs `inferred`) | 🆕 new, opt-in, not yet validated |
+| - | **Persisted edge provenance** (`stated` vs `inferred`) | built + tested |
 | - | **Typed identity entities + relations** | validated on synthetic acceptance fixtures; no real-profile validation yet |
 | - | **Entity-aware card aggregation/enrichment** | validated on synthetic acceptance fixtures; no real-profile validation yet |
 | 1 | **Private collective priors** (network-effect cold-start; k-anonymity + bounded-mean DP) | ✅ built + tested |
@@ -184,6 +191,8 @@ flowchart TD
     CONSENT -->|yes| ENGINE
     subgraph ENGINE[Engine - no LLM in the write path]
       W[Hebbian write + decay] --> G[(Per-site preference graph<br/>fuzzy 0-9 edges)]
+      W --> E[(Entity tables<br/>entities, aliases, fields, relations)]
+      E -->|opt-in alias aggregation| R
       G --> R[Spreading-activation retrieval]
       R --> CARD[Token-minimal card ~25 tok]
       PRIOR[Population prior<br/>differential encoding] --> R
@@ -213,7 +222,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 194 passing, 3 skipped
+pytest -q                               # 195 passing, 3 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -250,6 +259,17 @@ svc.observe(
 )
 
 print(svc.card("shop.example", "elena")["wire"])
+```
+
+Typed entities are opt-in (`entities=True`, `entity_aggregation=True`):
+
+```python
+from dataclasses import replace; from fernme.config import DEFAULT
+svc = FernService(db_path=":memory:", cfg=replace(DEFAULT, entities=True, entity_aggregation=True)); svc.consent("demo.example", "alex", True)
+alex = svc.entity_create("demo.example", "alex", "person", "Alex Chen")
+dana = svc.entity_create("demo.example", "alex", "person", "Dana Reyes")
+svc.entity_relate("demo.example", "alex", alex, "friend_of", dana)
+print(svc.recall_path("demo.example", "alex", alex, dana))
 ```
 
 ---
@@ -289,6 +309,7 @@ FERNme is a **different category** from conversational memories — it is a user
 | | 🌿 FERNme | Mem0 | Zep/Graphiti | Letta | MemOS |
 |---|:--:|:--:|:--:|:--:|:--:|
 | Write | **no LLM** | LLM | LLM → KG | LLM-paged | LLM |
+| Typed relations | deterministic, opt-in entity/relation graph | LLM-extracted memories | LLM-built KG per episode | model-managed pages | hybrid |
 | Retrieval | spreading activation | vector | graph+time | OS paging | hybrid |
 | Eval axis | **outcomes** | QA | temporal QA | long-horizon | QA |
 | User-owned + glass-box | **✅** | – | – | – | – |
@@ -300,19 +321,17 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (194 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, typed entity storage/service APIs, opt-in entity-aware cards, and the full results suite above.
+Done & tested (195 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, and the full results suite above.
 
-New: typed entity layer. The core now has deterministic, consent-gated service
-APIs plus additive SQLite/Postgres tables for entities, aliases, fields, and typed
-relations with Hebbian strengthening/decay. Opt-in retrieval integration can
-aggregate fragmented aliases and enrich card slots with compact entity context.
-It is validated on synthetic acceptance fixtures, including a non-commerce
-research/family scenario; there is no real-profile validation yet.
-
-🆕 **Structured-field ingest:** the capture pipeline now retains deterministic
-email, phone, URL, handle, and ISO-date extractions in event payloads before tag
-extraction. These values are stored as raw Cabinet data only; entity-field writes
-are available through the service API, with automatic promotion left for a later pass.
+🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
+SQLite/Postgres tables for entities, aliases, fields, and typed relations with
+Hebbian strengthening/decay. Opt-in retrieval integration can aggregate fragmented
+aliases and enrich card slots with compact entity context. It is validated on
+synthetic acceptance fixtures and the `python -m fernme.eval.entities` micro-eval;
+there is no real-profile validation yet. Structured-field ingest now retains
+email, phone, URL, handle, and ISO-date extractions in event payloads as Cabinet
+data; entity-field writes are available through the service API, with automatic
+promotion left for a later pass.
 
 🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
 
@@ -334,13 +353,15 @@ are available through the service API, with automatic promotion left for a later
 fernme/
   core/      graph types · fuzzy 0–9 edges · event record
   write/     event→attr mapping (no LLM) · Hebbian update · decay
-  retrieve/  base-level + spreading activation · token-minimal card
+  retrieve/  base-level + spreading activation · token-minimal card · entity_card.py
+  capture/   adapters · extractors.py (regex-only structured fields)
   prior/     population prior · differential encoding · IDF cold-start
   store/     sqlite_store · postgres_store (one interface)
+  relations.py · typed entity/relation vocabulary
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
-  eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       194 passing, 3 skipped   ·   *_demo.py walkthroughs
+  eval/      simulator · cost · quality · drift · context · ablation · pilot · entities
+tests/       195 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---
