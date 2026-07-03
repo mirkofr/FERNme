@@ -15,6 +15,8 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   direction-inverted canonical relations.
 - Added opt-in entity-aware retrieval integration: alias activation aggregation,
   compact card enrichment, card token estimates, and one-hop stated relation pull.
+- Added fictional entity-layer acceptance fixtures covering commerce and
+  non-commerce research/family scenarios.
 
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 
