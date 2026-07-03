@@ -101,6 +101,8 @@ def test_elena_fixture_graph_includes_entity_layer():
     assert {"entities", "entity_aliases", "entity_relations"} <= set(g)
     entities = {e["display_name"]: e for e in g["entities"]}
     assert {"Elena", "Jonas", "Daniel", "memory-journal-platform"} <= set(entities)
+    assert entities["Elena"]["node_id"] == "user:elena"
+    assert entities["Elena"]["owner_entity"] is True
     assert entities["Jonas"]["fields"] == [{
         "entity_id": entities["Jonas"]["entity_id"],
         "field": "handle",
@@ -116,12 +118,19 @@ def test_elena_fixture_graph_includes_entity_layer():
     assert "person:jonas-k" in jonas_nodes[0]["collapsed_aliases"]
     assert "person:jonas-k" not in {n["id"] for n in g["nodes"]}
     assert g["entity_aliases"]["person:jonas"] == g["entity_aliases"]["person:jonas-k"]
+    node_ids = {n["id"] for n in g["nodes"]}
+    assert "person:elena" not in node_ids
+    owner_node = next(n for n in g["nodes"] if n["id"] == "user:elena")
+    assert owner_node["entity_display_name"] == "Elena"
+    assert owner_node["owner_entity"] is True
 
     relation_edges = [e for e in g["edges"] if e.get("entity_relation")]
     assert {"friend_of", "colleague_of", "works_on"} <= {e["relation"] for e in relation_edges}
     assert all(e.get("label") == e["relation"] for e in relation_edges)
-    assert all(e["source"] in {n["id"] for n in g["nodes"]} for e in relation_edges)
-    assert all(e["target"] in {n["id"] for n in g["nodes"]} for e in relation_edges)
+    assert any("user:elena" in (e["source"], e["target"]) for e in relation_edges)
+    assert all(e["source"] in node_ids for e in relation_edges)
+    assert all(e["target"] in node_ids for e in relation_edges)
+    assert all(e["source"] != e["target"] for e in g["edges"])
 
 
 def test_elena_fixture_graph_contains_only_fictional_cast():

@@ -859,7 +859,6 @@ class FernService:
             return None
         entities: Dict[str, Dict] = {}
         entity_users: Dict[str, str] = {}
-        alias_links: Dict[str, Dict] = {}
         for u in users:
             for attr in sorted(present):
                 entity = self.store.entity_by_alias(site, u, attr)
@@ -868,7 +867,6 @@ class FernService:
                 eid = entity["entity_id"]
                 entities.setdefault(eid, entity)
                 entity_users.setdefault(eid, u)
-                alias_links[attr] = {"entity_id": eid, "user": u}
         if not entities:
             return None
 
@@ -882,7 +880,15 @@ class FernService:
             visible = sorted([a for a in aliases if a in present])
             if not visible:
                 continue
-            canonical = next((a for a in visible if a.startswith(entity["kind"] + ":")), visible[0])
+            owner_id = "user:" + u
+            owner_alias = f"person:{u}"
+            is_owner_entity = (
+                entity["kind"] == "person"
+                and owner_id in nodes
+                and (owner_alias in aliases or str(entity["display_name"]).lower() == u.lower())
+            )
+            canonical = owner_id if is_owner_entity else next(
+                (a for a in visible if a.startswith(entity["kind"] + ":")), visible[0])
             entity_node[eid] = canonical
             for alias in aliases:
                 alias_to_entity[alias] = eid
@@ -917,6 +923,8 @@ class FernService:
                 "entity_fields": fields,
                 "entity_relations": related,
             })
+            if is_owner_entity:
+                node["owner_entity"] = True
             entity_payload.append({
                 "entity_id": eid,
                 "node_id": canonical,
@@ -926,6 +934,7 @@ class FernService:
                 "collapsed_aliases": collapsed,
                 "fields": fields,
                 "relations": related,
+                "owner_entity": is_owner_entity,
             })
 
         if not entity_payload:
@@ -942,6 +951,8 @@ class FernService:
             edge["target"] = alias_to_node.get(edge["target"], edge["target"])
         deduped: Dict[tuple, Dict] = {}
         for edge in edges:
+            if edge.get("source") == edge.get("target"):
+                continue
             key = (
                 edge.get("source"), edge.get("target"), bool(edge.get("assoc")),
                 bool(edge.get("entity_relation")), edge.get("relation"),

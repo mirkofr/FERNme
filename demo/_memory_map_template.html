@@ -59,6 +59,9 @@ let W=0,H=0,view=d3.zoomIdentity,hover=null,selected=null,knownOnly=true,hierarc
 let expanded=new Set(),expandSeeds={},focusAnchor=null;
 const CAT={}; DATA.cats.forEach(c=>CAT[c.key]=c);
 function catColor(k){return (CAT[k]&&CAT[k].color)||"#8b93a1";}
+const OWNER_SOURCE_ID=((DATA.entities||[]).find(e=>e.owner_entity)||{}).node_id||
+  (((DATA.nodes||[]).find(n=>n.owner_entity)||{}).id);
+function displayId(id){return id===OWNER_SOURCE_ID?"__owner__":id;}
 function relKey(e){return `${e.source}|${e.relation||e.label||""}|${e.target}`;}
 function withEntityRelations(sourceEdges){
   const rels=DATA.entity_relations||[];
@@ -69,13 +72,30 @@ function withEntityRelations(sourceEdges){
     const e={...r,entity_relation:true,relation:r.relation||r.label,label:r.label||r.relation};
     if(!seen.has(relKey(e))){seen.add(relKey(e));add.push(e);}
   });
-  return [...sourceEdges,...add];
+  return [...sourceEdges,...add].map(e=>({...e,source:displayId(e.source),target:displayId(e.target)}));
 }
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
 
 // ---- build nodes/links ----
-const owner={id:"__owner__",label:"__OWNER__",owner:true,r:15,cat:null};
+const ownerSource=(DATA.nodes||[]).find(n=>n.id===OWNER_SOURCE_ID)||{};
+const ownerCat=ownerSource.cat||ownerSource.category||"people";
+const owner={...ownerSource,id:"__owner__",label:"__OWNER__",owner:true,r:15,cat:ownerCat,color:ownerSource.color||catColor(ownerCat)};
 let nodes=[], links=[], byId={}, adj={};
+function nodeRadius(n){
+  const base=(n.anchor?7:5)+Math.sqrt(n.size||1)*(n.anchor?2.8:2.4);
+  return n.id==="__unclustered__"?Math.max(base,22):base;
+}
+function endpointId(v){return v&&v.id?v.id:v;}
+function relationBucket(l){
+  if(!l.entity_relation)return "";
+  const s=endpointId(l.source),t=endpointId(l.target);
+  return l.relation==="works_on"?`${l.relation}|${t}`:`${l.relation}|${[s,t].sort().join("|")}`;
+}
+function assignRelationSlots(items){
+  const buckets={};
+  items.forEach(l=>{if(l.entity_relation)(buckets[relationBucket(l)]=buckets[relationBucket(l)]||[]).push(l);});
+  Object.values(buckets).forEach(group=>group.forEach((l,i)=>{l.relationCount=group.length;l.relationSlot=i-(group.length-1)/2;}));
+}
 function build(){
   const prev=byId||{};
   let sourceNodes, sourceEdges;
@@ -99,8 +119,9 @@ function build(){
     sourceEdges=DATA.edges;
   }
   sourceEdges=withEntityRelations(sourceEdges||[]);
+  sourceNodes=(sourceNodes||[]).filter(n=>n.id!==OWNER_SOURCE_ID);
   const ns=sourceNodes.filter(n=>!knownOnly||n.known||n.anchor||(hierarchyOn&&expanded.has(n.parent)));
-  const keep=new Set(ns.map(n=>n.id));
+  const keep=new Set(ns.map(n=>n.id)); if(!focusAnchor)keep.add("__owner__");
   const siblings={}; ns.forEach(n=>{if(n.parent)(siblings[n.parent]=siblings[n.parent]||[]).push(n.id);});
   const focusChildren=focusAnchor?(siblings[focusAnchor]||[]):[], focusNeighborIds=focusAnchor?ns.filter(n=>n.anchor&&n.id!==focusAnchor).map(n=>n.id):[];
   nodes=[...(focusAnchor?[]:[owner]), ...ns.map(n=>{
@@ -123,7 +144,7 @@ function build(){
       x=cx+Math.cos(a)*ring; y=cy+Math.sin(a)*ring;
     }
     if(x==null||y==null){x=n.kind==="owner"?W/2:W/2+(Math.random()-.5)*360;y=n.kind==="owner"?H/2:H/2+(Math.random()-.5)*300;}
-    return {...n,r:(n.anchor?7:5)+Math.sqrt(n.size||1)*(n.anchor?2.8:2.4),x,y,fx,fy};
+    return {...n,r:nodeRadius(n),x,y,fx,fy};
   })];
   byId={}; nodes.forEach(n=>byId[n.id]=n);
   links=sourceEdges.filter(e=>keep.has(e.source)&&keep.has(e.target))
@@ -133,6 +154,7 @@ function build(){
   const strongest={};
   ns.forEach(n=>{ if(!strongest[n.cat]||n.size>strongest[n.cat].size) strongest[n.cat]=n; });
   if(!focusAnchor)Object.values(strongest).forEach(n=>links.push({source:"__owner__",target:n.id,weight:3,owner:true}));
+  assignRelationSlots(links);
   adj={}; links.forEach(l=>{const s=l.source.id||l.source,t=l.target.id||l.target;(adj[s]=adj[s]||new Set()).add(t);(adj[t]=adj[t]||new Set()).add(s);});
 }
 
@@ -149,7 +171,7 @@ function start(){
   sim=d3.forceSimulation(nodes)
     .force("charge",d3.forceManyBody().strength(d=>d.owner?-200:-55))
     .force("link",d3.forceLink(links).id(d=>d.id).distance(d=>d.owner?70:42).strength(d=>d.owner?0.06:0.18))
-    .force("collide",d3.forceCollide().radius(d=>d.r+2.5).strength(.9))
+    .force("collide",d3.forceCollide().radius(d=>d.r+(d.entity_id?18:(d.id==="__unclustered__"?12:2.5))).strength(.9))
     .force("x",d3.forceX(d=>d.owner?W/2:(catPos[d.cat]?catPos[d.cat].x:W/2)).strength(d=>d.owner?0.2:0.09))
     .force("y",d3.forceY(d=>d.owner?H/2:(catPos[d.cat]?catPos[d.cat].y:H/2)).strength(d=>d.owner?0.2:0.09))
     .on("tick",paint);
@@ -160,6 +182,19 @@ function resize(){const r=cv.getBoundingClientRect();W=r.width;H=r.height;cv.wid
 function T(x,y){return [x*view.k+view.x, y*view.k+view.y];}
 function nb(n){return n&&hover&&(n===hover||(adj[hover.id]&&adj[hover.id].has(n.id)));}
 function nbSel(n){return n&&selected&&(n===selected||(adj[selected.id]&&adj[selected.id].has(n.id)));}
+function relationLabelPoint(x1,y1,x2,y2,l){
+  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1;
+  const nx=-dy/len,ny=dx/len,slot=l.relationSlot||0,count=l.relationCount||1;
+  const side=count>1&&slot<0?-1:1,offset=(count>1?22:14)+Math.abs(slot)*24;
+  return {x:(x1+x2)/2+nx*side*offset,y:(y1+y2)/2+ny*side*offset};
+}
+function drawRelationLabel(text,x,y,dim){
+  const w=ctx.measureText(text).width+10;
+  ctx.fillStyle=`rgba(14,17,22,${dim?0.38:0.82})`;
+  ctx.fillRect(x-w/2,y-8,w,16);
+  ctx.fillStyle=`rgba(245,211,107,${dim?0.18:0.92})`;
+  ctx.fillText(text,x,y);
+}
 
 function paint(){
   ctx.clearRect(0,0,W,H);
@@ -178,10 +213,10 @@ function paint(){
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
     if(l.entity_relation&&(lit||view.k>=0.7)){
       ctx.setLineDash([]);
-      ctx.fillStyle=`rgba(245,211,107,${dim?0.12:0.88})`;
       ctx.font="10px -apple-system,Segoe UI";
       ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.fillText((l.relation||"relation").replace(/_/g," "), (x1+x2)/2, (y1+y2)/2-7);
+      const label=(l.relation||"relation").replace(/_/g," "),p=relationLabelPoint(x1,y1,x2,y2,l);
+      drawRelationLabel(label,p.x,p.y,dim);
     }
   }
   ctx.setLineDash([]);
@@ -195,6 +230,10 @@ function paint(){
     if(n.owner){
       ctx.shadowColor="rgba(255,255,255,.55)";ctx.shadowBlur=18;
       ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle="#f5f7fa";ctx.fill();ctx.shadowBlur=0;
+      if(n.entity_id){
+        ctx.lineWidth=2.5;ctx.strokeStyle="#f5d36b";ctx.stroke();
+        ctx.beginPath();ctx.moveTo(x,y-r-7);ctx.lineTo(x+r+7,y);ctx.lineTo(x,y+r+7);ctx.lineTo(x-r-7,y);ctx.closePath();ctx.stroke();
+      }
       ctx.fillStyle="#0e1116";ctx.font="600 11px -apple-system,Segoe UI";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("__OWNER__",x,y);
     } else {
       ctx.shadowColor=n.color;ctx.shadowBlur=(focused||n===foc)?16:7;
@@ -222,7 +261,8 @@ function paint(){
     const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.7,view.k));
     ctx.fillStyle="rgba(231,233,238,.92)";ctx.font="11px -apple-system,Segoe UI";
     const lab=(n.negative?"!":"")+(n.entity_display_name||n.label);
-    ctx.fillText(lab.length>26?lab.slice(0,24)+"…":lab, x+r+5, y);
+    const pad=n.entity_id?18:5;
+    ctx.fillText(lab.length>26?lab.slice(0,24)+"…":lab, x+r+pad, y);
   }
 }
 function hexToRgb(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)].join(',');}
@@ -235,7 +275,7 @@ function nodeAt(mx,my){let best=null,bd=1e9;for(const n of nodes){if(n.x==null)c
 cv.addEventListener("mousemove",e=>{
   const mx=e.offsetX,my=e.offsetY,n=nodeAt(mx,my),tip=$("tip");
   hover=n;cv.style.cursor=n?"pointer":"grab";
-  if(n&&!n.owner){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+(n.entity_display_name||n.label)}</div><div class="m">${n.entity_id?`${n.entity_kind} entity · ${(n.entity_aliases||[]).length} aliases · `:''}${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9${n.anchor?` · ${n.child_count||0} tucked tags`:''}</div>`;
+  if(n&&(!n.owner||n.entity_id)){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+(n.entity_display_name||n.label)}</div><div class="m">${n.entity_id?`${n.entity_kind} entity · ${(n.entity_aliases||[]).length} aliases · `:''}${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9${n.anchor?` · ${n.child_count||0} tucked tags`:''}</div>`;
     tip.style.left=Math.min(W-270,mx+14)+"px";tip.style.top=Math.min(H-60,my+14)+"px";}
   else tip.style.display="none";
   paint();
@@ -247,7 +287,7 @@ cv.addEventListener("click",e=>{
     else{expanded.clear();expandSeeds={};expanded.add(n.id);expandSeeds[n.id]={x:n.x,y:n.y};focusAnchor=n.id;}
     closeInsp();start();return;
   }
-  if(n&&!n.owner)inspect(n);else closeInsp();
+  if(n&&(!n.owner||n.entity_id))inspect(n);else closeInsp();
 });
 
 const zoom=d3.zoom().scaleExtent([0.2,6]).on("zoom",ev=>{view=ev.transform;paint();});
