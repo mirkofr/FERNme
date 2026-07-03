@@ -15,6 +15,8 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   direction-inverted canonical relations.
 - Added opt-in entity-aware retrieval integration: alias activation aggregation,
   compact card enrichment, card token estimates, and one-hop stated relation pull.
+- Added entity-aware graph/map rendering: canonical entity nodes with alias
+  grouping, labeled typed-relation edges, and a synthetic Elena entity map demo.
 - Added fictional entity-layer acceptance fixtures covering commerce and
   non-commerce research/family scenarios.
 - Added `python -m fernme.eval.entities`, a reproducible synthetic micro-eval for

@@ -839,13 +839,157 @@ class FernService:
         for (a, b), w in ag.edges.items():
             if a in present and b in present and w >= assoc_floor:
                 edges.append({"source": a, "target": b, "weight": round(w, 1), "assoc": True})
+        entity_overlay = self._entity_graph_overlay(site, users, nodes, edges, present)
         out = {"nodes": list(nodes.values()), "edges": edges,
                "categories": CATEGORIES, "cats": CATEGORIES,
                "stats": {"users": sum(1 for v in nodes.values() if v["kind"] == "user"),
-                         "attributes": len(present), "edges": len(edges)}}
+                         "attributes": sum(1 for v in nodes.values() if v["kind"] != "user"),
+                         "edges": len(edges)}}
+        if entity_overlay:
+            out.update(entity_overlay)
+            out["stats"]["entities"] = len(entity_overlay["entities"])
+            out["stats"]["entity_relations"] = len(entity_overlay["entity_relations"])
         if hierarchy:
             out["hierarchy"] = build_hierarchy(out)
         return out
+
+    def _entity_graph_overlay(self, site: str, users: List[str], nodes: Dict,
+                              edges: List[Dict], present: set) -> Optional[Dict]:
+        if not present or not hasattr(self.store, "entity_by_alias"):
+            return None
+        entities: Dict[str, Dict] = {}
+        entity_users: Dict[str, str] = {}
+        alias_links: Dict[str, Dict] = {}
+        for u in users:
+            for attr in sorted(present):
+                entity = self.store.entity_by_alias(site, u, attr)
+                if not entity:
+                    continue
+                eid = entity["entity_id"]
+                entities.setdefault(eid, entity)
+                entity_users.setdefault(eid, u)
+                alias_links[attr] = {"entity_id": eid, "user": u}
+        if not entities:
+            return None
+
+        alias_to_entity = {}
+        alias_to_node = {}
+        entity_payload = []
+        entity_node = {}
+        for eid, entity in sorted(entities.items(), key=lambda item: item[1]["display_name"]):
+            u = entity_users[eid]
+            aliases = [r["alias_attr"] for r in self.store.list_entity_aliases(site, u, eid)]
+            visible = sorted([a for a in aliases if a in present])
+            if not visible:
+                continue
+            canonical = next((a for a in visible if a.startswith(entity["kind"] + ":")), visible[0])
+            entity_node[eid] = canonical
+            for alias in aliases:
+                alias_to_entity[alias] = eid
+                if alias in present:
+                    alias_to_node[alias] = canonical
+            fields = self.store.list_entity_fields(eid)
+            related = []
+            for row in self.store.list_entity_relations(site, u, eid):
+                outbound = row["subject_id"] == eid
+                other_id = row["object_id"] if outbound else row["subject_id"]
+                rel = row["relation"] if outbound else DEFAULT_RELATIONS.relations[row["relation"]].inverse
+                other = self.store.get_entity(site, u, other_id)
+                related.append({
+                    "relation": rel,
+                    "other_id": other_id,
+                    "other_name": other["display_name"] if other else other_id,
+                    "weight": round(float(row["weight"]), 3),
+                    "confidence": round(float(row["confidence"]), 3),
+                    "hits": int(row["hits"]),
+                    "provenance": row.get("provenance", ""),
+                })
+            related.sort(key=lambda r: (r["relation"], r["other_name"]))
+            collapsed = [a for a in visible if a != canonical]
+            node = nodes[canonical]
+            node.update({
+                "label": entity["display_name"],
+                "entity_id": eid,
+                "entity_kind": entity["kind"],
+                "entity_display_name": entity["display_name"],
+                "entity_aliases": aliases,
+                "collapsed_aliases": collapsed,
+                "entity_fields": fields,
+                "entity_relations": related,
+            })
+            entity_payload.append({
+                "entity_id": eid,
+                "node_id": canonical,
+                "kind": entity["kind"],
+                "display_name": entity["display_name"],
+                "aliases": aliases,
+                "collapsed_aliases": collapsed,
+                "fields": fields,
+                "relations": related,
+            })
+
+        if not entity_payload:
+            return None
+
+        for alias, canonical in alias_to_node.items():
+            if alias == canonical or alias not in nodes:
+                continue
+            nodes[canonical]["size"] = max(float(nodes[canonical].get("size", 0)),
+                                           float(nodes[alias].get("size", 0)))
+            del nodes[alias]
+        for edge in edges:
+            edge["source"] = alias_to_node.get(edge["source"], edge["source"])
+            edge["target"] = alias_to_node.get(edge["target"], edge["target"])
+        deduped: Dict[tuple, Dict] = {}
+        for edge in edges:
+            key = (
+                edge.get("source"), edge.get("target"), bool(edge.get("assoc")),
+                bool(edge.get("entity_relation")), edge.get("relation"),
+                bool(edge.get("negative")),
+            )
+            current = deduped.get(key)
+            if current is None:
+                deduped[key] = edge
+                continue
+            current["weight"] = max(float(current.get("weight", 0)), float(edge.get("weight", 0)))
+            current["confidence"] = max(float(current.get("confidence", 0)), float(edge.get("confidence", 0)))
+            current["known"] = bool(current.get("known") or edge.get("known"))
+        edges[:] = list(deduped.values())
+
+        relation_payload = []
+        seen_relations = set()
+        for eid, u in sorted(entity_users.items()):
+            for row in self.store.list_entity_relations(site, u):
+                source = entity_node.get(row["subject_id"])
+                target = entity_node.get(row["object_id"])
+                if not source or not target:
+                    continue
+                key = (source, row["relation"], target)
+                if key in seen_relations:
+                    continue
+                seen_relations.add(key)
+                item = {
+                    "source": source,
+                    "target": target,
+                    "subject_id": row["subject_id"],
+                    "object_id": row["object_id"],
+                    "relation": row["relation"],
+                    "label": row["relation"],
+                    "weight": round(float(row["weight"]), 3),
+                    "confidence": round(float(row["confidence"]), 3),
+                    "hits": int(row["hits"]),
+                    "known": float(row["confidence"]) >= self.cfg.conf_known,
+                    "provenance": row.get("provenance", ""),
+                    "note": row.get("note", ""),
+                }
+                relation_payload.append(item)
+                edges.append({**item, "entity_relation": True})
+
+        return {
+            "entities": entity_payload,
+            "entity_aliases": alias_to_entity,
+            "entity_relations": relation_payload,
+        }
 
     def confidence(self, site: str, user: str, attr: str, now: float = 0.0,
                    taxonomy_match=None, outcome_success=None, conflict: float = 0.0,

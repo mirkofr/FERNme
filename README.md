@@ -215,6 +215,11 @@ flowchart TD
 | ![The LLM gate](explanation%20of%20fern/IMG_7784.PNG)<br/>**The LLM gate** — an exception, not the default; most events are handled deterministically. | ![Memory card](explanation%20of%20fern/IMG_7802.PNG)<br/>**Memory card** — bounded, interpretable, token-minimal context for the agent. |
 | ![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)<br/>**Action-aware learning** — good outcomes strengthen connections, bad outcomes weaken them. | ![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)<br/>**Architecture** — ingestion bridge → vocabulary → fuzzy graph → memory card → agent, with LLM fallback only when uncertain. |
 
+**Interactive memory map demo:** the static Elena map in `demo/elena/` is a
+screenshot-ready synthetic graph. It now shows typed entity nodes with alias
+grouping and labeled relation edges (`friend_of`, `colleague_of`, `works_on`)
+while keeping the underlying memories inspectable.
+
 ## 🚀 Quickstart
 
 ```bash

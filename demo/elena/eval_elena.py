@@ -8,10 +8,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from fernme.service import FernService
 from fernme.store.sqlite_store import SQLiteStore
+from entity_scene import SITE, USER, populate_elena_entities
 
 DIR = os.environ["DIR"]
 OUT = os.environ.get("OUT", os.path.join(os.path.dirname(os.path.abspath(__file__)),"figures"))
 os.makedirs(OUT, exist_ok=True)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 tok = lambda s: max(1, len(s) // 4)            # chars/4 token estimate
 
 # ---------------- parsing (same scheme as ingest, with tea canonicalization) ----------------
@@ -78,7 +80,7 @@ N=len(entries)
 
 # ---------------- instrumented ingest ----------------
 svc=FernService(store=SQLiteStore(":memory:")); svc.track_style=False
-SITE,USER="elena.journal","elena"; svc.store.set_consent(SITE,USER,True)
+svc.store.set_consent(SITE,USER,True)
 track=["tea:jasmine","tea:earl-grey","pref:flat-white","goal:half-marathon"]
 hist={"card":[], "attrs":[], "naive":[], "llm":[]}
 series={t:[] for t in track}
@@ -93,6 +95,15 @@ for i,(o,fn,tags,rt) in enumerate(entries,1):
     hist["llm"].append(svc.llm_calls)
     for t in track:
         series[t].append(ug.edges[t].weight if t in ug.edges else 0.0)
+populate_elena_entities(svc, SITE, USER, ts=float(N + 1))
+
+template_path = os.path.join(ROOT, "_memory_map_template.html")
+map_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_map" + ".html")
+with open(template_path, encoding="utf-8") as fh:
+    template = fh.read()
+graph_payload = json.dumps(svc.graph(SITE, USER), ensure_ascii=False, separators=(",", ":"))
+with open(map_path, "w", encoding="utf-8") as fh:
+    fh.write(template.replace("__OWNER__", "Elena").replace("__DATA__", graph_payload))
 
 ug=svc.store.load_user(SITE,USER)
 edges=sorted(ug.edges.items(), key=lambda kv:-kv[1].weight)

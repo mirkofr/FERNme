@@ -59,6 +59,19 @@ let W=0,H=0,view=d3.zoomIdentity,hover=null,selected=null,knownOnly=true,hierarc
 let expanded=new Set(),expandSeeds={},focusAnchor=null;
 const CAT={}; DATA.cats.forEach(c=>CAT[c.key]=c);
 function catColor(k){return (CAT[k]&&CAT[k].color)||"#8b93a1";}
+function relKey(e){return `${e.source}|${e.relation||e.label||""}|${e.target}`;}
+function withEntityRelations(sourceEdges){
+  const rels=DATA.entity_relations||[];
+  if(!rels.length)return sourceEdges;
+  const seen=new Set(sourceEdges.filter(e=>e.entity_relation).map(relKey));
+  const add=[];
+  rels.forEach(r=>{
+    const e={...r,entity_relation:true,relation:r.relation||r.label,label:r.label||r.relation};
+    if(!seen.has(relKey(e))){seen.add(relKey(e));add.push(e);}
+  });
+  return [...sourceEdges,...add];
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
 
 // ---- build nodes/links ----
 const owner={id:"__owner__",label:"__OWNER__",owner:true,r:15,cat:null};
@@ -85,6 +98,7 @@ function build(){
     sourceNodes=DATA.nodes;
     sourceEdges=DATA.edges;
   }
+  sourceEdges=withEntityRelations(sourceEdges||[]);
   const ns=sourceNodes.filter(n=>!knownOnly||n.known||n.anchor||(hierarchyOn&&expanded.has(n.parent)));
   const keep=new Set(ns.map(n=>n.id));
   const siblings={}; ns.forEach(n=>{if(n.parent)(siblings[n.parent]=siblings[n.parent]||[]).push(n.id);});
@@ -113,7 +127,8 @@ function build(){
   })];
   byId={}; nodes.forEach(n=>byId[n.id]=n);
   links=sourceEdges.filter(e=>keep.has(e.source)&&keep.has(e.target))
-                   .map(e=>({source:e.source,target:e.target,weight:e.weight,aggregated:e.aggregated,cross:e.cross}));
+                   .map(e=>({source:e.source,target:e.target,weight:e.weight,aggregated:e.aggregated,cross:e.cross,
+                             entity_relation:e.entity_relation,relation:e.relation||e.label,confidence:e.confidence}));
   // owner links to the strongest node per category so it sits central + connected
   const strongest={};
   ns.forEach(n=>{ if(!strongest[n.cat]||n.size>strongest[n.cat].size) strongest[n.cat]=n; });
@@ -156,11 +171,18 @@ function paint(){
     const [x1,y1]=T(s.x,s.y),[x2,y2]=T(t.x,t.y);
     const lit=foc&&(s===foc||t===foc);
     const dim=foc&&!lit;
-    const col=l.owner?"255,255,255":hexToRgb(catColor(s.owner?t.cat:s.cat));
-    ctx.strokeStyle=`rgba(${col},${lit?0.85:(dim?0.03:0.16)})`;
-    ctx.lineWidth=(lit?1.6:(l.aggregated?1.0:0.6))*Math.min(1.5,view.k);
-    ctx.setLineDash(l.cross?[5,4]:[]);
+    const col=l.entity_relation?"231,183,95":(l.owner?"255,255,255":hexToRgb(catColor(s.owner?t.cat:s.cat)));
+    ctx.strokeStyle=`rgba(${col},${lit?0.9:(dim?0.04:(l.entity_relation?0.58:0.16))})`;
+    ctx.lineWidth=(lit?1.8:(l.entity_relation?1.35:(l.aggregated?1.0:0.6)))*Math.min(1.5,view.k);
+    ctx.setLineDash(l.entity_relation?[2,3]:(l.cross?[5,4]:[]));
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    if(l.entity_relation&&(lit||view.k>=0.7)){
+      ctx.setLineDash([]);
+      ctx.fillStyle=`rgba(245,211,107,${dim?0.12:0.88})`;
+      ctx.font="10px -apple-system,Segoe UI";
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText((l.relation||"relation").replace(/_/g," "), (x1+x2)/2, (y1+y2)/2-7);
+    }
   }
   ctx.setLineDash([]);
   // nodes
@@ -177,6 +199,14 @@ function paint(){
     } else {
       ctx.shadowColor=n.color;ctx.shadowBlur=(focused||n===foc)?16:7;
       ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=n.color;ctx.fill();ctx.shadowBlur=0;
+      if(n.entity_id){
+        ctx.lineWidth=2.4;ctx.strokeStyle="#f5d36b";ctx.stroke();
+        ctx.beginPath();ctx.moveTo(x,y-r-6);ctx.lineTo(x+r+6,y);ctx.lineTo(x,y+r+6);ctx.lineTo(x-r-6,y);ctx.closePath();ctx.stroke();
+        (n.collapsed_aliases||[]).slice(0,4).forEach((_,i)=>{
+          const aliases=n.collapsed_aliases||[], a=-Math.PI/2+i*2*Math.PI/Math.max(4,aliases.length);
+          ctx.beginPath();ctx.arc(x+Math.cos(a)*(r+10),y+Math.sin(a)*(r+10),2.2,0,7);ctx.fillStyle="#f5d36b";ctx.fill();
+        });
+      }
       if(n.anchor&&expanded.has(n.id)){ctx.lineWidth=2.5;ctx.strokeStyle="#fff";ctx.stroke();}
       else if(n===selected){ctx.lineWidth=2.5;ctx.strokeStyle="#fff";ctx.stroke();}
       else if(n.negative){ctx.lineWidth=1.6;ctx.strokeStyle="var(--danger)";ctx.strokeStyle="#f0708a";ctx.stroke();}
@@ -191,7 +221,7 @@ function paint(){
     if(!show)continue;
     const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.7,view.k));
     ctx.fillStyle="rgba(231,233,238,.92)";ctx.font="11px -apple-system,Segoe UI";
-    const lab=(n.negative?"!":"")+n.label;
+    const lab=(n.negative?"!":"")+(n.entity_display_name||n.label);
     ctx.fillText(lab.length>26?lab.slice(0,24)+"…":lab, x+r+5, y);
   }
 }
@@ -199,13 +229,13 @@ function hexToRgb(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parse
 
 // ---- interaction ----
 function nodeAt(mx,my){let best=null,bd=1e9;for(const n of nodes){if(n.x==null)continue;const [x,y]=T(n.x,n.y),d=Math.hypot(x-mx,y-my),rr=Math.max(8,n.r*view.k+5);
-  const lab=((n.negative?"!":"")+(n.label||"")).slice(0,26), lx=x+rr+4, ly=y-9, lw=Math.max(38,lab.length*7);
+  const lab=((n.negative?"!":"")+(n.entity_display_name||n.label||"")).slice(0,26), lx=x+rr+4, ly=y-9, lw=Math.max(38,lab.length*7);
   const inLabel=mx>=lx&&mx<=lx+lw&&my>=ly&&my<=ly+18;
   if((d<rr||inLabel)&&d<bd){bd=d;best=n;}}return best;}
 cv.addEventListener("mousemove",e=>{
   const mx=e.offsetX,my=e.offsetY,n=nodeAt(mx,my),tip=$("tip");
   hover=n;cv.style.cursor=n?"pointer":"grab";
-  if(n&&!n.owner){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+n.label}</div><div class="m">${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9${n.anchor?` · ${n.child_count||0} tucked tags`:''}</div>`;
+  if(n&&!n.owner){tip.style.display="block";tip.innerHTML=`<div class="t">${(n.negative?'dislikes: ':'')+(n.entity_display_name||n.label)}</div><div class="m">${n.entity_id?`${n.entity_kind} entity · ${(n.entity_aliases||[]).length} aliases · `:''}${(CAT[n.cat]||{}).label||n.cat} · strength ${(n.size||0)}/9${n.anchor?` · ${n.child_count||0} tucked tags`:''}</div>`;
     tip.style.left=Math.min(W-270,mx+14)+"px";tip.style.top=Math.min(H-60,my+14)+"px";}
   else tip.style.display="none";
   paint();
@@ -237,6 +267,15 @@ addEventListener("keydown",e=>{if(e.key==="Escape"){expanded.clear();expandSeeds
 function closeInsp(){selected=null;$("insp").classList.remove("open");paint();}
 
 function strengthWord(s){return s>=7?"very strong":s>=4?"strong":s>=2?"moderate":"weak/tentative";}
+function entityDetails(n){
+  if(!n.entity_id)return "";
+  const fields=(n.entity_fields||[]).map(f=>`<div>${esc(f.field)}: <b>${esc(f.value)}</b> <span class="hint">${esc(f.provenance||"")}</span></div>`).join("")||'<span class="hint">none</span>';
+  const rels=(n.entity_relations||[]).map(r=>`<a>${esc(String(r.relation||"").replace(/_/g," "))} ${esc(r.other_name)}<span class="w">${r.weight}/9</span></a>`).join("")||'<span class="hint">none</span>';
+  const aliases=(n.entity_aliases||[]).map(esc).join(", ");
+  return `<div class="kv"><div class="k">Entity</div><div class="box"><b>${esc(n.entity_kind)}</b> · ${esc(n.entity_display_name||n.label)}<br/><span class="hint">${aliases}</span></div></div>`+
+    `<div class="kv"><div class="k">Fields</div><div class="box">${fields}</div></div>`+
+    `<div class="kv"><div class="k">Relations</div><div class="links">${rels}</div></div>`;
+}
 function inspect(n){
   selected=n;const c=CAT[n.cat]||{label:n.cat,color:n.color};
   const conf=Math.round((n.confidence||0)*100);
@@ -246,6 +285,7 @@ function inspect(n){
   $("ibody").innerHTML=
     `<h2>${(n.negative?'not ':'')+n.label}${n.negative?'<span class="badge">dislike</span>':''}</h2>`+
     `<div class="chip"><span class="dot" style="background:${c.color}"></span>${c.label}</div>`+
+    entityDetails(n)+
     (n.gloss?`<div class="kv"><div class="k">What it means</div><div class="v">${n.gloss}</div></div>`:'')+
     (n.context?`<div class="kv"><div class="k">Context</div><div class="box">${n.context}</div></div>`:'')+
     `<div class="kv"><div class="k">Strength</div><div class="bar"><i style="width:${(n.size/9*100)}%;background:${c.color}"></i></div><div class="v" style="margin-top:5px">${(n.size||0)} / 9</div></div>`+

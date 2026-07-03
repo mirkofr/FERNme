@@ -20,6 +20,12 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 #legend .sw{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:7px}
 #stats{right:14px;top:14px;padding:10px 12px;font-size:12px;color:var(--mut);line-height:1.7;text-align:right}
 #stats b{color:var(--tx);font-size:15px}
+#insp{position:absolute;top:0;right:0;height:100%;width:330px;transform:translateX(106%);transition:transform .22s ease;padding:18px;overflow:auto;z-index:8;border-left:.5px solid var(--bd);background:rgba(16,19,24,.97)}
+#insp.open{transform:none}
+#insp .x{position:absolute;top:10px;right:14px;cursor:pointer;color:var(--mut);font-size:22px}
+#insp h2{font-size:18px;margin:4px 34px 10px 0;word-break:break-word}
+.kv{margin:12px 0}.kv .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.box{font-size:13px;line-height:1.5;background:#0e1116;border:.5px solid var(--bd);border-radius:8px;padding:10px}.links a{display:block;font-size:13px;color:var(--tx);padding:6px 8px;border:.5px solid var(--bd);border-radius:8px;margin-bottom:6px;text-decoration:none}.links a .w{float:right;color:var(--mut);font-size:11px}
 </style></head><body>
 <header>
   <h1>FERNme<span>memory map</span></h1>
@@ -38,6 +44,7 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
   <div id="tip" class="panel"></div>
   <div id="stats" class="panel"></div>
   <div id="legend" class="panel"></div>
+  <div id="insp" class="panel"><span class="x" id="ix">&times;</span><div id="ibody"></div></div>
 </div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
@@ -76,8 +83,21 @@ const SAMPLE={
   stats:{attributes:4,edges:3}
 };
 let DATA=SAMPLE, nodes=[], links=[], byId={}, adj={}, W=0, H=0, view=d3.zoomIdentity;
-let hover=null, hierarchyOn=true, knownOnly=true, expanded=new Set(), focusAnchor=null, sim=null, zoom=null;
+let hover=null, selected=null, hierarchyOn=true, knownOnly=true, expanded=new Set(), focusAnchor=null, sim=null, zoom=null;
 const cv=document.getElementById("c"), ctx=cv.getContext("2d"), DPR=Math.max(1,devicePixelRatio||1), $=id=>document.getElementById(id);
+function relKey(e){return `${e.source}|${e.relation||e.label||""}|${e.target}`;}
+function withEntityRelations(sourceEdges){
+  const rels=DATA.entity_relations||[];
+  if(!rels.length)return sourceEdges;
+  const seen=new Set(sourceEdges.filter(e=>e.entity_relation).map(relKey));
+  const add=[];
+  rels.forEach(r=>{
+    const e={...r,entity_relation:true,relation:r.relation||r.label,label:r.label||r.relation};
+    if(!seen.has(relKey(e))){seen.add(relKey(e));add.push(e);}
+  });
+  return [...sourceEdges,...add];
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
 function norm(data){
   const cats=data.cats||data.categories||[];
   const cmap={}; cats.forEach(c=>cmap[c.key]=c);
@@ -99,10 +119,10 @@ function visibleGraph(){
     subs.forEach(n=>visible.add(n.id));
     return {
       nodes:[...anchors.filter(n=>visibleAnchors.has(n.id)),...subs],
-      edges:[...(DATA.hierarchy.edges||[]),...(DATA.hierarchy.expanded_edges||[]).filter(e=>visible.has(e.source)&&visible.has(e.target))]
+      edges:withEntityRelations([...(DATA.hierarchy.edges||[]),...(DATA.hierarchy.expanded_edges||[]).filter(e=>visible.has(e.source)&&visible.has(e.target))])
     };
   }
-  return {nodes:DATA.nodes||[], edges:DATA.edges||[]};
+  return {nodes:DATA.nodes||[], edges:withEntityRelations(DATA.edges||[])};
 }
 function build(){
   const vg=visibleGraph();
@@ -110,7 +130,7 @@ function build(){
   const keep=new Set(ns.map(n=>n.id));
   nodes=ns.map(n=>({...n,r:(n.anchor?8:5)+Math.sqrt(n.size||1)*(n.anchor?2.6:2.1),x:W/2+(Math.random()-.5)*380,y:H/2+(Math.random()-.5)*300}));
   byId={}; nodes.forEach(n=>byId[n.id]=n);
-  links=vg.edges.filter(e=>keep.has(e.source)&&keep.has(e.target)).map(e=>({source:e.source,target:e.target,weight:e.weight,aggregated:e.aggregated,cross:e.cross}));
+  links=vg.edges.filter(e=>keep.has(e.source)&&keep.has(e.target)).map(e=>({source:e.source,target:e.target,weight:e.weight,aggregated:e.aggregated,cross:e.cross,entity_relation:e.entity_relation,relation:e.relation||e.label}));
   adj={}; links.forEach(l=>{(adj[l.source]=adj[l.source]||new Set()).add(l.target);(adj[l.target]=adj[l.target]||new Set()).add(l.source)});
   start();
   $("stats").innerHTML=`<b>${nodes.length}</b> visible nodes<br/><b>${links.length}</b> visible links`;
@@ -133,22 +153,36 @@ function paint(){
     const s=typeof l.source==="string"?byId[l.source]:l.source, t=typeof l.target==="string"?byId[l.target]:l.target;
     if(!s||!t)continue;
     const [x1,y1]=T(s.x,s.y),[x2,y2]=T(t.x,t.y), lit=hover&&(s===hover||t===hover), dim=hover&&!lit;
-    ctx.strokeStyle=l.cross?`rgba(231,233,238,${dim?0.05:0.35})`:`rgba(139,147,161,${lit?0.8:(dim?0.05:0.28)})`;
-    ctx.lineWidth=(lit?1.8:(l.aggregated?1.2:.8))*Math.min(1.5,view.k);
-    ctx.setLineDash(l.cross?[5,4]:[]);
+    ctx.strokeStyle=l.entity_relation?`rgba(245,211,107,${lit?0.9:(dim?0.06:0.62)})`:(l.cross?`rgba(231,233,238,${dim?0.05:0.35})`:`rgba(139,147,161,${lit?0.8:(dim?0.05:0.28)})`);
+    ctx.lineWidth=(lit?1.8:(l.entity_relation?1.35:(l.aggregated?1.2:.8)))*Math.min(1.5,view.k);
+    ctx.setLineDash(l.entity_relation?[2,3]:(l.cross?[5,4]:[]));
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    if(l.entity_relation&&(lit||view.k>=0.7)){
+      ctx.setLineDash([]);
+      ctx.fillStyle=`rgba(245,211,107,${dim?0.12:0.9})`;
+      ctx.font="10px -apple-system,Segoe UI";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText((l.relation||"relation").replace(/_/g," "),(x1+x2)/2,(y1+y2)/2-7);
+    }
   }
   ctx.setLineDash([]);
   for(const n of nodes){
     const [x,y]=T(n.x,n.y),r=n.r*Math.min(1.7,Math.max(.75,view.k)), dim=hover&&!related(n);
     ctx.globalAlpha=dim?0.25:1;
     ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=n.color||catColor(n.cat);ctx.fill();
+    if(n.entity_id){
+      ctx.lineWidth=2.3;ctx.strokeStyle="#f5d36b";ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,y-r-6);ctx.lineTo(x+r+6,y);ctx.lineTo(x,y+r+6);ctx.lineTo(x-r-6,y);ctx.closePath();ctx.stroke();
+      (n.collapsed_aliases||[]).slice(0,4).forEach((_,i)=>{
+        const aliases=n.collapsed_aliases||[], a=-Math.PI/2+i*2*Math.PI/Math.max(4,aliases.length);
+        ctx.beginPath();ctx.arc(x+Math.cos(a)*(r+10),y+Math.sin(a)*(r+10),2.2,0,7);ctx.fillStyle="#f5d36b";ctx.fill();
+      });
+    }
     if(n.anchor&&expanded.has(n.id)){ctx.lineWidth=2.4;ctx.strokeStyle="#fff";ctx.stroke()}
     if(n.negative){ctx.lineWidth=1.8;ctx.strokeStyle="var(--danger)";ctx.stroke()}
     ctx.globalAlpha=1;
     if(n.anchor||n.parent||n.size>=4||n===hover){
       ctx.fillStyle="rgba(231,233,238,.94)";ctx.font="11px -apple-system,Segoe UI";ctx.textBaseline="middle";
-      const lab=(n.negative?"!":"")+(n.label||n.id);
+      const lab=(n.negative?"!":"")+(n.entity_display_name||n.label||n.id);
       ctx.fillText(lab.length>28?lab.slice(0,26)+"...":lab,x+r+5,y);
     }
   }
@@ -159,7 +193,7 @@ cv.addEventListener("mousemove",e=>{
   const tip=$("tip");
   if(hover){
     tip.style.display="block";
-    tip.innerHTML=`<div class="t">${hover.label||hover.id}</div><div class="m">${hover.kind||hover.cat} - strength ${hover.size||1}${hover.anchor?` - ${hover.child_count||0} tucked tags`:''}</div>`;
+    tip.innerHTML=`<div class="t">${hover.entity_display_name||hover.label||hover.id}</div><div class="m">${hover.entity_id?`${hover.entity_kind} entity - ${(hover.entity_aliases||[]).length} aliases - `:''}${hover.kind||hover.cat} - strength ${hover.size||1}${hover.anchor?` - ${hover.child_count||0} tucked tags`:''}</div>`;
     tip.style.left=Math.min(W-305,e.offsetX+14)+"px";tip.style.top=Math.min(H-70,e.offsetY+14)+"px";
   }else tip.style.display="none";
   paint();
@@ -169,6 +203,10 @@ cv.addEventListener("click",e=>{
   if(n&&hierarchyOn&&n.anchor){
     if(expanded.has(n.id)){expanded.delete(n.id);focusAnchor=null}else{expanded.add(n.id);focusAnchor=n.id}
     build();
+  }else if(n){
+    inspect(n);
+  }else{
+    closeInsp();
   }
 });
 zoom=d3.zoom().scaleExtent([.25,5]).on("zoom",ev=>{view=ev.transform;paint()});
@@ -196,7 +234,28 @@ async function load(){
 $("load").onclick=load;$("fit").onclick=fit;
 $("hier").onclick=()=>{hierarchyOn=!hierarchyOn;$("hier").classList.toggle("on",hierarchyOn);expanded.clear();build();setTimeout(fit,500)};
 $("known").onclick=()=>{knownOnly=!knownOnly;$("known").classList.toggle("on",knownOnly);build();setTimeout(fit,500)};
+$("ix").onclick=closeInsp;
 addEventListener("resize",()=>{resize();sim&&sim.alpha(.25).restart();paint()});
+function closeInsp(){selected=null;$("insp").classList.remove("open");paint();}
+function entityDetails(n){
+  if(!n.entity_id)return "";
+  const fields=(n.entity_fields||[]).map(f=>`<div>${esc(f.field)}: <b>${esc(f.value)}</b> <span class="hint">${esc(f.provenance||"")}</span></div>`).join("")||'<span class="hint">none</span>';
+  const rels=(n.entity_relations||[]).map(r=>`<a>${esc(String(r.relation||"").replace(/_/g," "))} ${esc(r.other_name)}<span class="w">${r.weight}/9</span></a>`).join("")||'<span class="hint">none</span>';
+  const aliases=(n.entity_aliases||[]).map(esc).join(", ");
+  return `<div class="kv"><div class="k">Entity</div><div class="box"><b>${esc(n.entity_kind)}</b> - ${esc(n.entity_display_name||n.label)}<br/><span class="hint">${aliases}</span></div></div>`+
+    `<div class="kv"><div class="k">Fields</div><div class="box">${fields}</div></div>`+
+    `<div class="kv"><div class="k">Relations</div><div class="links">${rels}</div></div>`;
+}
+function inspect(n){
+  selected=n;
+  const conn=[...(adj[n.id]||[])].map(id=>byId[id]).filter(Boolean).sort((a,b)=>(b.size||0)-(a.size||0));
+  $("ibody").innerHTML=`<h2>${esc(n.entity_display_name||n.label||n.id)}</h2>`+
+    entityDetails(n)+
+    `<div class="kv"><div class="k">Kind</div><div class="box">${esc(n.kind||n.cat||"memory")}</div></div>`+
+    `<div class="kv"><div class="k">Strength</div><div class="box">${esc(n.size||1)} / 9</div></div>`+
+    `<div class="kv"><div class="k">Connected memories (${conn.length})</div><div class="links">${conn.slice(0,12).map(t=>`<a>${esc(t.entity_display_name||t.label||t.id)}<span class="w">${esc(t.size||1)}/9</span></a>`).join("")||'<span class="hint">none</span>'}</div></div>`;
+  $("insp").classList.add("open");paint();
+}
 resize();DATA=norm(SAMPLE);legend();build();setTimeout(fit,650);
 if(location.protocol!=="file:")$("base").value=location.origin;
 </script></body></html>

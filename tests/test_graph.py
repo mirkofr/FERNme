@@ -1,6 +1,8 @@
 """Graph visualization endpoint: nodes + edges for the memory graph view."""
 import sys, os
+import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from demo.elena.entity_scene import populate_elena_entities
 from fernme.service import FernService
 from fernme.store.sqlite_store import SQLiteStore
 
@@ -72,6 +74,74 @@ def test_graph_includes_hierarchy_without_removing_flat_view():
     anchors = {n["id"] for n in g["hierarchy"]["anchors"]}
     assert {"person:mrs-reyes", "project:orbit-newmarket"} <= anchors
     assert g["hierarchy"]["assignments"]["connection:helped-connect-orbitlabs"] in anchors
+
+
+def test_graph_payload_shape_is_unchanged_without_entities():
+    s = _svc()
+    g = s.graph("demo.com", "ana", hierarchy=False)
+    assert list(g.keys()) == ["nodes", "edges", "categories", "cats", "stats"]
+    assert "entities" not in g
+    assert "entity_aliases" not in g
+    assert "entity_relations" not in g
+    assert json.dumps(g, sort_keys=True, separators=(",", ":")) == json.dumps({
+        "cats": g["cats"],
+        "categories": g["categories"],
+        "edges": g["edges"],
+        "nodes": g["nodes"],
+        "stats": g["stats"],
+    }, sort_keys=True, separators=(",", ":"))
+
+
+def test_elena_fixture_graph_includes_entity_layer():
+    s = FernService(store=SQLiteStore(":memory:"))
+    s.store.set_consent("elena.journal", "elena", True)
+    populate_elena_entities(s)
+    g = s.graph("elena.journal", "elena", hierarchy=False)
+
+    assert {"entities", "entity_aliases", "entity_relations"} <= set(g)
+    entities = {e["display_name"]: e for e in g["entities"]}
+    assert {"Elena", "Jonas", "Daniel", "memory-journal-platform"} <= set(entities)
+    assert entities["Jonas"]["fields"] == [{
+        "entity_id": entities["Jonas"]["entity_id"],
+        "field": "handle",
+        "value": "@jonas-k-demo",
+        "provenance": "stated",
+        "ts": 1000.1,
+    }]
+
+    jonas_nodes = [n for n in g["nodes"] if n.get("entity_display_name") == "Jonas"]
+    assert len(jonas_nodes) == 1
+    assert "person:jonas" in jonas_nodes[0]["entity_aliases"]
+    assert "person:jonas-k" in jonas_nodes[0]["entity_aliases"]
+    assert "person:jonas-k" in jonas_nodes[0]["collapsed_aliases"]
+    assert "person:jonas-k" not in {n["id"] for n in g["nodes"]}
+    assert g["entity_aliases"]["person:jonas"] == g["entity_aliases"]["person:jonas-k"]
+
+    relation_edges = [e for e in g["edges"] if e.get("entity_relation")]
+    assert {"friend_of", "colleague_of", "works_on"} <= {e["relation"] for e in relation_edges}
+    assert all(e.get("label") == e["relation"] for e in relation_edges)
+    assert all(e["source"] in {n["id"] for n in g["nodes"]} for e in relation_edges)
+    assert all(e["target"] in {n["id"] for n in g["nodes"]} for e in relation_edges)
+
+
+def test_elena_fixture_graph_contains_only_fictional_cast():
+    s = FernService(store=SQLiteStore(":memory:"))
+    s.store.set_consent("elena.journal", "elena", True)
+    populate_elena_entities(s)
+    g = s.graph("elena.journal", "elena", hierarchy=False)
+    assert {e["display_name"] for e in g["entities"]} == {
+        "Elena", "Jonas", "Daniel", "memory-journal-platform"
+    }
+    assert set(g["entity_aliases"]) == {
+        "person:elena",
+        "name:elena-sofia-markovic",
+        "person:jonas",
+        "person:jonas-k",
+        "rel:jonas",
+        "person:daniel",
+        "rel:daniel",
+        "project:memory-journal-platform",
+    }
 
 
 def test_memory_graph_is_cross_surface():
