@@ -8,6 +8,7 @@ from .write import Catalog, map_event, observe, decay
 from .categories import category_of, CATEGORIES
 from .hierarchy import build_hierarchy
 from .retrieve.card import compile_card
+from .retrieve.entity_card import compile_entity_card
 from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
 from .supernode import Supernode
@@ -22,13 +23,33 @@ from . import glossary as _glossary
 from . import resolution as _resolution
 from .vocabulary import Vocabulary
 from .identity import is_identity_attr
+from .relations import DEFAULT_RELATIONS, ENTITY_KINDS, canonical_pair, relation_sort_key
+from .write.hebbian import _saturating_bump
 from dataclasses import replace as _replace
 from .triggers import due_reorders, fading_favorites
+import math
 import os
+import re
+import uuid
 
 
 def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
+
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_FIELD_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+
+
+def _clean_data(value: str, limit: int) -> str:
+    value = _CONTROL.sub(" ", str(value)).strip()
+    value = " ".join(value.split())
+    return value[:limit]
+
+
+def _valid_uuid(value: str) -> str:
+    parsed = uuid.UUID(str(value))
+    return str(parsed)
 
 
 def _conflict_for_edge(ug: UserGraph, attr: str, cfg: Config) -> float:
@@ -228,7 +249,52 @@ class FernService:
         prior = self.store.load_prior(site)
         if cold_start and ug.n_edges() == 0 and prior.n_users > 0:
             prior.cold_start(ug, self.cfg)     # turn-one usefulness from the population
+        if self.cfg.entities or self.cfg.entity_aggregation:
+            return compile_entity_card(
+                ug, ag, context or [], now, prior, self.cfg,
+                self._entity_card_context(site, user, ug),
+            )
         return compile_card(ug, ag, context or [], now, prior, self.cfg)
+
+    def _entity_card_context(self, site: str, user: str, ug: UserGraph) -> Dict:
+        alias_to_entity = {}
+        aliases_by_entity = {}
+        entities = {}
+        for attr in sorted(ug.edges):
+            entity = self.store.entity_by_alias(site, user, attr)
+            if entity is None:
+                continue
+            entity_id = entity["entity_id"]
+            alias_to_entity[attr] = entity_id
+            entities[entity_id] = entity
+            aliases_by_entity.setdefault(entity_id, set()).add(attr)
+        for entity_id in list(entities):
+            for row in self.store.list_entity_aliases(site, user, entity_id):
+                aliases_by_entity.setdefault(entity_id, set()).add(row["alias_attr"])
+
+        relations_by_entity = {entity_id: [] for entity_id in entities}
+        for row in self.store.list_entity_relations(site, user):
+            for entity_id in (row["subject_id"], row["object_id"]):
+                if entity_id not in entities:
+                    entity = self.store.get_entity(site, user, entity_id)
+                    if entity:
+                        entities[entity_id] = entity
+                relations_by_entity.setdefault(entity_id, []).append(row)
+
+        fields_by_entity = {
+            entity_id: self.store.list_entity_fields(entity_id)
+            for entity_id in entities
+        }
+        return {
+            "alias_to_entity": dict(sorted(alias_to_entity.items())),
+            "aliases_by_entity": {
+                entity_id: sorted(aliases)
+                for entity_id, aliases in sorted(aliases_by_entity.items())
+            },
+            "entities": dict(sorted(entities.items())),
+            "fields_by_entity": fields_by_entity,
+            "relations_by_entity": relations_by_entity,
+        }
 
     def recall(self, site: str, user: str, type: Optional[str] = None,
                contains: Optional[str] = None, limit: int = 20) -> List[Dict]:
@@ -268,8 +334,33 @@ class FernService:
         conflict_map = self._decay_conflicts(ug) if self.cfg.resolution else {}
         dropped = decay(ug, now, self.cfg, conflict_map=conflict_map,
                         ctx={"now": now})
+        dropped_relations = self._decay_entity_relations(site, user, now)
         self.store.save_user(ug)
-        return {"dropped": dropped, "remaining": ug.n_edges()}
+        return {"dropped": dropped, "remaining": ug.n_edges(),
+                "dropped_relations": dropped_relations}
+
+    def _decay_entity_relations(self, site: str, user: str, now: float) -> int:
+        if not hasattr(self.store, "list_entity_relations"):
+            return 0
+        dropped = 0
+        for row in list(self.store.list_entity_relations(site, user)):
+            dt = max(0.0, now - float(row["last_reinforced"]))
+            lam_eff = self.cfg.lam * (1.0 - self.cfg.salience_beta * float(row["salience"]))
+            row["weight"] = float(row["weight"]) * math.exp(-lam_eff * dt)
+            row["salience"] = float(row["salience"]) * math.exp(
+                -self.cfg.lam * self.cfg.salience_decay * dt)
+            row["last_reinforced"] = now
+            if row["weight"] < self.cfg.floor:
+                if row["provenance"] == "stated":
+                    row["weight"] = self.cfg.floor
+                    self.store.upsert_entity_relation(row)
+                else:
+                    self.store.delete_entity_relation(
+                        site, user, row["subject_id"], row["relation"], row["object_id"])
+                    dropped += 1
+            else:
+                self.store.upsert_entity_relation(row)
+        return dropped
 
     def _decay_conflicts(self, ug) -> Dict[str, float]:
         conflicts = {}
@@ -295,6 +386,195 @@ class FernService:
     def unlink_identity(self, person: str, site: str, local_user: str) -> Dict:
         self.store.unlink_identity(person, site, local_user)
         return {"person": person, "linked": self.store.list_identities(person)}
+
+    # ---------- typed entity layer ----------
+    def entity_create(self, site: str, user: str, kind: str, display_name: str) -> str:
+        self._require_consent(site, user)
+        if kind not in ENTITY_KINDS:
+            raise ValueError(f"unknown entity kind {kind}; allowed: {sorted(ENTITY_KINDS)}")
+        name = _clean_data(display_name, 80)
+        if not name:
+            raise ValueError("display_name is required")
+        entity_id = str(uuid.uuid4())
+        self.store.create_entity(entity_id, site, user, kind, name, 0.0)
+        self._audit(site, user, "entity_create", {"kind": kind}, 0.0)
+        return entity_id
+
+    def _entity_or_raise(self, site: str, user: str, entity_id: str) -> Dict:
+        entity_id = _valid_uuid(entity_id)
+        entity = self.store.get_entity(site, user, entity_id)
+        if entity is None:
+            raise ValueError("entity not found")
+        return entity
+
+    def entity_link_alias(self, site: str, user: str, entity_id: str, alias_attr: str) -> Dict:
+        self._require_consent(site, user)
+        entity = self._entity_or_raise(site, user, entity_id)
+        cleaned = sanitize_tags([alias_attr])
+        if cleaned != [alias_attr]:
+            raise ValueError("alias_attr must be a sanitized tag")
+        self.store.link_entity_alias(site, user, entity["entity_id"], alias_attr)
+        self._audit(site, user, "entity_link_alias", {"alias": alias_attr}, 0.0)
+        return {"entity_id": entity["entity_id"], "linked_tags": [alias_attr]}
+
+    def entity_unlink_alias(self, site: str, user: str, entity_id: str, alias_attr: str) -> Dict:
+        self._require_consent(site, user)
+        entity = self._entity_or_raise(site, user, entity_id)
+        self.store.unlink_entity_alias(site, user, entity["entity_id"], alias_attr)
+        self._audit(site, user, "entity_unlink_alias", {"alias": alias_attr}, 0.0)
+        return {"entity_id": entity["entity_id"],
+                "linked_tags": [r["alias_attr"] for r in self.store.list_entity_aliases(
+                    site, user, entity["entity_id"])]}
+
+    def entity_set_field(self, site: str, user: str, entity_id: str, field: str,
+                         value: str, provenance: str = "stated", ts: float = 0.0) -> Dict:
+        self._require_consent(site, user)
+        entity = self._entity_or_raise(site, user, entity_id)
+        if not _FIELD_NAME.fullmatch(field):
+            raise ValueError("field must be a short lowercase identifier")
+        if provenance not in {"stated", "inferred"}:
+            raise ValueError("provenance must be stated or inferred")
+        clean = _clean_data(value, 128)
+        if not clean:
+            raise ValueError("value is required")
+        self.store.set_entity_field(entity["entity_id"], field, clean, provenance, ts)
+        self._audit(site, user, "entity_set_field", {"field": field}, ts)
+        return {"entity_id": entity["entity_id"], "field": field,
+                "value": clean, "provenance": provenance}
+
+    def _validate_relation_kinds(self, relation: str, subject: Dict, obj: Dict) -> str:
+        canonical = DEFAULT_RELATIONS.resolve(relation)
+        spec = DEFAULT_RELATIONS.relations[canonical]
+        normal = subject["kind"] in spec.subject_kinds and obj["kind"] in spec.object_kinds
+        swapped = spec.symmetric and obj["kind"] in spec.subject_kinds and subject["kind"] in spec.object_kinds
+        if not (normal or swapped):
+            raise ValueError(
+                f"{canonical} allows subjects {sorted(spec.subject_kinds)} "
+                f"and objects {sorted(spec.object_kinds)}")
+        return canonical
+
+    def entity_relate(self, site: str, user: str, subject_id: str, relation: str,
+                      object_id: str, note: str = "", provenance: str = "stated",
+                      mag: float = 1.0, ts: float = 0.0) -> Dict:
+        self._require_consent(site, user)
+        subject = self._entity_or_raise(site, user, subject_id)
+        obj = self._entity_or_raise(site, user, object_id)
+        if subject["entity_id"] == obj["entity_id"]:
+            raise ValueError("self-relations are not supported")
+        if provenance not in {"stated", "inferred"}:
+            raise ValueError("provenance must be stated or inferred")
+        canonical = self._validate_relation_kinds(relation, subject, obj)
+        sub_id, canonical, obj_id = canonical_pair(
+            subject["entity_id"], canonical, obj["entity_id"], DEFAULT_RELATIONS)
+        existing = self.store.get_entity_relation(site, user, sub_id, canonical, obj_id)
+        hits = int(existing["hits"]) if existing else 0
+        old_weight = float(existing["weight"]) if existing else 0.0
+        hits += 1
+        row = {
+            "site": site, "user": user, "subject_id": sub_id, "relation": canonical,
+            "object_id": obj_id,
+            "weight": min(self.cfg.w_max, _saturating_bump(
+                old_weight, self.cfg.alpha, float(mag), self.cfg.w_max)),
+            "confidence": 1.0 - math.exp(-self.cfg.gamma * hits),
+            "hits": hits,
+            "last_reinforced": float(ts),
+            "salience": max(float(existing["salience"]) if existing else 0.0, 0.0),
+            "provenance": "stated" if provenance == "stated" or (
+                existing and existing["provenance"] == "stated") else "inferred",
+            "note": _clean_data(note, 280),
+        }
+        self.store.upsert_entity_relation(row)
+        self._audit(site, user, "entity_relate", {"relation": canonical}, ts)
+        return row
+
+    def entity_forget(self, site: str, user: str, entity_id: str) -> Dict:
+        self._require_consent(site, user)
+        entity = self._entity_or_raise(site, user, entity_id)
+        aliases = [r["alias_attr"] for r in self.store.list_entity_aliases(
+            site, user, entity["entity_id"])]
+        ug = self.store.load_user(site, user)
+        tombstoned = []
+        for alias in aliases:
+            edge = ug.edges.get(alias)
+            if edge is None:
+                continue
+            edge.weight = min(edge.weight, self.cfg.floor)
+            edge.source = "superseded"
+            tombstoned.append(alias)
+        self.store.save_user(ug)
+        self.store.delete_entity(site, user, entity["entity_id"])
+        self._audit(site, user, "forget", {"entity_id": entity["entity_id"],
+                                           "aliases": len(aliases)}, 0.0)
+        return {"forgotten": entity["entity_id"], "aliases_tombstoned": tombstoned,
+                "remaining_refs": self.store.count_entity_references(entity["entity_id"])}
+
+    def _resolve_entity_ref(self, site: str, user: str, ref: str) -> Dict:
+        try:
+            return self._entity_or_raise(site, user, ref)
+        except ValueError:
+            entity = self.store.entity_by_alias(site, user, ref)
+            if entity is None:
+                raise ValueError("entity not found")
+            return entity
+
+    def recall_entity(self, site: str, user: str, entity_id_or_alias_attr: str) -> Dict:
+        self._require_consent(site, user)
+        entity = self._resolve_entity_ref(site, user, entity_id_or_alias_attr)
+        aliases = self.store.list_entity_aliases(site, user, entity["entity_id"])
+        fields = self.store.list_entity_fields(entity["entity_id"])
+        relations = self.store.list_entity_relations(site, user, entity["entity_id"])
+        by_id = {entity["entity_id"]: entity}
+        for row in relations:
+            for eid in (row["subject_id"], row["object_id"]):
+                if eid not in by_id:
+                    ent = self.store.get_entity(site, user, eid)
+                    if ent:
+                        by_id[eid] = ent
+        rendered = []
+        for row in relations:
+            outbound = row["subject_id"] == entity["entity_id"]
+            other_id = row["object_id"] if outbound else row["subject_id"]
+            rel = row["relation"] if outbound else DEFAULT_RELATIONS.relations[row["relation"]].inverse
+            rendered.append({**row, "display_relation": rel,
+                             "other_id": other_id,
+                             "other_name": by_id.get(other_id, {}).get("display_name", other_id)})
+        rendered.sort(key=relation_sort_key)
+        return {"entity_id": entity["entity_id"], "display_name": entity["display_name"],
+                "kind": entity["kind"], "fields": fields, "relations": rendered,
+                "linked_tags": [r["alias_attr"] for r in aliases]}
+
+    def recall_path(self, site: str, user: str, from_entity: str, to_entity: str,
+                    max_hops: int = 3) -> List[List[Dict]]:
+        self._require_consent(site, user)
+        start = self._resolve_entity_ref(site, user, from_entity)["entity_id"]
+        goal = self._resolve_entity_ref(site, user, to_entity)["entity_id"]
+        rows = [r for r in self.store.list_entity_relations(site, user)
+                if float(r["weight"]) >= self.cfg.floor]
+        adj = {}
+        for row in rows:
+            adj.setdefault(row["subject_id"], []).append((row["object_id"], row))
+            adj.setdefault(row["object_id"], []).append((row["subject_id"], row))
+        queue = [(start, [])]
+        results = []
+        while queue and len(results) < 20:
+            node, path = queue.pop(0)
+            if len(path) >= max_hops:
+                continue
+            for nxt, row in sorted(adj.get(node, []), key=lambda item: (item[0], item[1]["relation"])):
+                if any(step["next_id"] == nxt for step in path):
+                    continue
+                step = {**row, "from_id": node, "next_id": nxt}
+                new_path = path + [step]
+                if nxt == goal:
+                    results.append(new_path)
+                else:
+                    queue.append((nxt, new_path))
+        results.sort(key=lambda p: (
+            len(p), -min(float(step["weight"]) for step in p),
+            sum(1 for step in p if step["relation"] == "related_to"),
+            [step["from_id"] + step["relation"] + step["next_id"] for step in p],
+        ))
+        return results[:5]
 
     def set_share(self, person: str, target_site: str, category: str, allowed: bool) -> Dict:
         self.store.set_share(person, target_site, category, allowed)

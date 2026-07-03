@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-139%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-194%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.3%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -160,6 +160,9 @@ on dimensions single-user, vendor-owned, recall-optimized systems **structurally
 | 9 | **Communication-style & mood memory** | ✅ built + tested |
 | 2 | **Outcome-learning for any goal** (reinforce on results) | ✅ built + tested |
 | 8 | **Explainable provenance** (`why`) | ✅ built + tested |
+| - | **Persisted edge provenance** (`stated` vs `inferred`) | 🆕 new, opt-in, not yet validated |
+| - | **Typed identity entities + relations** | validated on synthetic acceptance fixtures; no real-profile validation yet |
+| - | **Entity-aware card aggregation/enrichment** | validated on synthetic acceptance fixtures; no real-profile validation yet |
 | 1 | **Private collective priors** (network-effect cold-start; k-anonymity + bounded-mean DP) | ✅ built + tested |
 | 4 | **Verifiable, cryptographic data ownership** (tamper-evident HMAC chain, cascading unlearning) | ✅ built + tested |
 | 7 | **Multi-timescale memory** (fast context vs. slow identity) | ✅ built + tested |
@@ -210,7 +213,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 138 passing, 2 skipped
+pytest -q                               # 194 passing, 3 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -263,7 +266,14 @@ print(svc.card("shop.example", "elena")["wire"])
   concept never drifts across months. Deterministic by default; gated-LLM only for
   novel free text. *This is the product-critical layer — and the foundation a future
   recursive/region organization would group on.*
+- **Structured-field capture** — regex-only contact/date extraction keeps email,
+  phone, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
+- **Typed entity layer** - opt-in service APIs and additive SQLite/Postgres tables for
+  entities, tag aliases, fields, Hebbian typed relations, alias aggregation, and
+  compact entity-aware card enrichment behind default-off flags.
 - **The Cabinet** — append-only event log with `recall()` for specific facts.
+- **Edge provenance** — persisted `stated`/`inferred` authority metadata on graph
+  edges across SQLite, Postgres, and consolidation undo.
 - **Supernode** (`supernode.py` + `auth.py`) — user-owned cross-site profile, built by **sign-in** (verified token → opaque person id), default-deny scoped views, sensitive categories walled off.
 - **Proactive triggers** — due-to-reorder + fading-favorite nudges.
 - **Safety** — event tags treated as untrusted data: injection-pattern dropping, size/value caps.
@@ -290,7 +300,19 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-✅ **Done & tested (139 passing, 2 skipped):** engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, and the full results suite above.
+Done & tested (194 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, typed entity storage/service APIs, opt-in entity-aware cards, and the full results suite above.
+
+New: typed entity layer. The core now has deterministic, consent-gated service
+APIs plus additive SQLite/Postgres tables for entities, aliases, fields, and typed
+relations with Hebbian strengthening/decay. Opt-in retrieval integration can
+aggregate fragmented aliases and enrich card slots with compact entity context.
+It is validated on synthetic acceptance fixtures, including a non-commerce
+research/family scenario; there is no real-profile validation yet.
+
+🆕 **Structured-field ingest:** the capture pipeline now retains deterministic
+email, phone, URL, handle, and ISO-date extractions in event payloads before tag
+extraction. These values are stored as raw Cabinet data only; entity-field writes
+are available through the service API, with automatic promotion left for a later pass.
 
 🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
 
@@ -318,7 +340,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       139 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       194 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS consents(
   PRIMARY KEY(site, "user"));
 CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, "user" TEXT, attr TEXT, weight DOUBLE PRECISION, confidence DOUBLE PRECISION,
-  source TEXT, last_reinforced DOUBLE PRECISION, hits INT, fast DOUBLE PRECISION DEFAULT 0, salience DOUBLE PRECISION DEFAULT 0,
+  source TEXT, last_reinforced DOUBLE PRECISION, hits INT, fast DOUBLE PRECISION DEFAULT 0,
+  salience DOUBLE PRECISION DEFAULT 0, provenance TEXT NOT NULL DEFAULT 'inferred',
   PRIMARY KEY(site, "user", attr));
 CREATE TABLE IF NOT EXISTS user_numeric(
   site TEXT, "user" TEXT, key TEXT, value TEXT,
@@ -39,6 +40,29 @@ CREATE TABLE IF NOT EXISTS identities(
 CREATE TABLE IF NOT EXISTS share_policy(
   person TEXT, target_site TEXT, category TEXT, allowed INT,
   PRIMARY KEY(person, target_site, category));
+CREATE TABLE IF NOT EXISTS entities(
+  entity_id TEXT PRIMARY KEY, site TEXT NOT NULL, "user" TEXT NOT NULL,
+  kind TEXT NOT NULL, display_name TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL);
+CREATE TABLE IF NOT EXISTS entity_aliases(
+  site TEXT NOT NULL, "user" TEXT NOT NULL, alias_attr TEXT NOT NULL,
+  entity_id TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'stated',
+  confidence DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+  PRIMARY KEY(site, "user", alias_attr));
+CREATE TABLE IF NOT EXISTS entity_fields(
+  entity_id TEXT NOT NULL, field TEXT NOT NULL,
+  value TEXT NOT NULL, provenance TEXT NOT NULL DEFAULT 'stated',
+  ts DOUBLE PRECISION NOT NULL,
+  PRIMARY KEY(entity_id, field));
+CREATE TABLE IF NOT EXISTS entity_relations(
+  site TEXT NOT NULL, "user" TEXT NOT NULL,
+  subject_id TEXT NOT NULL, relation TEXT NOT NULL, object_id TEXT NOT NULL,
+  weight DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+  confidence DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+  hits INT NOT NULL DEFAULT 0, last_reinforced DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+  salience DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+  provenance TEXT NOT NULL DEFAULT 'stated',
+  note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY(site, "user", subject_id, relation, object_id));
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, "user", ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, "user", attr);
 """
@@ -52,6 +76,9 @@ class PostgresStore:
         self._conn.execute(SCHEMA)
         for col in ("fast", "salience"):   # forward-compat for DBs created before these columns
             self._conn.execute("ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS %s DOUBLE PRECISION DEFAULT 0" % col)
+        self._conn.execute(
+            "ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'inferred'"
+        )
 
     def _q(self, sql, args=()):
         return self._conn.execute(sql, args)
@@ -72,7 +99,8 @@ class PostgresStore:
         ug = UserGraph(site, user)
         for r in self._q('SELECT * FROM user_edges WHERE site=%s AND "user"=%s', (site, user)).fetchall():
             ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
-                                       r["last_reinforced"], r["hits"], r.get("fast", 0.0), r.get("salience", 0.0))
+                                       r["last_reinforced"], r["hits"], r.get("fast", 0.0),
+                                       r.get("salience", 0.0), r.get("provenance", "inferred"))
         for r in self._q('SELECT key,value FROM user_numeric WHERE site=%s AND "user"=%s', (site, user)).fetchall():
             v = r["value"]
             try:
@@ -87,9 +115,10 @@ class PostgresStore:
     def save_user(self, ug: UserGraph):
         with self._lock, self._conn.cursor() as c:
             c.execute('DELETE FROM user_edges WHERE site=%s AND "user"=%s', (ug.site, ug.user))
-            c.executemany('INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+            c.executemany('INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                           [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                            e.last_reinforced, e.hits, e.fast, e.salience) for a, e in ug.edges.items()])
+                            e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
+                           for a, e in ug.edges.items()])
             c.execute('DELETE FROM user_numeric WHERE site=%s AND "user"=%s', (ug.site, ug.user))
             c.executemany('INSERT INTO user_numeric VALUES(%s,%s,%s,%s)',
                           [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
@@ -99,6 +128,18 @@ class PostgresStore:
 
     def delete_user(self, site, user):
         with self._lock:
+            ids = [r["entity_id"] for r in self._q(
+                'SELECT entity_id FROM entities WHERE site=%s AND "user"=%s',
+                (site, user)).fetchall()]
+            for entity_id in ids:
+                self._q('DELETE FROM entity_relations WHERE site=%s AND "user"=%s '
+                        'AND (subject_id=%s OR object_id=%s)',
+                        (site, user, entity_id, entity_id))
+                self._q("DELETE FROM entity_fields WHERE entity_id=%s", (entity_id,))
+                self._q('DELETE FROM entity_aliases WHERE site=%s AND "user"=%s AND entity_id=%s',
+                        (site, user, entity_id))
+                self._q('DELETE FROM entities WHERE site=%s AND "user"=%s AND entity_id=%s',
+                        (site, user, entity_id))
             for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
                 self._q(f'DELETE FROM {t} WHERE site=%s AND "user"=%s', (site, user))
 
@@ -180,6 +221,121 @@ class PostgresStore:
         return {r["category"]: bool(r["allowed"]) for r in
                 self._q("SELECT category,allowed FROM share_policy WHERE person=%s AND target_site=%s",
                         (person, target_site)).fetchall()}
+
+    # ---- typed entity layer ----
+    def create_entity(self, entity_id, site, user, kind, display_name, created_at):
+        with self._lock:
+            self._q('INSERT INTO entities(entity_id,site,"user",kind,display_name,created_at) '
+                    'VALUES(%s,%s,%s,%s,%s,%s)',
+                    (entity_id, site, user, kind, display_name, created_at))
+
+    def get_entity(self, site, user, entity_id):
+        row = self._q('SELECT * FROM entities WHERE site=%s AND "user"=%s AND entity_id=%s',
+                      (site, user, entity_id)).fetchone()
+        return dict(row) if row else None
+
+    def entity_by_alias(self, site, user, alias_attr):
+        row = self._q(
+            'SELECT e.* FROM entity_aliases a JOIN entities e ON e.entity_id=a.entity_id '
+            'WHERE a.site=%s AND a."user"=%s AND a.alias_attr=%s',
+            (site, user, alias_attr)).fetchone()
+        return dict(row) if row else None
+
+    def link_entity_alias(self, site, user, entity_id, alias_attr,
+                          source="stated", confidence=1.0):
+        with self._lock:
+            self._q('INSERT INTO entity_aliases(site,"user",alias_attr,entity_id,source,confidence) '
+                    'VALUES(%s,%s,%s,%s,%s,%s) '
+                    'ON CONFLICT(site,"user",alias_attr) DO UPDATE SET '
+                    'entity_id=EXCLUDED.entity_id, source=EXCLUDED.source, confidence=EXCLUDED.confidence',
+                    (site, user, alias_attr, entity_id, source, float(confidence)))
+
+    def unlink_entity_alias(self, site, user, entity_id, alias_attr):
+        with self._lock:
+            self._q('DELETE FROM entity_aliases WHERE site=%s AND "user"=%s '
+                    'AND entity_id=%s AND alias_attr=%s',
+                    (site, user, entity_id, alias_attr))
+
+    def list_entity_aliases(self, site, user, entity_id):
+        return [dict(r) for r in self._q(
+            'SELECT * FROM entity_aliases WHERE site=%s AND "user"=%s '
+            'AND entity_id=%s ORDER BY alias_attr',
+            (site, user, entity_id)).fetchall()]
+
+    def set_entity_field(self, entity_id, field, value, provenance, ts):
+        with self._lock:
+            self._q("INSERT INTO entity_fields(entity_id,field,value,provenance,ts) "
+                    "VALUES(%s,%s,%s,%s,%s) "
+                    "ON CONFLICT(entity_id,field) DO UPDATE SET "
+                    "value=EXCLUDED.value, provenance=EXCLUDED.provenance, ts=EXCLUDED.ts",
+                    (entity_id, field, value, provenance, float(ts)))
+
+    def list_entity_fields(self, entity_id):
+        return [dict(r) for r in self._q(
+            "SELECT * FROM entity_fields WHERE entity_id=%s ORDER BY field",
+            (entity_id,)).fetchall()]
+
+    def get_entity_relation(self, site, user, subject_id, relation, object_id):
+        row = self._q(
+            'SELECT * FROM entity_relations WHERE site=%s AND "user"=%s '
+            'AND subject_id=%s AND relation=%s AND object_id=%s',
+            (site, user, subject_id, relation, object_id)).fetchone()
+        return dict(row) if row else None
+
+    def upsert_entity_relation(self, row):
+        with self._lock:
+            self._q(
+                'INSERT INTO entity_relations(site,"user",subject_id,relation,object_id,'
+                'weight,confidence,hits,last_reinforced,salience,provenance,note) '
+                'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) '
+                'ON CONFLICT(site,"user",subject_id,relation,object_id) DO UPDATE SET '
+                'weight=EXCLUDED.weight, confidence=EXCLUDED.confidence, hits=EXCLUDED.hits, '
+                'last_reinforced=EXCLUDED.last_reinforced, salience=EXCLUDED.salience, '
+                'provenance=EXCLUDED.provenance, note=EXCLUDED.note',
+                (row["site"], row["user"], row["subject_id"], row["relation"],
+                 row["object_id"], row["weight"], row["confidence"], row["hits"],
+                 row["last_reinforced"], row["salience"], row["provenance"], row["note"]))
+
+    def list_entity_relations(self, site, user, entity_id=None):
+        if entity_id is None:
+            rows = self._q(
+                'SELECT * FROM entity_relations WHERE site=%s AND "user"=%s '
+                'ORDER BY subject_id,relation,object_id', (site, user)).fetchall()
+        else:
+            rows = self._q(
+                'SELECT * FROM entity_relations WHERE site=%s AND "user"=%s '
+                'AND (subject_id=%s OR object_id=%s) ORDER BY relation,subject_id,object_id',
+                (site, user, entity_id, entity_id)).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_entity_relation(self, site, user, subject_id, relation, object_id):
+        with self._lock:
+            self._q('DELETE FROM entity_relations WHERE site=%s AND "user"=%s '
+                    'AND subject_id=%s AND relation=%s AND object_id=%s',
+                    (site, user, subject_id, relation, object_id))
+
+    def delete_entity(self, site, user, entity_id):
+        with self._lock:
+            self._q('DELETE FROM entity_relations WHERE site=%s AND "user"=%s '
+                    'AND (subject_id=%s OR object_id=%s)',
+                    (site, user, entity_id, entity_id))
+            self._q("DELETE FROM entity_fields WHERE entity_id=%s", (entity_id,))
+            self._q('DELETE FROM entity_aliases WHERE site=%s AND "user"=%s AND entity_id=%s',
+                    (site, user, entity_id))
+            self._q('DELETE FROM entities WHERE site=%s AND "user"=%s AND entity_id=%s',
+                    (site, user, entity_id))
+
+    def count_entity_references(self, entity_id):
+        specs = [
+            ("entities", "entity_id=%s", (entity_id,)),
+            ("entity_aliases", "entity_id=%s", (entity_id,)),
+            ("entity_fields", "entity_id=%s", (entity_id,)),
+            ("entity_relations", "subject_id=%s OR object_id=%s", (entity_id, entity_id)),
+        ]
+        total = 0
+        for table, where, args in specs:
+            total += self._q(f"SELECT COUNT(*) n FROM {table} WHERE {where}", args).fetchone()["n"]
+        return total
 
     def list_users(self, site):
         return [r["user"] for r in self._q(

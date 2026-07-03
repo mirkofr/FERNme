@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS consolidation_runs(
 
 EDGE_COLUMNS = (
     "site", "user", "attr", "weight", "confidence", "source",
-    "last_reinforced", "hits", "fast", "salience",
+    "last_reinforced", "hits", "fast", "salience", "provenance",
 )
 HISTORY_COLUMNS = ("site", "user", "attr", "ts")
 ASSOC_COLUMNS = ("site", "a", "b", "weight")
@@ -89,14 +89,14 @@ def _edge_to_row(site: str, user: str, attr: str, edge: Edge) -> Tuple:
     return (
         site, user, attr, float(edge.weight), float(edge.confidence), edge.source,
         float(edge.last_reinforced), int(edge.hits), float(edge.fast),
-        float(edge.salience),
+        float(edge.salience), edge.provenance,
     )
 
 
 def _replace_user_graph(conn, ug: UserGraph) -> None:
     conn.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
     conn.executemany(
-        "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         [_edge_to_row(ug.site, ug.user, attr, edge)
          for attr, edge in ug.edges.items()],
     )
@@ -200,7 +200,13 @@ def _merge_edges(edges: Sequence[Edge]) -> Edge:
         hits=hits,
         fast=sum(float(e.fast) for e in edges),
         salience=max((float(e.salience) for e in edges), default=0.0),
+        provenance="stated" if any(e.provenance == "stated" for e in edges) else "inferred",
     )
+
+
+def _edge_snapshot_values(row: Dict) -> Tuple:
+    return tuple(row.get(c, "inferred") if c == "provenance" else row[c]
+                 for c in EDGE_COLUMNS)
 
 
 def _snapshot(store: SQLiteStore, plan: ConsolidationPlan) -> Dict:
@@ -273,6 +279,7 @@ def _apply_user_groups(store: SQLiteStore, groups: Sequence[MergeGroup]) -> None
                     hits=old.hits,
                     fast=0.0,
                     salience=old.salience,
+                    provenance=old.provenance,
                 )
         _replace_user_graph(store._conn, ug)
 
@@ -384,8 +391,8 @@ def undo_consolidation(db_path: str | Path, run_id: str) -> Dict:
                 args,
             )
             conn.executemany(
-                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?)",
-                [tuple(r[c] for c in EDGE_COLUMNS) for r in user_snapshot["user_edges"]],
+                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                [_edge_snapshot_values(r) for r in user_snapshot["user_edges"]],
             )
             conn.executemany(
                 "INSERT INTO user_history VALUES(?,?,?,?)",

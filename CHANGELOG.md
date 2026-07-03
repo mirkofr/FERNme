@@ -2,6 +2,22 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [0.4.0-unreleased] — entity layer groundwork
+
+### Added
+- Persisted edge provenance (`stated`/`inferred`) in SQLite and Postgres stores,
+  including migration defaults and consolidation snapshot/undo preservation.
+- Added deterministic structured-field extraction at capture ingest for email,
+  phone, URL, handle, and ISO-date payload retention.
+- Added the typed entity layer: additive SQLite/Postgres tables and deterministic
+  service APIs for entities, aliases, fields, and Hebbian typed relations.
+- Rejected reversed relation surfaces such as `buys_from` instead of storing
+  direction-inverted canonical relations.
+- Added opt-in entity-aware retrieval integration: alias activation aggregation,
+  compact card enrichment, card token estimates, and one-hop stated relation pull.
+- Added fictional entity-layer acceptance fixtures covering commerce and
+  non-commerce research/family scenarios.
+
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 
 ### Added

@@ -28,6 +28,7 @@ from .local_tagger import LocalTaggerAdapter
 from .agent_byproduct import AgentByproductAdapter
 from .config import load_config, write_config, default_config, VALID
 from .pipeline import CapturePipeline
+from .extractors import extract_structured
 
 REGISTRY = {
     "signal": SignalAdapter,
@@ -65,5 +66,5 @@ __all__ = [
     "BaseAdapter", "SignalAdapter", "LocalTaggerAdapter", "AgentByproductAdapter",
     "CapturePipeline", "REGISTRY", "VALID",
     "build_adapters", "load_pipeline", "load_config", "write_config",
-    "default_config",
+    "default_config", "extract_structured",
 ]

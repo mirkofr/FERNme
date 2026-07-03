@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS consents(
 CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, user TEXT, attr TEXT, weight REAL, confidence REAL,
   source TEXT, last_reinforced REAL, hits INTEGER, fast REAL DEFAULT 0, salience REAL DEFAULT 0,
+  provenance TEXT NOT NULL DEFAULT 'inferred',
   PRIMARY KEY(site, user, attr));
 CREATE TABLE IF NOT EXISTS user_numeric(
   site TEXT, user TEXT, key TEXT, value TEXT,
@@ -38,6 +39,26 @@ CREATE TABLE IF NOT EXISTS identities(
 CREATE TABLE IF NOT EXISTS share_policy(
   person TEXT, target_site TEXT, category TEXT, allowed INTEGER,
   PRIMARY KEY(person, target_site, category));
+CREATE TABLE IF NOT EXISTS entities(
+  entity_id TEXT PRIMARY KEY, site TEXT NOT NULL, user TEXT NOT NULL,
+  kind TEXT NOT NULL, display_name TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS entity_aliases(
+  site TEXT NOT NULL, user TEXT NOT NULL, alias_attr TEXT NOT NULL,
+  entity_id TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'stated',
+  confidence REAL NOT NULL DEFAULT 1.0,
+  PRIMARY KEY(site, user, alias_attr));
+CREATE TABLE IF NOT EXISTS entity_fields(
+  entity_id TEXT NOT NULL, field TEXT NOT NULL,
+  value TEXT NOT NULL, provenance TEXT NOT NULL DEFAULT 'stated', ts REAL NOT NULL,
+  PRIMARY KEY(entity_id, field));
+CREATE TABLE IF NOT EXISTS entity_relations(
+  site TEXT NOT NULL, user TEXT NOT NULL,
+  subject_id TEXT NOT NULL, relation TEXT NOT NULL, object_id TEXT NOT NULL,
+  weight REAL NOT NULL DEFAULT 0.0, confidence REAL NOT NULL DEFAULT 0.0,
+  hits INTEGER NOT NULL DEFAULT 0, last_reinforced REAL NOT NULL DEFAULT 0.0,
+  salience REAL NOT NULL DEFAULT 0.0, provenance TEXT NOT NULL DEFAULT 'stated',
+  note TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY(site, user, subject_id, relation, object_id));
 CREATE TABLE IF NOT EXISTS audit(
   site TEXT, user TEXT, seq INTEGER, ts REAL, action TEXT, detail TEXT,
   prev_hash TEXT, hash TEXT, PRIMARY KEY(site, user, seq));
@@ -70,6 +91,10 @@ class SQLiteStore:
         for col in ("fast", "salience"):
             if col not in cols:
                 self._conn.execute("ALTER TABLE user_edges ADD COLUMN %s REAL DEFAULT 0" % col)
+        if "provenance" not in cols:
+            self._conn.execute(
+                "ALTER TABLE user_edges ADD COLUMN provenance TEXT NOT NULL DEFAULT 'inferred'"
+            )
 
     # ---- consent ----
     def set_consent(self, site: str, user: str, granted: bool, ts: float = 0.0):
@@ -93,7 +118,8 @@ class SQLiteStore:
             ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
                                        r["last_reinforced"], r["hits"],
                                        r["fast"] if "fast" in r.keys() else 0.0,
-                                       r["salience"] if "salience" in r.keys() else 0.0)
+                                       r["salience"] if "salience" in r.keys() else 0.0,
+                                       r["provenance"] if "provenance" in r.keys() else "inferred")
         for r in self._conn.execute(
                 "SELECT key,value FROM user_numeric WHERE site=? AND user=?", (site, user)):
             v = r["value"]
@@ -114,9 +140,10 @@ class SQLiteStore:
             c = self._conn
             c.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany(
-                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                  e.last_reinforced, e.hits, e.fast, e.salience) for a, e in ug.edges.items()])
+                  e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
+                 for a, e in ug.edges.items()])
             c.execute("DELETE FROM user_numeric WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany("INSERT INTO user_numeric VALUES(?,?,?,?)",
                           [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
@@ -127,6 +154,19 @@ class SQLiteStore:
 
     def delete_user(self, site: str, user: str):
         with self._lock:
+            ids = [r["entity_id"] for r in self._conn.execute(
+                "SELECT entity_id FROM entities WHERE site=? AND user=?", (site, user))]
+            for entity_id in ids:
+                self._conn.execute(
+                    "DELETE FROM entity_relations WHERE site=? AND user=? AND "
+                    "(subject_id=? OR object_id=?)", (site, user, entity_id, entity_id))
+                self._conn.execute("DELETE FROM entity_fields WHERE entity_id=?", (entity_id,))
+                self._conn.execute(
+                    "DELETE FROM entity_aliases WHERE site=? AND user=? AND entity_id=?",
+                    (site, user, entity_id))
+                self._conn.execute(
+                    "DELETE FROM entities WHERE site=? AND user=? AND entity_id=?",
+                    (site, user, entity_id))
             for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
                 self._conn.execute(f"DELETE FROM {t} WHERE site=? AND user=?", (site, user))
             self._conn.commit()
@@ -231,6 +271,138 @@ class SQLiteStore:
         return {r["category"]: bool(r["allowed"]) for r in self._conn.execute(
             "SELECT category, allowed FROM share_policy WHERE person=? AND target_site=?",
             (person, target_site))}
+
+    # ---- typed entity layer ----
+    def create_entity(self, entity_id: str, site: str, user: str, kind: str,
+                      display_name: str, created_at: float):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO entities(entity_id,site,user,kind,display_name,created_at) "
+                "VALUES(?,?,?,?,?,?)",
+                (entity_id, site, user, kind, display_name, created_at))
+            self._conn.commit()
+
+    def get_entity(self, site: str, user: str, entity_id: str):
+        row = self._conn.execute(
+            "SELECT * FROM entities WHERE site=? AND user=? AND entity_id=?",
+            (site, user, entity_id)).fetchone()
+        return dict(row) if row else None
+
+    def entity_by_alias(self, site: str, user: str, alias_attr: str):
+        row = self._conn.execute(
+            "SELECT e.* FROM entity_aliases a JOIN entities e ON e.entity_id=a.entity_id "
+            "WHERE a.site=? AND a.user=? AND a.alias_attr=?",
+            (site, user, alias_attr)).fetchone()
+        return dict(row) if row else None
+
+    def link_entity_alias(self, site: str, user: str, entity_id: str, alias_attr: str,
+                          source: str = "stated", confidence: float = 1.0):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO entity_aliases(site,user,alias_attr,entity_id,source,confidence) "
+                "VALUES(?,?,?,?,?,?) "
+                "ON CONFLICT(site,user,alias_attr) DO UPDATE SET "
+                "entity_id=excluded.entity_id, source=excluded.source, confidence=excluded.confidence",
+                (site, user, alias_attr, entity_id, source, float(confidence)))
+            self._conn.commit()
+
+    def unlink_entity_alias(self, site: str, user: str, entity_id: str, alias_attr: str):
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM entity_aliases WHERE site=? AND user=? AND entity_id=? AND alias_attr=?",
+                (site, user, entity_id, alias_attr))
+            self._conn.commit()
+
+    def list_entity_aliases(self, site: str, user: str, entity_id: str):
+        return [dict(r) for r in self._conn.execute(
+            "SELECT * FROM entity_aliases WHERE site=? AND user=? AND entity_id=? ORDER BY alias_attr",
+            (site, user, entity_id))]
+
+    def set_entity_field(self, entity_id: str, field: str, value: str,
+                         provenance: str, ts: float):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO entity_fields(entity_id,field,value,provenance,ts) VALUES(?,?,?,?,?) "
+                "ON CONFLICT(entity_id,field) DO UPDATE SET "
+                "value=excluded.value, provenance=excluded.provenance, ts=excluded.ts",
+                (entity_id, field, value, provenance, float(ts)))
+            self._conn.commit()
+
+    def list_entity_fields(self, entity_id: str):
+        return [dict(r) for r in self._conn.execute(
+            "SELECT * FROM entity_fields WHERE entity_id=? ORDER BY field", (entity_id,))]
+
+    def get_entity_relation(self, site: str, user: str, subject_id: str,
+                            relation: str, object_id: str):
+        row = self._conn.execute(
+            "SELECT * FROM entity_relations WHERE site=? AND user=? AND subject_id=? "
+            "AND relation=? AND object_id=?",
+            (site, user, subject_id, relation, object_id)).fetchone()
+        return dict(row) if row else None
+
+    def upsert_entity_relation(self, row: Dict):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO entity_relations(site,user,subject_id,relation,object_id,"
+                "weight,confidence,hits,last_reinforced,salience,provenance,note) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(site,user,subject_id,relation,object_id) DO UPDATE SET "
+                "weight=excluded.weight, confidence=excluded.confidence, hits=excluded.hits, "
+                "last_reinforced=excluded.last_reinforced, salience=excluded.salience, "
+                "provenance=excluded.provenance, note=excluded.note",
+                (row["site"], row["user"], row["subject_id"], row["relation"],
+                 row["object_id"], row["weight"], row["confidence"], row["hits"],
+                 row["last_reinforced"], row["salience"], row["provenance"], row["note"]))
+            self._conn.commit()
+
+    def list_entity_relations(self, site: str, user: str, entity_id: str = None):
+        if entity_id is None:
+            rows = self._conn.execute(
+                "SELECT * FROM entity_relations WHERE site=? AND user=? "
+                "ORDER BY subject_id,relation,object_id", (site, user))
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM entity_relations WHERE site=? AND user=? "
+                "AND (subject_id=? OR object_id=?) ORDER BY relation,subject_id,object_id",
+                (site, user, entity_id, entity_id))
+        return [dict(r) for r in rows]
+
+    def delete_entity_relation(self, site: str, user: str, subject_id: str,
+                               relation: str, object_id: str):
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM entity_relations WHERE site=? AND user=? AND subject_id=? "
+                "AND relation=? AND object_id=?",
+                (site, user, subject_id, relation, object_id))
+            self._conn.commit()
+
+    def delete_entity(self, site: str, user: str, entity_id: str):
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM entity_relations WHERE site=? AND user=? AND "
+                "(subject_id=? OR object_id=?)", (site, user, entity_id, entity_id))
+            self._conn.execute("DELETE FROM entity_fields WHERE entity_id=?", (entity_id,))
+            self._conn.execute(
+                "DELETE FROM entity_aliases WHERE site=? AND user=? AND entity_id=?",
+                (site, user, entity_id))
+            self._conn.execute(
+                "DELETE FROM entities WHERE site=? AND user=? AND entity_id=?",
+                (site, user, entity_id))
+            self._conn.commit()
+
+    def count_entity_references(self, entity_id: str) -> int:
+        queries = [
+            ("entities", "entity_id=?"),
+            ("entity_aliases", "entity_id=?"),
+            ("entity_fields", "entity_id=?"),
+            ("entity_relations", "subject_id=? OR object_id=?"),
+        ]
+        total = 0
+        for table, where in queries:
+            args = (entity_id, entity_id) if " OR " in where else (entity_id,)
+            total += self._conn.execute(
+                f"SELECT COUNT(*) n FROM {table} WHERE {where}", args).fetchone()["n"]
+        return total
 
     # ---- verifiable audit log (#4) ----
     def append_audit(self, site, user, ts, action, detail, key):
