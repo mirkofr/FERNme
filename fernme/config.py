@@ -99,6 +99,10 @@ class Config:
     capture_context: bool = True  # store the sentence a memory came from (no LLM)
     auto_gloss: bool = True        # fill missing glosses from namespace templates
 
+    # --- typed entity layer (entity/card integration remains opt-in) ---
+    entities: bool = False
+    entity_aggregation: bool = False
+
     # --- Differential / population-prior encoding (prior/population.py) ---
     theta: float = 2.0        # store a user edge only if |w_user - w_prior| > theta
 
