@@ -45,8 +45,11 @@ RELATION_ALIASES = {
     "married_to": "family_of", "parent_of": "family_of", "child_of": "family_of",
     "sibling_of": "family_of",
     "coworker_of": "colleague_of",
-    "buys_from": "selling_to",
     "connected_to": "related_to", "linked_to": "related_to",
+}
+
+REVERSED_SURFACES = {
+    "buys_from": "selling_to",
 }
 
 
@@ -84,6 +87,12 @@ class RelationVocabulary:
                 raise ValueError(f"relation alias {alias} targets unknown {canonical}")
 
     def resolve(self, relation: str) -> str:
+        if relation in REVERSED_SURFACES:
+            canonical = REVERSED_SURFACES[relation]
+            raise ValueError(
+                f"{relation} is the reversed form of {canonical}; "
+                f"write {canonical} with subject and object swapped"
+            )
         if relation in inverse_names(self.relations):
             allowed = ", ".join(sorted(self.relations))
             raise ValueError(f"inverse relation {relation} is read-only; allowed: {allowed}")

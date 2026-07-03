@@ -11,6 +11,7 @@ from fernme.relations import (
     DEFAULT_RELATIONS,
     RELATION_ALIASES,
     RELATIONS,
+    REVERSED_SURFACES,
     RelationVocabulary,
     canonical_pair,
     inverse_names,
@@ -31,6 +32,49 @@ def test_relation_alias_targets_are_canonical():
     assert RELATION_ALIASES
     for canonical in RELATION_ALIASES.values():
         assert canonical in RELATIONS
+
+
+def test_reversed_surface_buys_from_rejects_with_swap_guidance():
+    svc, _ = _svc()
+    orbit = svc.entity_create("demo", "alex", "org", "Orbit Labs")
+    northwind = svc.entity_create("demo", "alex", "org", "Northwind Ltd")
+
+    with pytest.raises(ValueError, match="selling_to.*swapped"):
+        DEFAULT_RELATIONS.resolve("buys_from")
+    with pytest.raises(ValueError, match="selling_to.*swapped"):
+        svc.entity_relate("demo", "alex", orbit, "buys_from", northwind)
+
+    assert REVERSED_SURFACES["buys_from"] == "selling_to"
+    assert "buys_from" not in RELATION_ALIASES
+
+
+def test_alias_table_does_not_contain_direction_reversing_surfaces():
+    intended = {
+        "employed_by": ({"person"}, {"org"}),
+        "employee_of": ({"person"}, {"org"}),
+        "job_at": ({"person"}, {"org"}),
+        "founder_of": ({"person"}, {"org"}),
+        "boss_of": ({"person"}, {"org", "project"}),
+        "leads": ({"person"}, {"org", "project"}),
+        "married_to": ({"person"}, {"person"}),
+        "parent_of": ({"person"}, {"person"}),
+        "child_of": ({"person"}, {"person"}),
+        "sibling_of": ({"person"}, {"person"}),
+        "coworker_of": ({"person"}, {"person"}),
+        "connected_to": (set(RELATIONS["related_to"].subject_kinds),
+                         set(RELATIONS["related_to"].object_kinds)),
+        "linked_to": (set(RELATIONS["related_to"].subject_kinds),
+                      set(RELATIONS["related_to"].object_kinds)),
+    }
+
+    assert set(RELATION_ALIASES) == set(intended)
+    for alias, canonical in RELATION_ALIASES.items():
+        spec = RELATIONS[canonical]
+        subject_kinds, object_kinds = intended[alias]
+        # Direction-changing aliases are forbidden: alias(subject, object) must
+        # be valid as canonical(subject, object), with no hidden argument swap.
+        assert subject_kinds <= spec.subject_kinds
+        assert object_kinds <= spec.object_kinds
 
 
 def test_inverse_names_are_read_only_write_surfaces():
@@ -88,6 +132,19 @@ def test_alias_resolution_at_entity_relate_boundary():
 
     assert row["relation"] == "ceo_of"
     assert len(svc.store.list_entity_relations("demo", "alex")) == 1
+
+
+def test_symmetric_alias_resolution_is_unchanged():
+    svc, _ = _svc()
+    dana = svc.entity_create("demo", "alex", "person", "Dana Reyes")
+    felix = svc.entity_create("demo", "alex", "person", "Felix Tan")
+
+    married = svc.entity_relate("demo", "alex", dana, "married_to", felix)
+    coworker = svc.entity_relate("demo", "alex", felix, "coworker_of", dana)
+
+    assert married["relation"] == "family_of"
+    assert coworker["relation"] == "colleague_of"
+    assert len(svc.store.list_entity_relations("demo", "alex")) == 2
 
 
 def test_related_to_accepts_any_kind_pair():
