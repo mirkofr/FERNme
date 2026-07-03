@@ -8,6 +8,7 @@ from .write import Catalog, map_event, observe, decay
 from .categories import category_of, CATEGORIES
 from .hierarchy import build_hierarchy
 from .retrieve.card import compile_card
+from .retrieve.entity_card import compile_entity_card
 from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
 from .supernode import Supernode
@@ -248,7 +249,52 @@ class FernService:
         prior = self.store.load_prior(site)
         if cold_start and ug.n_edges() == 0 and prior.n_users > 0:
             prior.cold_start(ug, self.cfg)     # turn-one usefulness from the population
+        if self.cfg.entities or self.cfg.entity_aggregation:
+            return compile_entity_card(
+                ug, ag, context or [], now, prior, self.cfg,
+                self._entity_card_context(site, user, ug),
+            )
         return compile_card(ug, ag, context or [], now, prior, self.cfg)
+
+    def _entity_card_context(self, site: str, user: str, ug: UserGraph) -> Dict:
+        alias_to_entity = {}
+        aliases_by_entity = {}
+        entities = {}
+        for attr in sorted(ug.edges):
+            entity = self.store.entity_by_alias(site, user, attr)
+            if entity is None:
+                continue
+            entity_id = entity["entity_id"]
+            alias_to_entity[attr] = entity_id
+            entities[entity_id] = entity
+            aliases_by_entity.setdefault(entity_id, set()).add(attr)
+        for entity_id in list(entities):
+            for row in self.store.list_entity_aliases(site, user, entity_id):
+                aliases_by_entity.setdefault(entity_id, set()).add(row["alias_attr"])
+
+        relations_by_entity = {entity_id: [] for entity_id in entities}
+        for row in self.store.list_entity_relations(site, user):
+            for entity_id in (row["subject_id"], row["object_id"]):
+                if entity_id not in entities:
+                    entity = self.store.get_entity(site, user, entity_id)
+                    if entity:
+                        entities[entity_id] = entity
+                relations_by_entity.setdefault(entity_id, []).append(row)
+
+        fields_by_entity = {
+            entity_id: self.store.list_entity_fields(entity_id)
+            for entity_id in entities
+        }
+        return {
+            "alias_to_entity": dict(sorted(alias_to_entity.items())),
+            "aliases_by_entity": {
+                entity_id: sorted(aliases)
+                for entity_id, aliases in sorted(aliases_by_entity.items())
+            },
+            "entities": dict(sorted(entities.items())),
+            "fields_by_entity": fields_by_entity,
+            "relations_by_entity": relations_by_entity,
+        }
 
     def recall(self, site: str, user: str, type: Optional[str] = None,
                contains: Optional[str] = None, limit: int = 20) -> List[Dict]:

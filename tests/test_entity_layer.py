@@ -179,18 +179,19 @@ def test_display_field_and_note_data_are_sanitized_and_capped():
 def test_flags_off_card_output_byte_identical_after_entity_rows_added():
     svc, _ = _svc()
     svc.observe("demo", "alex", "note", {"tags": ["pref:quiet", "topic:maps"]}, ts=1.0)
-    before = json.dumps(svc.card("demo", "alex", context=["maps"], now=2.0),
-                        sort_keys=True, separators=(",", ":"))
+    before_card = svc.card("demo", "alex", context=["maps"], now=2.0)
+    before = json.dumps(before_card, sort_keys=True, separators=(",", ":"))
     dana = svc.entity_create("demo", "alex", "person", "Dana Reyes")
     northwind = svc.entity_create("demo", "alex", "org", "Northwind Ltd")
     svc.entity_link_alias("demo", "alex", dana, "pref:quiet")
     svc.entity_set_field("demo", "alex", dana, "email", "dana@example.test")
     svc.entity_relate("demo", "alex", dana, "ceo_of", northwind)
-    after = json.dumps(svc.card("demo", "alex", context=["maps"], now=2.0),
-                       sort_keys=True, separators=(",", ":"))
+    after_card = svc.card("demo", "alex", context=["maps"], now=2.0)
+    after = json.dumps(after_card, sort_keys=True, separators=(",", ":"))
 
     assert svc.cfg.entities is False
     assert svc.cfg.entity_aggregation is False
+    assert "card_token_estimate" not in after_card
     assert after == before
 
 

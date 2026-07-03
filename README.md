@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-182%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-186%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.3%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -162,6 +162,7 @@ on dimensions single-user, vendor-owned, recall-optimized systems **structurally
 | 8 | **Explainable provenance** (`why`) | ✅ built + tested |
 | - | **Persisted edge provenance** (`stated` vs `inferred`) | 🆕 new, opt-in, not yet validated |
 | - | **Typed identity entities + relations** | new, opt-in, not yet validated |
+| - | **Entity-aware card aggregation/enrichment** | new, opt-in, not yet validated |
 | 1 | **Private collective priors** (network-effect cold-start; k-anonymity + bounded-mean DP) | ✅ built + tested |
 | 4 | **Verifiable, cryptographic data ownership** (tamper-evident HMAC chain, cascading unlearning) | ✅ built + tested |
 | 7 | **Multi-timescale memory** (fast context vs. slow identity) | ✅ built + tested |
@@ -212,7 +213,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-pytest -q                               # 182 passing, 3 skipped
+pytest -q                               # 186 passing, 3 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -268,8 +269,8 @@ print(svc.card("shop.example", "elena")["wire"])
 - **Structured-field capture** — regex-only contact/date extraction keeps email,
   phone, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
 - **Typed entity layer** - opt-in service APIs and additive SQLite/Postgres tables for
-  entities, tag aliases, fields, and Hebbian typed relations. Card enrichment and
-  activation aggregation are intentionally left off until the next phase.
+  entities, tag aliases, fields, Hebbian typed relations, alias aggregation, and
+  compact entity-aware card enrichment behind default-off flags.
 - **The Cabinet** — append-only event log with `recall()` for specific facts.
 - **Edge provenance** — persisted `stated`/`inferred` authority metadata on graph
   edges across SQLite, Postgres, and consolidation undo.
@@ -299,13 +300,13 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (182 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, typed entity storage/service APIs, and the full results suite above.
+Done & tested (186 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, typed entity storage/service APIs, opt-in entity-aware cards, and the full results suite above.
 
 New: typed entity layer. The core now has deterministic, consent-gated service
 APIs plus additive SQLite/Postgres tables for entities, aliases, fields, and typed
-relations with Hebbian strengthening/decay. It is infrastructure for v0.4:
-retrieval/card integration remains off by default and is not yet validated as an
-end-user entity capability.
+relations with Hebbian strengthening/decay. Opt-in retrieval integration can
+aggregate fragmented aliases and enrich card slots with compact entity context.
+Both flags remain off by default, and the end-user quality is not yet validated.
 
 🆕 **Structured-field ingest:** the capture pipeline now retains deterministic
 email, phone, URL, handle, and ISO-date extractions in event payloads before tag
@@ -338,7 +339,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot
-tests/       182 passing, 3 skipped   ·   *_demo.py walkthroughs
+tests/       186 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---
