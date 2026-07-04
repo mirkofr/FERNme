@@ -220,6 +220,10 @@ screenshot-ready synthetic graph. It now shows typed entity nodes with alias
 grouping and labeled relation edges (`friend_of`, `colleague_of`, `works_on`)
 while keeping the underlying memories inspectable.
 
+![Elena's memory map](docs/elena_memory_map.png)
+
+*Elena's memory (fictional demo) — glass-box memory map with typed entities and labeled relations. Every node inspectable, every edge explainable.*
+
 ## 🚀 Quickstart
 
 ```bash
