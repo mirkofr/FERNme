@@ -58,6 +58,10 @@ files matching `*_entity_map.yaml` are gitignored. Filenames starting with
 `mirko` are refused unless you pass `--i-am-the-owner-on-a-copy`; use that only
 for a copy, never the live DB.
 
+Importer bookkeeping namespaces -- import ids, file paths, section markers, and
+similar source-tracking tags -- should be added to `cfg.card_exclude_ns` so they
+stay queryable in the profile without spending compact-card slots.
+
 ---
 
 ## 1. Seed ~20 memories — deliberately mixed by how fast they should rot

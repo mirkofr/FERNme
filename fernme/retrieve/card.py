@@ -16,6 +16,10 @@ from .activation import spread
 CARD_EXCLUDE_NS = {"style", "mood", "mood_ema", "mood_prev"}
 
 
+def card_exclude_namespaces(cfg: Config = DEFAULT) -> set:
+    return CARD_EXCLUDE_NS | set(getattr(cfg, "card_exclude_ns", frozenset()))
+
+
 def _namespace(attr: str) -> str:
     base = attr.lstrip("!")
     return base.split(":", 1)[0] if ":" in base else base
@@ -47,10 +51,11 @@ def compile_card(ug: UserGraph, assoc: AssocGraph, seeds: List[str], now: float,
                  cfg: Config = DEFAULT) -> Dict:
     """Returns {'wire': str, 'tokens': int, 'links': [...], 'numeric': {...}}."""
     act = spread(ug, assoc, seeds, now, cfg)
+    exclude_ns = card_exclude_namespaces(cfg)
     # score = activation * idf (rare attrs earn slots); only stored attrs eligible
     scored = []
     for attr, e in ug.edges.items():
-        if e.source == "superseded" or _namespace(attr) in CARD_EXCLUDE_NS:
+        if e.source == "superseded" or _namespace(attr) in exclude_ns:
             continue
         idf = prior.idf(attr) if prior else 1.0
         a = act.get(attr, 0.0)

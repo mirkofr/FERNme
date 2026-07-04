@@ -109,6 +109,8 @@ class Config:
     # --- Retrieval (retrieve/) ---
     hops: int = 2             # spreading-activation hops
     top_n: int = 8            # max attributes on the wire card
+    card_exclude_ns: frozenset = field(default_factory=frozenset)
+    # Extra namespaces to keep out of the compact card, merged with built-ins.
 
     # --- Wire encoding ---
     conf_known: float = 0.6   # confidence at/above which a link is treated as 'known' (act silently)

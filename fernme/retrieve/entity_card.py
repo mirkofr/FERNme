@@ -12,7 +12,13 @@ from ..core.graph import AssocGraph, UserGraph
 from ..prior.population import PopulationPrior
 from ..relations import DEFAULT_RELATIONS
 from .activation import spread
-from .card import CARD_EXCLUDE_NS, _conflict_for, _namespace, compile_card, estimate_tokens
+from .card import (
+    _conflict_for,
+    _namespace,
+    card_exclude_namespaces,
+    compile_card,
+    estimate_tokens,
+)
 from .. import resolution as _resolution
 
 
@@ -26,6 +32,7 @@ def aggregate_entity_activation(
     alias_to_entity: Dict[str, str],
     aliases_by_entity: Dict[str, List[str]],
     edge_weights: Dict[str, float],
+    alias_scores: Optional[Dict[str, tuple]] = None,
 ) -> Dict[str, Dict]:
     """Return deterministic entity scores and representative aliases.
 
@@ -37,14 +44,27 @@ def aggregate_entity_activation(
         active_aliases = sorted(a for a in aliases if a in edge_weights)
         if not active_aliases:
             continue
-        representative = sorted(
-            active_aliases,
-            key=lambda alias: (-float(edge_weights.get(alias, 0.0)), alias),
-        )[0]
+        if alias_scores:
+            representative = sorted(
+                active_aliases,
+                key=lambda alias: (
+                    -int(alias_scores.get(alias, (0, 0.0))[0]),
+                    -float(alias_scores.get(alias, (0, 0.0))[1]),
+                    alias,
+                ),
+            )[0]
+            score_floor = max(alias_scores.get(alias, (0, 0.0)) for alias in active_aliases)
+        else:
+            representative = sorted(
+                active_aliases,
+                key=lambda alias: (-float(edge_weights.get(alias, 0.0)), alias),
+            )[0]
+            score_floor = (0, 0.0)
         out[entity_id] = {
             "activation": sum(float(activation.get(alias, 0.0)) for alias in active_aliases),
             "representative": representative,
             "aliases": active_aliases,
+            "score_floor": score_floor,
         }
     return out
 
@@ -67,8 +87,12 @@ def compile_entity_card(
     edge_weights = {attr: edge.weight for attr, edge in ug.edges.items()}
     alias_to_entity = entity_ctx["alias_to_entity"]
     aliases_by_entity = entity_ctx["aliases_by_entity"]
+    exclude_ns = card_exclude_namespaces(cfg)
+    alias_scores = _individual_alias_scores(ug, activation, prior, cfg, exclude_ns)
     entity_scores = (
-        aggregate_entity_activation(activation, alias_to_entity, aliases_by_entity, edge_weights)
+        aggregate_entity_activation(
+            activation, alias_to_entity, aliases_by_entity, edge_weights, alias_scores
+        )
         if cfg.entity_aggregation
         else {}
     )
@@ -78,7 +102,7 @@ def compile_entity_card(
 
     scored = []
     for attr, edge in ug.edges.items():
-        if edge.source == "superseded" or _namespace(attr) in CARD_EXCLUDE_NS:
+        if edge.source == "superseded" or _namespace(attr) in exclude_ns:
             continue
         entity_id = alias_to_entity.get(attr)
         if cfg.entity_aggregation and entity_id in entity_scores:
@@ -92,7 +116,8 @@ def compile_entity_card(
         fast_boost = cfg.beta_fast * (edge.fast / cfg.w_max)
         salience_boost = cfg.salience_card_boost * edge.salience
         score = active * (idf + 1.0) + fast_boost + salience_boost
-        scored.append((attr, (real, score), edge))
+        scored.append((attr, max((real, score), entity_scores.get(entity_id, {}).get(
+            "score_floor", (real, score))), edge))
     scored.sort(key=lambda row: (-row[1][0], -row[1][1], row[0]))
     top = scored[:cfg.top_n]
 
@@ -124,6 +149,28 @@ def compile_entity_card(
         "links": links,
         "numeric": _clean_numeric(ug),
     }
+
+
+def _individual_alias_scores(
+    ug: UserGraph,
+    activation: Dict[str, float],
+    prior: Optional[PopulationPrior],
+    cfg: Config,
+    exclude_ns: set,
+) -> Dict[str, tuple]:
+    scores = {}
+    for attr, edge in ug.edges.items():
+        if edge.source == "superseded" or _namespace(attr) in exclude_ns:
+            continue
+        idf = prior.idf(attr) if prior else 1.0
+        real = 0 if edge.source == "guessed" else 1
+        fast_boost = cfg.beta_fast * (edge.fast / cfg.w_max)
+        salience_boost = cfg.salience_card_boost * edge.salience
+        scores[attr] = (
+            real,
+            float(activation.get(attr, 0.0)) * (idf + 1.0) + fast_boost + salience_boost,
+        )
+    return scores
 
 
 def _clean_numeric(ug: UserGraph) -> Dict:
@@ -204,8 +251,13 @@ def _fit_budget(parts: List[str], links: List[Dict], base_parts: List[str],
     fitted_parts = list(parts)
     fitted_links = list(links)
     while fitted_parts and card_token_estimate(_wire(ug, fitted_parts)) > cap:
-        fitted_parts.pop()
-        fitted_links.pop()
+        idx = len(fitted_parts) - 1
+        if (idx < len(base_parts) and fitted_parts[idx] != base_parts[idx]
+                and len(fitted_parts[idx]) > len(base_parts[idx])):
+            fitted_parts[idx] = base_parts[idx]
+        else:
+            fitted_parts.pop()
+            fitted_links.pop()
     if not fitted_parts and base_parts:
         fitted_parts = [base_parts[0]]
         fitted_links = links[:1]

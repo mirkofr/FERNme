@@ -147,6 +147,23 @@ def test_card_excludes_style_and_mood_noise():
     assert card["numeric"] == {"budget": 10}
 
 
+def test_card_excludes_configured_import_bookkeeping_namespaces():
+    ug = UserGraph("s", "u")
+    ag = AssocGraph("s")
+    cfg = replace(DEFAULT, card_exclude_ns=frozenset({"import_id", "file_path", "section"}))
+    ug.edges["import_id:batch-001"] = Edge(weight=9.0, confidence=1.0, hits=20)
+    ug.edges["file_path:notes-demo-md"] = Edge(weight=9.0, confidence=1.0, hits=20)
+    ug.edges["section:meeting-notes"] = Edge(weight=9.0, confidence=1.0, hits=20)
+    ug.edges["project:atlas"] = Edge(weight=2.0, confidence=0.8, hits=1)
+
+    card = compile_card(ug, ag, [], 0.0, cfg=cfg)
+
+    assert "project:atlas" in card["wire"]
+    assert "import_id:" not in card["wire"]
+    assert "file_path:" not in card["wire"]
+    assert "section:" not in card["wire"]
+
+
 def test_card_salience_surfaces_identity_fact():
     ug = UserGraph("s", "u")
     ag = AssocGraph("s")
