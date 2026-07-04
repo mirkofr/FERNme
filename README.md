@@ -337,10 +337,7 @@ SQLite/Postgres tables for entities, aliases, fields, and typed relations with
 Hebbian strengthening/decay. Opt-in retrieval integration can aggregate fragmented
 aliases and enrich card slots with compact entity context. It is validated on
 synthetic acceptance fixtures and the `python -m fernme.eval.entities` micro-eval;
-there is no real-profile validation yet. Structured-field ingest now retains
-email, phone, URL, handle, and ISO-date extractions in event payloads as Cabinet
-data; entity-field writes are available through the service API, with automatic
-promotion left for a later pass.
+First real-profile validation (n=1, maintainer's own 722-tag profile): with entity flags on, a fragmented person's card rank improved 11→6, a previously-missed contact_of relationship surfaced in the card, and token cost stayed flat (~150 vs ~155). Synthetic-vs-real caveat applies: one profile, one probe set. Structured-field ingest now retains email, phone, URL, handle, and ISO-date extractions in event payloads as Cabinet data; entity-field writes are available through the service API, with automatic promotion left for a later pass.
 
 🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
 
