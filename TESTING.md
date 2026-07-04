@@ -43,6 +43,21 @@ FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077
 Conventions below use `site="demo.shop"`, `user="tester"`. **Use a fresh/empty
 DB.** Don't point the recipe at a profile you care about.
 
+### Real-profile copy validator
+
+For local validation on a copied SQLite profile, use:
+
+```bash
+python scripts/validate_real_profile.py --db copied_profile.db --site demo.shop --user tester --entity-map local_entity_map.yaml
+```
+
+The script copies the supplied DB to a temporary file before doing any entity
+work. Default output is redacted: candidate alias clusters are reported by size
+and score only, and probe relation checks are yes/no by probe id. Local mapping
+files matching `*_entity_map.yaml` are gitignored. Filenames starting with
+`mirko` are refused unless you pass `--i-am-the-owner-on-a-copy`; use that only
+for a copy, never the live DB.
+
 ---
 
 ## 1. Seed ~20 memories — deliberately mixed by how fast they should rot

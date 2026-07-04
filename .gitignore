@@ -15,6 +15,7 @@ venv/
 .fern/
 mirko_memory_map.html
 glossary.json
+*_entity_map.yaml
 claude_desktop_config.json
 .env
 *.key
