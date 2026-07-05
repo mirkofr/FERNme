@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-195%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-207%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -70,8 +70,8 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 > **Honest scope:** the numbers below are on **synthetic or LLM-authored** data, not real
 > users. They validate the *mechanism* and surface failures; a real-human pilot is the
 > pending next step. The Mem0 (LLM) head-to-head needs an API key and is not yet run.
-> Entity-layer validation is currently acceptance-fixture and micro-eval only; a
-> real-profile entity benchmark is pending.
+> Entity-layer validation includes synthetic acceptance fixtures, the entity micro-eval,
+> and one scoped maintainer-copy check; broader real-profile benchmarks are still pending.
 
 ### On LLM-authored people (closest to real, agentic ingestion)
 A sample of 16 of 92 third-person profiles (ChatGPT-authored), read as **prose only** and
@@ -93,6 +93,35 @@ engine is solid; the extraction quality is the agent's.)*
 
 > Reproduce: `python -m fernme.eval.cost_variance` · `... quality` · `... drift` · `... context` · `... retention` · `... ablation` · `... pilot` · `... entities`
 
+> Unified harness: `python -m fernme.eval.harness --seeds 6 --json reports/eval_harness.json`
+
+**Unified Phase 8 harness** - synthetic hidden-answer-key scenarios for static,
+drift, and contextual regimes. Same events/probes for every method; BM25 reads
+Cabinet event text with a pure-Python scorer; all methods use 0 LLM calls.
+
+| regime | method | recall@5 | precision@5 | stale recall | tokens | LLM calls |
+|---|---|---:|---:|---:|---:|---:|
+| static | FERNme pure | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 41.7 +/- 0.7 | 0 |
+| static | FERNme entities | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 38.0 +/- 1.2 | 0 |
+| static | recency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 25.7 +/- 1.1 | 0 |
+| static | frequency | 0.958 +/- 0.093 | 0.767 +/- 0.075 | 0.000 +/- 0.000 | 26.8 +/- 0.4 | 0 |
+| static | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 119.8 +/- 35.2 | 0 |
+| drift | FERNme pure | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 42.3 +/- 3.5 | 0 |
+| drift | FERNme entities | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 42.3 +/- 3.5 | 0 |
+| drift | recency | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 28.7 +/- 0.9 | 0 |
+| drift | frequency | 0.292 +/- 0.093 | 0.233 +/- 0.075 | 0.958 +/- 0.093 | 29.3 +/- 0.7 | 0 |
+| drift | BM25 Cabinet | 0.250 +/- 0.000 | 0.200 +/- 0.000 | 1.000 +/- 0.000 | 907.3 +/- 30.6 | 0 |
+| contextual | FERNme pure | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 42.5 +/- 0.5 | 0 |
+| contextual | FERNme entities | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 42.5 +/- 0.5 | 0 |
+| contextual | recency | 0.542 +/- 0.093 | 0.433 +/- 0.075 | 0.000 +/- 0.000 | 28.5 +/- 1.0 | 0 |
+| contextual | frequency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 28.5 +/- 0.5 | 0 |
+| contextual | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 842.0 +/- 0.0 | 0 |
+
+Read this as a quality gate, not a victory lap: BM25 wins when query text directly
+matches Cabinet prose but spends far more context tokens; recency wins the deliberately
+abrupt drift fixture; frequency fails staleness; FERNme stays compact and zero-call but
+does not dominate every synthetic regime.
+
 **Cost** — per-turn memory tokens vs. profile size (5 seeds):
 
 | metric | FERNme | baseline |
@@ -101,7 +130,9 @@ engine is solid; the extraction quality is the agent's.)*
 | at 120 interactions | **1×** | **77.4× ± 1.3** larger |
 | LLM calls per write | **0** | ~2 (extraction memory) |
 
-**Recall quality** — precision@5 vs. ground-truth preferences (5 seeds × 40 users):
+**Legacy focused recall evals** — precision@5 vs. ground-truth preferences
+(5 seeds × 40 users). These older single-purpose modules remain regression checks;
+the unified harness above is the Phase 8 gate.
 
 | regime | 🌿 FERNme | frequency | recency |
 |---|:---:|:---:|:---:|
@@ -109,13 +140,17 @@ engine is solid; the extraction quality is the agent's.)*
 | **drift** (taste shifts) | **0.718** ✅ | 0.128 ❌ | 0.586 |
 | **context** (precision@3) | **0.617** ✅ | 0.513 (blind) | — |
 
-> **The headline:** FERNme is the *only* method strong everywhere. Frequency can't forget (fails drift); recency is noisy (fails static). FERNme's decay + spreading activation get both.
+> **Legacy read:** in these narrower fixtures, FERNme is strong across static,
+> drift, and context; the unified harness above intentionally adds BM25 Cabinet
+> retrieval and a harsher abrupt-drift case where other baselines can win.
 
 **Cold-start ablation** — population prior gives **+0.06 precision@5 at turns 1–3**, washing out by turn 10 (a real but modest, cold-start-only benefit).
 
 **Typed-entity A2 micro-eval** (`python -m fernme.eval.entities`) — synthetic,
 fictional alias-fragmentation fixture. It reports the rank of a fragmented person
-entity with `entity_aggregation` off vs. on; no real-profile claims yet.
+entity with `entity_aggregation` off vs. on. The entity layer also has one scoped
+maintainer-copy check listed in Honest status; treat that as n=1 evidence, not a
+general real-profile benchmark.
 
 **Cost / quality Pareto** (`python -m fernme.eval.pareto`) — measured FERNme recall &
 tokens, modeled LLM nuance & price (assumptions in-file). Per 1,000 interactions:
@@ -330,7 +365,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (195 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, and the full results suite above.
+Done & tested (207 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, and typed relations with

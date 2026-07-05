@@ -21,6 +21,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   non-commerce research/family scenarios.
 - Added `python -m fernme.eval.entities`, a reproducible synthetic micro-eval for
   the A2 alias-fragmentation dilution effect with entity aggregation off vs. on.
+- Added `python -m fernme.eval.harness`, a synthetic hidden-answer-key eval gate
+  covering static, drift, and contextual regimes across FERNme, entity flags,
+  recency, frequency, and pure-Python BM25 Cabinet baselines.
 - Documented first real-profile validation (n=1, maintainer's own 722-tag profile):
   entity flags improved a fragmented person's card rank 11→6, surfaced a
   previously missed `contact_of` relationship, and kept token cost flat.
