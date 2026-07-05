@@ -39,6 +39,7 @@ def _clamp01(x: float) -> float:
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _FIELD_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+RELATION_FACTS_PER_RELATION = 5
 
 
 def _clean_data(value: str, limit: int) -> str:
@@ -453,26 +454,26 @@ class FernService:
                 f"and objects {sorted(spec.object_kinds)}")
         return canonical
 
-    def entity_relate(self, site: str, user: str, subject_id: str, relation: str,
-                      object_id: str, note: str = "", provenance: str = "stated",
-                      mag: float = 1.0, ts: float = 0.0) -> Dict:
-        self._require_consent(site, user)
+    def _canonical_relation_tuple(self, site: str, user: str, subject_id: str,
+                                  relation: str, object_id: str) -> tuple:
         subject = self._entity_or_raise(site, user, subject_id)
         obj = self._entity_or_raise(site, user, object_id)
         if subject["entity_id"] == obj["entity_id"]:
             raise ValueError("self-relations are not supported")
-        if provenance not in {"stated", "inferred"}:
-            raise ValueError("provenance must be stated or inferred")
         canonical = self._validate_relation_kinds(relation, subject, obj)
-        sub_id, canonical, obj_id = canonical_pair(
+        return canonical_pair(
             subject["entity_id"], canonical, obj["entity_id"], DEFAULT_RELATIONS)
-        existing = self.store.get_entity_relation(site, user, sub_id, canonical, obj_id)
+
+    def _bump_entity_relation(self, site: str, user: str, subject_id: str,
+                              relation: str, object_id: str, provenance: str,
+                              mag: float, ts: float, note: str = None) -> Dict:
+        existing = self.store.get_entity_relation(site, user, subject_id, relation, object_id)
         hits = int(existing["hits"]) if existing else 0
         old_weight = float(existing["weight"]) if existing else 0.0
         hits += 1
         row = {
-            "site": site, "user": user, "subject_id": sub_id, "relation": canonical,
-            "object_id": obj_id,
+            "site": site, "user": user, "subject_id": subject_id, "relation": relation,
+            "object_id": object_id,
             "weight": min(self.cfg.w_max, _saturating_bump(
                 old_weight, self.cfg.alpha, float(mag), self.cfg.w_max)),
             "confidence": 1.0 - math.exp(-self.cfg.gamma * hits),
@@ -481,11 +482,88 @@ class FernService:
             "salience": max(float(existing["salience"]) if existing else 0.0, 0.0),
             "provenance": "stated" if provenance == "stated" or (
                 existing and existing["provenance"] == "stated") else "inferred",
-            "note": _clean_data(note, 280),
+            "note": _clean_data(note, 280) if note is not None else (
+                existing["note"] if existing else ""),
         }
         self.store.upsert_entity_relation(row)
+        return row
+
+    def _store_relation_fact(self, site: str, user: str, subject_id: str,
+                             relation: str, object_id: str, note: str,
+                             provenance: str, ts: float, event_id: int = None,
+                             reinforce: bool = True) -> Dict:
+        if provenance not in {"stated", "inferred"}:
+            raise ValueError("provenance must be stated or inferred")
+        clean_note = _clean_data(note, 280)
+        if not clean_note:
+            raise ValueError("note is required")
+        if self.store.get_entity_relation(site, user, subject_id, relation, object_id) is None:
+            raise ValueError("entity relation not found; call entity_relate first")
+        fact = self.store.upsert_relation_fact({
+            "fact_id": str(uuid.uuid4()),
+            "site": site,
+            "user": user,
+            "subject_id": subject_id,
+            "relation": relation,
+            "object_id": object_id,
+            "note": clean_note,
+            "ts": float(ts),
+            "provenance": provenance,
+            "event_id": event_id,
+        })
+        if reinforce:
+            row = self._bump_entity_relation(
+                site, user, subject_id, relation, object_id, provenance, 1.0, ts)
+            fact["relation_weight"] = row["weight"]
+            fact["relation_hits"] = row["hits"]
+        return fact
+
+    def entity_relate(self, site: str, user: str, subject_id: str, relation: str,
+                      object_id: str, note: str = "", provenance: str = "stated",
+                      mag: float = 1.0, ts: float = 0.0) -> Dict:
+        """Create or reinforce an entity relation.
+
+        `note` is kept on the relation row for backward compatibility and is also
+        copied to relation_facts as inert display data. New multi-note callers
+        should use entity_add_fact().
+        """
+        self._require_consent(site, user)
+        if provenance not in {"stated", "inferred"}:
+            raise ValueError("provenance must be stated or inferred")
+        sub_id, canonical, obj_id = self._canonical_relation_tuple(
+            site, user, subject_id, relation, object_id)
+        row = self._bump_entity_relation(
+            site, user, sub_id, canonical, obj_id, provenance, mag, ts, note=note)
+        if row["note"]:
+            self._store_relation_fact(
+                site, user, sub_id, canonical, obj_id, row["note"], provenance, ts,
+                reinforce=False)
         self._audit(site, user, "entity_relate", {"relation": canonical}, ts)
         return row
+
+    def entity_add_fact(self, site: str, user: str, subject_id: str, relation: str,
+                        object_id: str, note: str, provenance: str = "stated",
+                        ts: float = 0.0, event_id: int = None) -> Dict:
+        """Append an inert display fact to an existing entity relation."""
+        self._require_consent(site, user)
+        sub_id, canonical, obj_id = self._canonical_relation_tuple(
+            site, user, subject_id, relation, object_id)
+        fact = self._store_relation_fact(
+            site, user, sub_id, canonical, obj_id, note, provenance, ts, event_id,
+            reinforce=True)
+        self._audit(site, user, "entity_add_fact", {"relation": canonical}, ts)
+        return fact
+
+    def entity_forget_fact(self, fact_id: str) -> Dict:
+        fact = self.store.get_relation_fact(_valid_uuid(fact_id))
+        if fact is None:
+            raise ValueError("fact not found")
+        self._require_consent(fact["site"], fact["user"])
+        deleted = self.store.delete_relation_fact(fact["fact_id"])
+        self._audit(fact["site"], fact["user"], "entity_forget_fact",
+                    {"fact_id": fact["fact_id"], "relation": fact["relation"]},
+                    fact["ts"])
+        return {"forgotten": fact["fact_id"], "deleted": bool(deleted)}
 
     def entity_forget(self, site: str, user: str, entity_id: str) -> Dict:
         self._require_consent(site, user)
@@ -535,9 +613,13 @@ class FernService:
             outbound = row["subject_id"] == entity["entity_id"]
             other_id = row["object_id"] if outbound else row["subject_id"]
             rel = row["relation"] if outbound else DEFAULT_RELATIONS.relations[row["relation"]].inverse
+            facts = self.store.list_relation_facts(
+                site, user, row["subject_id"], row["relation"], row["object_id"],
+                limit=RELATION_FACTS_PER_RELATION)
             rendered.append({**row, "display_relation": rel,
                              "other_id": other_id,
-                             "other_name": by_id.get(other_id, {}).get("display_name", other_id)})
+                             "other_name": by_id.get(other_id, {}).get("display_name", other_id),
+                             "facts": facts})
         rendered.sort(key=relation_sort_key)
         return {"entity_id": entity["entity_id"], "display_name": entity["display_name"],
                 "kind": entity["kind"], "fields": fields, "relations": rendered,

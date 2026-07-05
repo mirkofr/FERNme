@@ -63,8 +63,22 @@ CREATE TABLE IF NOT EXISTS entity_relations(
   provenance TEXT NOT NULL DEFAULT 'stated',
   note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(site, "user", subject_id, relation, object_id));
+CREATE TABLE IF NOT EXISTS relation_facts(
+  fact_id TEXT PRIMARY KEY,
+  site TEXT NOT NULL, "user" TEXT NOT NULL,
+  subject_id TEXT NOT NULL, relation TEXT NOT NULL, object_id TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  ts DOUBLE PRECISION NOT NULL,
+  provenance TEXT NOT NULL DEFAULT 'stated',
+  event_id BIGINT,
+  UNIQUE(site, "user", subject_id, relation, object_id, note),
+  FOREIGN KEY(site, "user", subject_id, relation, object_id)
+    REFERENCES entity_relations(site, "user", subject_id, relation, object_id)
+    ON DELETE CASCADE);
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, "user", ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, "user", attr);
+CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
+  ON relation_facts(site, "user", subject_id, relation, object_id, ts);
 """
 
 
@@ -132,6 +146,9 @@ class PostgresStore:
                 'SELECT entity_id FROM entities WHERE site=%s AND "user"=%s',
                 (site, user)).fetchall()]
             for entity_id in ids:
+                self._q('DELETE FROM relation_facts WHERE site=%s AND "user"=%s '
+                        'AND (subject_id=%s OR object_id=%s)',
+                        (site, user, entity_id, entity_id))
                 self._q('DELETE FROM entity_relations WHERE site=%s AND "user"=%s '
                         'AND (subject_id=%s OR object_id=%s)',
                         (site, user, entity_id, entity_id))
@@ -308,14 +325,68 @@ class PostgresStore:
                 (site, user, entity_id, entity_id)).fetchall()
         return [dict(r) for r in rows]
 
+    def get_relation_fact(self, fact_id):
+        row = self._q("SELECT * FROM relation_facts WHERE fact_id=%s",
+                      (fact_id,)).fetchone()
+        return dict(row) if row else None
+
+    def get_relation_fact_by_note(self, site, user, subject_id, relation, object_id, note):
+        row = self._q(
+            'SELECT * FROM relation_facts WHERE site=%s AND "user"=%s AND subject_id=%s '
+            'AND relation=%s AND object_id=%s AND note=%s',
+            (site, user, subject_id, relation, object_id, note)).fetchone()
+        return dict(row) if row else None
+
+    def upsert_relation_fact(self, row):
+        with self._lock:
+            existing = self.get_relation_fact_by_note(
+                row["site"], row["user"], row["subject_id"], row["relation"],
+                row["object_id"], row["note"])
+            if existing:
+                self._q(
+                    "UPDATE relation_facts SET ts=%s, provenance=%s, event_id=%s "
+                    "WHERE fact_id=%s",
+                    (row["ts"], row["provenance"], row.get("event_id"),
+                     existing["fact_id"]))
+                updated = self.get_relation_fact(existing["fact_id"])
+                updated["created"] = False
+                return updated
+            self._q(
+                'INSERT INTO relation_facts(fact_id,site,"user",subject_id,relation,'
+                'object_id,note,ts,provenance,event_id) '
+                'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (row["fact_id"], row["site"], row["user"], row["subject_id"],
+                 row["relation"], row["object_id"], row["note"], row["ts"],
+                 row["provenance"], row.get("event_id")))
+            created = self.get_relation_fact(row["fact_id"])
+            created["created"] = True
+            return created
+
+    def list_relation_facts(self, site, user, subject_id, relation, object_id, limit=5):
+        return [dict(r) for r in self._q(
+            'SELECT * FROM relation_facts WHERE site=%s AND "user"=%s AND subject_id=%s '
+            'AND relation=%s AND object_id=%s ORDER BY ts DESC, fact_id DESC LIMIT %s',
+            (site, user, subject_id, relation, object_id, int(limit))).fetchall()]
+
+    def delete_relation_fact(self, fact_id):
+        with self._lock:
+            cur = self._q("DELETE FROM relation_facts WHERE fact_id=%s", (fact_id,))
+            return cur.rowcount > 0
+
     def delete_entity_relation(self, site, user, subject_id, relation, object_id):
         with self._lock:
+            self._q('DELETE FROM relation_facts WHERE site=%s AND "user"=%s '
+                    'AND subject_id=%s AND relation=%s AND object_id=%s',
+                    (site, user, subject_id, relation, object_id))
             self._q('DELETE FROM entity_relations WHERE site=%s AND "user"=%s '
                     'AND subject_id=%s AND relation=%s AND object_id=%s',
                     (site, user, subject_id, relation, object_id))
 
     def delete_entity(self, site, user, entity_id):
         with self._lock:
+            self._q('DELETE FROM relation_facts WHERE site=%s AND "user"=%s '
+                    'AND (subject_id=%s OR object_id=%s)',
+                    (site, user, entity_id, entity_id))
             self._q('DELETE FROM entity_relations WHERE site=%s AND "user"=%s '
                     'AND (subject_id=%s OR object_id=%s)',
                     (site, user, entity_id, entity_id))
@@ -331,6 +402,7 @@ class PostgresStore:
             ("entity_aliases", "entity_id=%s", (entity_id,)),
             ("entity_fields", "entity_id=%s", (entity_id,)),
             ("entity_relations", "subject_id=%s OR object_id=%s", (entity_id, entity_id)),
+            ("relation_facts", "subject_id=%s OR object_id=%s", (entity_id, entity_id)),
         ]
         total = 0
         for table, where, args in specs:

@@ -59,11 +59,25 @@ CREATE TABLE IF NOT EXISTS entity_relations(
   salience REAL NOT NULL DEFAULT 0.0, provenance TEXT NOT NULL DEFAULT 'stated',
   note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(site, user, subject_id, relation, object_id));
+CREATE TABLE IF NOT EXISTS relation_facts(
+  fact_id TEXT PRIMARY KEY,
+  site TEXT NOT NULL, user TEXT NOT NULL,
+  subject_id TEXT NOT NULL, relation TEXT NOT NULL, object_id TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  ts REAL NOT NULL,
+  provenance TEXT NOT NULL DEFAULT 'stated',
+  event_id INTEGER,
+  UNIQUE(site, user, subject_id, relation, object_id, note),
+  FOREIGN KEY(site, user, subject_id, relation, object_id)
+    REFERENCES entity_relations(site, user, subject_id, relation, object_id)
+    ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS audit(
   site TEXT, user TEXT, seq INTEGER, ts REAL, action TEXT, detail TEXT,
   prev_hash TEXT, hash TEXT, PRIMARY KEY(site, user, seq));
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, user, ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, user, attr);
+CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
+  ON relation_facts(site, user, subject_id, relation, object_id, ts);
 """
 
 
@@ -157,6 +171,9 @@ class SQLiteStore:
             ids = [r["entity_id"] for r in self._conn.execute(
                 "SELECT entity_id FROM entities WHERE site=? AND user=?", (site, user))]
             for entity_id in ids:
+                self._conn.execute(
+                    "DELETE FROM relation_facts WHERE site=? AND user=? AND "
+                    "(subject_id=? OR object_id=?)", (site, user, entity_id, entity_id))
                 self._conn.execute(
                     "DELETE FROM entity_relations WHERE site=? AND user=? AND "
                     "(subject_id=? OR object_id=?)", (site, user, entity_id, entity_id))
@@ -367,9 +384,64 @@ class SQLiteStore:
                 (site, user, entity_id, entity_id))
         return [dict(r) for r in rows]
 
+    def get_relation_fact(self, fact_id: str):
+        row = self._conn.execute(
+            "SELECT * FROM relation_facts WHERE fact_id=?", (fact_id,)).fetchone()
+        return dict(row) if row else None
+
+    def get_relation_fact_by_note(self, site: str, user: str, subject_id: str,
+                                  relation: str, object_id: str, note: str):
+        row = self._conn.execute(
+            "SELECT * FROM relation_facts WHERE site=? AND user=? AND subject_id=? "
+            "AND relation=? AND object_id=? AND note=?",
+            (site, user, subject_id, relation, object_id, note)).fetchone()
+        return dict(row) if row else None
+
+    def upsert_relation_fact(self, row: Dict):
+        with self._lock:
+            existing = self.get_relation_fact_by_note(
+                row["site"], row["user"], row["subject_id"], row["relation"],
+                row["object_id"], row["note"])
+            if existing:
+                self._conn.execute(
+                    "UPDATE relation_facts SET ts=?, provenance=?, event_id=? WHERE fact_id=?",
+                    (row["ts"], row["provenance"], row.get("event_id"), existing["fact_id"]))
+                self._conn.commit()
+                updated = self.get_relation_fact(existing["fact_id"])
+                updated["created"] = False
+                return updated
+            self._conn.execute(
+                "INSERT INTO relation_facts(fact_id,site,user,subject_id,relation,object_id,"
+                "note,ts,provenance,event_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (row["fact_id"], row["site"], row["user"], row["subject_id"],
+                 row["relation"], row["object_id"], row["note"], row["ts"],
+                 row["provenance"], row.get("event_id")))
+            self._conn.commit()
+            created = self.get_relation_fact(row["fact_id"])
+            created["created"] = True
+            return created
+
+    def list_relation_facts(self, site: str, user: str, subject_id: str,
+                            relation: str, object_id: str, limit: int = 5):
+        return [dict(r) for r in self._conn.execute(
+            "SELECT * FROM relation_facts WHERE site=? AND user=? AND subject_id=? "
+            "AND relation=? AND object_id=? ORDER BY ts DESC, fact_id DESC LIMIT ?",
+            (site, user, subject_id, relation, object_id, int(limit)))]
+
+    def delete_relation_fact(self, fact_id: str) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM relation_facts WHERE fact_id=?", (fact_id,))
+            self._conn.commit()
+            return cur.rowcount > 0
+
     def delete_entity_relation(self, site: str, user: str, subject_id: str,
                                relation: str, object_id: str):
         with self._lock:
+            self._conn.execute(
+                "DELETE FROM relation_facts WHERE site=? AND user=? AND subject_id=? "
+                "AND relation=? AND object_id=?",
+                (site, user, subject_id, relation, object_id))
             self._conn.execute(
                 "DELETE FROM entity_relations WHERE site=? AND user=? AND subject_id=? "
                 "AND relation=? AND object_id=?",
@@ -378,6 +450,9 @@ class SQLiteStore:
 
     def delete_entity(self, site: str, user: str, entity_id: str):
         with self._lock:
+            self._conn.execute(
+                "DELETE FROM relation_facts WHERE site=? AND user=? AND "
+                "(subject_id=? OR object_id=?)", (site, user, entity_id, entity_id))
             self._conn.execute(
                 "DELETE FROM entity_relations WHERE site=? AND user=? AND "
                 "(subject_id=? OR object_id=?)", (site, user, entity_id, entity_id))
@@ -396,6 +471,7 @@ class SQLiteStore:
             ("entity_aliases", "entity_id=?"),
             ("entity_fields", "entity_id=?"),
             ("entity_relations", "subject_id=? OR object_id=?"),
+            ("relation_facts", "subject_id=? OR object_id=?"),
         ]
         total = 0
         for table, where in queries:
