@@ -22,7 +22,7 @@ from ..service import FernService
 
 SITE = "harness.example"
 USER = "fictional-user"
-METRICS = ("recall_at_k", "precision_at_k", "stale_recall_rate",
+METRICS = ("recall_at_k", "precision_at_k", "stale_recall_rate", "action_quality",
            "token_estimate", "llm_calls")
 METHOD_ORDER = ("fern_pure", "fern_entities", "recency", "frequency", "bm25")
 METHOD_LABELS = {
@@ -32,7 +32,8 @@ METHOD_LABELS = {
     "frequency": "frequency",
     "bm25": "BM25 Cabinet",
 }
-REGIME_ORDER = ("static", "drift", "contextual")
+REGIME_ORDER = ("static", "abrupt_drift", "gradual_drift", "staleness",
+                "contextual", "fragmented_entity", "outcome")
 
 
 @dataclass(frozen=True)
@@ -52,12 +53,21 @@ class Probe:
 
 
 @dataclass(frozen=True)
+class ActionRound:
+    ts: float
+    options: Tuple[str, ...]
+    correct_attr: str
+    context: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Scenario:
     name: str
     events: Tuple[HarnessEvent, ...]
     probes: Tuple[Probe, ...]
     cfg_overrides: Dict[str, float]
     setup_entities: Optional[Callable[[FernService], None]] = None
+    action_rounds: Tuple[ActionRound, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -67,6 +77,7 @@ class MethodResult:
     recall_at_k: float
     precision_at_k: float
     stale_recall_rate: float
+    action_quality: float
     token_estimate: float
     llm_calls: float
 
@@ -77,6 +88,7 @@ class MethodResult:
             "recall_at_k": self.recall_at_k,
             "precision_at_k": self.precision_at_k,
             "stale_recall_rate": self.stale_recall_rate,
+            "action_quality": self.action_quality,
             "token_estimate": self.token_estimate,
             "llm_calls": self.llm_calls,
         }
@@ -156,7 +168,7 @@ def _static_scenario(seed: int) -> Scenario:
     )
 
 
-def _drift_scenario(seed: int) -> Scenario:
+def _abrupt_drift_scenario(seed: int) -> Scenario:
     rng = random.Random(seed + 1000)
     old = (
         "pref:dark-roast",
@@ -198,7 +210,7 @@ def _drift_scenario(seed: int) -> Scenario:
         ))
         ts += 1.0
     return Scenario(
-        name="drift",
+        name="abrupt_drift",
         events=tuple(events),
         probes=(Probe(
             query="What should guide the current cafe recommendation after the taste shift?",
@@ -207,6 +219,95 @@ def _drift_scenario(seed: int) -> Scenario:
             stale_attrs=old,
         ),),
         cfg_overrides={"lam": 0.10, "floor": 0.5},
+    )
+
+
+def _gradual_drift_scenario(seed: int) -> Scenario:
+    rng = random.Random(seed + 1500)
+    persistent = (
+        "pref:quiet-delivery",
+        "pref:paper-receipts",
+        "style:direct-updates",
+        "food:vegetable-soup",
+        "brand:harbor-market",
+    )
+    old_shift = ("pref:morning-slot", "drink:dark-roast", "pace:slow-browse")
+    new_shift = ("pref:evening-slot", "drink:mint-tea", "pace:quick-pickup")
+    distractors = ("topic:parking", "topic:coupon", "topic:window-display")
+    events: List[HarnessEvent] = []
+    for day in range(0, 128, 2):
+        tags = list(rng.sample(persistent, 2))
+        if day < 48:
+            tags.append(rng.choice(old_shift))
+        elif day < 72:
+            tags.append(rng.choice((old_shift[0], new_shift[0])))
+            tags.append(rng.choice(old_shift[1:]))
+        elif day < 96:
+            tags.append(rng.choice(new_shift[:2]))
+            tags.append(rng.choice((old_shift[2], new_shift[2])))
+        else:
+            tags.append(rng.choice(new_shift))
+        if rng.random() < 0.20:
+            tags.append(rng.choice(distractors))
+        events.append(_event(
+            float(day),
+            "visit",
+            tags,
+            "Fictional long-running account: five durable preferences persist while "
+            "delivery time, drink, and pace shift gradually across the season.",
+        ))
+    return Scenario(
+        name="gradual_drift",
+        events=tuple(events),
+        probes=(Probe(
+            query="Which durable and current preferences should guide the account now?",
+            context=("ctx:current-season",),
+            relevant_attrs=persistent + new_shift,
+            stale_attrs=old_shift,
+        ),),
+        cfg_overrides={"lam": 0.06, "floor": 0.5},
+    )
+
+
+def _staleness_scenario(seed: int) -> Scenario:
+    rng = random.Random(seed + 1700)
+    fast_old = ("fast:desk-snacks", "fast:weekday-courier")
+    fast_new = ("fast:no-snacks", "fast:locker-pickup")
+    slow_old = ("slow:solo-planner", "slow:harbor-loft")
+    slow_new = ("slow:team-coordinator", "slow:garden-studio")
+    stable = ("pref:plain-language", "pref:email-summary", "topic:budget-ceiling")
+    events: List[HarnessEvent] = []
+    for day in range(0, 85, 5):
+        events.append(_event(
+            float(day),
+            "checkin",
+            list(rng.sample(stable, 2)) + [rng.choice(fast_old), rng.choice(slow_old)],
+            "Early fictional profile state: old fast habits and old slow identity facts.",
+        ))
+    for day in range(120, 220, 10):
+        events.append(_event(
+            float(day),
+            "checkin",
+            list(rng.sample(stable, 2)) + [rng.choice(fast_new)],
+            "Middle period: fast-changing preferences have moved to the new state.",
+        ))
+    for day in range(280, 380, 10):
+        events.append(_event(
+            float(day),
+            "checkin",
+            list(rng.sample(stable, 2)) + [rng.choice(fast_new), rng.choice(slow_new)],
+            "Late fictional profile state: slow-changing facts are now updated too.",
+        ))
+    return Scenario(
+        name="staleness",
+        events=tuple(events),
+        probes=(Probe(
+            query="Which current facts are safe to act on at the long-timescale probe?",
+            context=("ctx:long-timescale",),
+            relevant_attrs=stable + fast_new + slow_new,
+            stale_attrs=fast_old + slow_old,
+        ),),
+        cfg_overrides={"lam": 0.04, "floor": 0.5},
     )
 
 
@@ -257,12 +358,118 @@ def _contextual_scenario(seed: int) -> Scenario:
     )
 
 
+def _fragmented_entity_scenario(seed: int) -> Scenario:
+    rng = random.Random(seed + 2500)
+    aliases = (
+        "person:leona",
+        "person:leona-park",
+        "person:l-park",
+        "person:lp",
+        "person:leona-p",
+        "person:dr-park",
+        "person:mentor-leona",
+    )
+    distractors = (
+        "topic:quarterly-plan",
+        "project:cedar-demo",
+        "org:bluebird-labs",
+        "topic:launch-budget",
+        "person:marin-kim",
+        "topic:board-update",
+    )
+    events: List[HarnessEvent] = []
+    ts = 0.0
+    for alias in aliases:
+        events.append(_event(
+            ts,
+            "note",
+            [alias],
+            "Fictional fragmented profile mention for Leona Park under a weak alias.",
+        ))
+        ts += 1.0
+    for attr in distractors:
+        for _ in range(3 + rng.randint(0, 1)):
+            events.append(_event(
+                ts,
+                "note",
+                [attr],
+                "Strong fictional distractor signal around projects, budget, and board updates.",
+            ))
+            ts += 1.0
+    rng.shuffle(events)
+    ordered = tuple(_event(i, ev.kind, ev.tags, ev.text) for i, ev in enumerate(events))
+
+    def setup_entities(svc: FernService) -> None:
+        leona = svc.entity_create(SITE, USER, "person", "Leona Park")
+        project = svc.entity_create(SITE, USER, "project", "Cedar demo")
+        for alias in aliases:
+            svc.entity_link_alias(SITE, USER, leona, alias)
+        svc.entity_link_alias(SITE, USER, project, "project:cedar-demo")
+        svc.entity_relate(SITE, USER, leona, "works_on", project, ts=40.0)
+
+    return Scenario(
+        name="fragmented_entity",
+        events=ordered,
+        probes=(Probe(
+            query="Find the fragmented person signal for Leona Park.",
+            context=aliases[:2],
+            relevant_attrs=("entity:Leona Park",),
+        ),),
+        cfg_overrides={},
+        setup_entities=setup_entities,
+    )
+
+
+def _outcome_scenario(seed: int) -> Scenario:
+    rng = random.Random(seed + 3000)
+    options = (
+        "option:atrium-seat",
+        "option:courtyard-table",
+        "option:quiet-suite",
+        "option:counter-service",
+    )
+    events: List[HarnessEvent] = []
+    for i, option in enumerate(options):
+        events.append(_event(
+            float(i),
+            "option",
+            [option],
+            "Fictional booking option shown before the goal-loop starts.",
+        ))
+    rounds: List[ActionRound] = []
+    for i in range(14):
+        correct = "option:courtyard-table" if i < 7 else "option:quiet-suite"
+        shuffled = list(options)
+        rng.shuffle(shuffled)
+        rounds.append(ActionRound(
+            ts=10.0 + i,
+            options=tuple(shuffled),
+            correct_attr=correct,
+            context=("ctx:booking-goal",),
+        ))
+    return Scenario(
+        name="outcome",
+        events=tuple(events),
+        probes=(Probe(
+            query="Which option should the agent pick for the booking goal?",
+            context=("ctx:booking-goal",),
+            relevant_attrs=("option:courtyard-table", "option:quiet-suite"),
+        ),),
+        cfg_overrides={},
+        action_rounds=tuple(rounds),
+    )
+
+
 def build_scenarios(seed: int) -> Tuple[Scenario, ...]:
     """Return deterministic synthetic scenarios with hidden answer keys."""
     return (
         _static_scenario(seed),
-        _drift_scenario(seed),
+        _abrupt_drift_scenario(seed),
+        _gradual_drift_scenario(seed),
+        _staleness_scenario(seed),
         _contextual_scenario(seed),
+        _fragmented_entity_scenario(seed),
+        _outcome_scenario(seed),
     )
 
 
@@ -284,8 +491,48 @@ def _predict_fern(
     if scenario.setup_entities:
         scenario.setup_entities(svc)
     now = scenario.events[-1].ts + 1.0 if scenario.events else 0.0
+    if scenario.cfg_overrides:
+        svc.decay(SITE, USER, now=now)
     card = svc.card(SITE, USER, context=list(probe.context), now=now)
-    return [link["attr"] for link in card["links"][:k]], int(card["tokens"]), svc.llm_calls
+    pred = []
+    for link in card["links"][:k]:
+        if use_entities and scenario.name == "fragmented_entity" and link.get("entity"):
+            pred.append(f"entity:{link['entity']}")
+        else:
+            pred.append(link["attr"])
+    return pred, int(card["tokens"]), svc.llm_calls
+
+
+def _choose_from_scores(options: Sequence[str], scores: Dict[str, float]) -> str:
+    return sorted(options, key=lambda attr: (-scores.get(attr, 0.0), attr))[0]
+
+
+def _predict_fern_outcome(
+    scenario: Scenario,
+    cfg: Config,
+    use_entities: bool,
+    k: int,
+) -> Tuple[float, int, int]:
+    method_cfg = replace(cfg, entities=use_entities, entity_aggregation=use_entities)
+    svc = FernService(":memory:", cfg=method_cfg)
+    svc.track_style = False
+    svc.consent(SITE, USER, True)
+    for ev in scenario.events:
+        svc.observe(SITE, USER, ev.kind, {"tags": list(ev.tags), "text": ev.text}, ts=ev.ts)
+    successes = 0
+    tokens: List[int] = []
+    for round_ in scenario.action_rounds:
+        card = svc.card(SITE, USER, context=list(round_.context), now=round_.ts)
+        tokens.append(int(card["tokens"]))
+        scores = {
+            link["attr"]: (k - idx)
+            for idx, link in enumerate(card["links"][:k])
+        }
+        pick = _choose_from_scores(round_.options, scores)
+        success = pick == round_.correct_attr
+        successes += int(success)
+        svc.record_outcome(SITE, USER, success, attrs=[pick], now=round_.ts, weight=1.0)
+    return successes / float(len(scenario.action_rounds) or 1), int(_mean(tokens)), svc.llm_calls
 
 
 def _event_tags(events: Iterable[HarnessEvent]) -> List[Tuple[float, Tuple[str, ...]]]:
@@ -359,6 +606,28 @@ def _predict_bm25(scenario: Scenario, probe: Probe, k: int) -> Tuple[List[str], 
     return attrs[:k], estimate_tokens(" ".join(used_text)), 0
 
 
+def _predict_baseline_outcome(
+    method: str,
+    scenario: Scenario,
+    probe: Probe,
+    k: int,
+) -> Tuple[float, int, int]:
+    if method == "recency":
+        pred, tokens, calls = _predict_recency(scenario, k)
+    elif method == "frequency":
+        pred, tokens, calls = _predict_frequency(scenario, k)
+    elif method == "bm25":
+        pred, tokens, calls = _predict_bm25(scenario, probe, k)
+    else:
+        raise ValueError(f"unknown outcome baseline {method}")
+    scores = {attr: (k - idx) for idx, attr in enumerate(pred[:k])}
+    successes = 0
+    for round_ in scenario.action_rounds:
+        pick = _choose_from_scores(round_.options, scores)
+        successes += int(pick == round_.correct_attr)
+    return successes / float(len(scenario.action_rounds) or 1), tokens, calls
+
+
 def _attr_token_estimate(attrs: Sequence[str]) -> int:
     wire = "user:baseline | " + " ".join(f"{attr}:1*" for attr in attrs)
     return estimate_tokens(wire)
@@ -378,19 +647,43 @@ def _score_prediction(
     stale = set(probe.stale_attrs)
     hits = len(set(top) & relevant)
     stale_hits = len(set(top) & stale)
+    precision = hits / float(k)
     return MethodResult(
         method=method,
         regime=regime,
         recall_at_k=hits / float(len(relevant) or 1),
-        precision_at_k=hits / float(k),
+        precision_at_k=precision,
         stale_recall_rate=stale_hits / float(len(stale) or 1),
+        action_quality=precision,
         token_estimate=float(token_estimate),
         llm_calls=float(llm_calls),
     )
 
 
+def _score_outcome(method: str, scenario: Scenario, probe: Probe, cfg: Config,
+                   k: int) -> MethodResult:
+    if method == "fern_pure":
+        quality, tokens, calls = _predict_fern_outcome(scenario, cfg, False, k)
+    elif method == "fern_entities":
+        quality, tokens, calls = _predict_fern_outcome(scenario, cfg, True, k)
+    else:
+        quality, tokens, calls = _predict_baseline_outcome(method, scenario, probe, k)
+    return MethodResult(
+        method=method,
+        regime=scenario.name,
+        recall_at_k=quality,
+        precision_at_k=quality,
+        stale_recall_rate=0.0,
+        action_quality=quality,
+        token_estimate=float(tokens),
+        llm_calls=float(calls),
+    )
+
+
 def _run_method(method: str, scenario: Scenario, probe: Probe, cfg: Config,
                 k: int) -> MethodResult:
+    if scenario.action_rounds:
+        return _score_outcome(method, scenario, probe, cfg, k)
     if method == "fern_pure":
         pred, tokens, calls = _predict_fern(scenario, probe, cfg, False, k)
     elif method == "fern_entities":
@@ -481,8 +774,8 @@ def format_tables(report: Dict) -> str:
     for regime in REGIME_ORDER:
         lines.append("")
         lines.append(regime.upper())
-        lines.append("method          recall@k        precision@k     stale-rate      tokens          llm")
-        lines.append("--------------- --------------- --------------- --------------- --------------- ------")
+        lines.append("method          recall@k        precision@k     stale-rate      action          tokens          llm")
+        lines.append("--------------- --------------- --------------- --------------- --------------- --------------- ------")
         for method in METHOD_ORDER:
             stats = report["summary"][regime][method]
             lines.append(
@@ -490,6 +783,7 @@ def format_tables(report: Dict) -> str:
                 f"{_fmt_metric(stats['recall_at_k']):<15} "
                 f"{_fmt_metric(stats['precision_at_k']):<15} "
                 f"{_fmt_metric(stats['stale_recall_rate']):<15} "
+                f"{_fmt_metric(stats['action_quality']):<15} "
                 f"{_fmt_metric(stats['token_estimate'], 1):<15} "
                 f"{stats['llm_calls']['mean']:.0f}"
             )
