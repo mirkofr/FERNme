@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-213%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-215%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -49,7 +49,7 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 |---|---|
 | 🪶 **Zero-LLM writes** | Memory updates are arithmetic on a graph — **0 LLM calls per interaction** vs. ~2 for extraction-based memory. No write-time cost, no write-time hallucination. |
 | 📉 **Flat token cost forever** | The prompt card holds **~25 tokens** whether it's a visitor's first day or fifth year. A full-history baseline is **77.4× larger** by 120 interactions. |
-| 🧠 **Strong in every regime** | Ties a frequency counter on static recall, **beats it 0.718 → 0.128 on drift**, and **wins on context** (0.617 → 0.513). Class-targeted volatility retention + spreading activation preserve permanent facts without giving stale tastes too much inertia. |
+| 🧠 **Measured trade-offs, no collapse** | The unified synthetic harness is the README source of truth: FERNme stays zero-call and token-flat across static, abrupt/gradual drift, staleness, context, fragmented-entity, and outcome regimes. It does not win every table, but it is the only method with entity aggregation and an outcome feedback loop. |
 | 🧬 **Typed people & relations** | Entities with aliases, contact fields, labeled relations (`ceo_of`, `family_of`, ...), and inert relation facts strengthened Hebbian-style; deterministic path queries; opt-in and byte-identical when off. |
 | 🪟 **Glass-box & user-owned** | Every preference is visible and editable. People fix what's wrong, delete everything, or export it. Privacy becomes a feature, not a liability. |
 | 🏬 **Built for outcomes** | Evaluated by **conversion**, not QA. A simulated storefront shows **+17% conversion lift** vs. non-personalized recommendations. |
@@ -95,32 +95,55 @@ engine is solid; the extraction quality is the agent's.)*
 
 > Unified harness: `python -m fernme.eval.harness --seeds 6 --json reports/eval_harness.json`
 
-**Unified Phase 8 harness** - synthetic hidden-answer-key scenarios for static,
-drift, and contextual regimes. Same events/probes for every method; BM25 reads
-Cabinet event text with a pure-Python scorer; all methods use 0 LLM calls.
+**Unified Phase 8.1 harness** - synthetic hidden-answer-key scenarios for static,
+abrupt drift, gradual drift, staleness, contextual, fragmented-entity, and outcome
+regimes. Same events/probes for every method; BM25 reads Cabinet event text with a
+pure-Python scorer; all methods use 0 LLM calls. Outcome rows include action
+quality; non-FERN baselines do not have an outcome feedback mechanism.
 
-| regime | method | recall@5 | precision@5 | stale recall | tokens | LLM calls |
-|---|---|---:|---:|---:|---:|---:|
-| static | FERNme pure | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 41.7 +/- 0.7 | 0 |
-| static | FERNme entities | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 38.0 +/- 1.2 | 0 |
-| static | recency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 25.7 +/- 1.1 | 0 |
-| static | frequency | 0.958 +/- 0.093 | 0.767 +/- 0.075 | 0.000 +/- 0.000 | 26.8 +/- 0.4 | 0 |
-| static | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 119.8 +/- 35.2 | 0 |
-| drift | FERNme pure | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 42.3 +/- 3.5 | 0 |
-| drift | FERNme entities | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 42.3 +/- 3.5 | 0 |
-| drift | recency | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 28.7 +/- 0.9 | 0 |
-| drift | frequency | 0.292 +/- 0.093 | 0.233 +/- 0.075 | 0.958 +/- 0.093 | 29.3 +/- 0.7 | 0 |
-| drift | BM25 Cabinet | 0.250 +/- 0.000 | 0.200 +/- 0.000 | 1.000 +/- 0.000 | 907.3 +/- 30.6 | 0 |
-| contextual | FERNme pure | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 42.5 +/- 0.5 | 0 |
-| contextual | FERNme entities | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 42.5 +/- 0.5 | 0 |
-| contextual | recency | 0.542 +/- 0.093 | 0.433 +/- 0.075 | 0.000 +/- 0.000 | 28.5 +/- 1.0 | 0 |
-| contextual | frequency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 28.5 +/- 0.5 | 0 |
-| contextual | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 842.0 +/- 0.0 | 0 |
+| regime | method | recall@5 | precision@5 | stale recall | action | tokens | LLM calls |
+|---|---|---:|---:|---:|---:|---:|---:|
+| static | FERNme pure | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 0.600 +/- 0.000 | 41.7 +/- 0.7 | 0 |
+| static | FERNme entities | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 0.600 +/- 0.000 | 38.0 +/- 1.2 | 0 |
+| static | recency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 0.467 +/- 0.094 | 25.7 +/- 1.1 | 0 |
+| static | frequency | 0.958 +/- 0.093 | 0.767 +/- 0.075 | 0.000 +/- 0.000 | 0.767 +/- 0.075 | 26.8 +/- 0.4 | 0 |
+| static | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 119.8 +/- 35.2 | 0 |
+| abrupt drift | FERNme pure | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 0.500 +/- 0.100 | 40.8 +/- 4.5 | 0 |
+| abrupt drift | FERNme entities | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 0.500 +/- 0.100 | 40.8 +/- 4.5 | 0 |
+| abrupt drift | recency | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 28.7 +/- 0.9 | 0 |
+| abrupt drift | frequency | 0.292 +/- 0.093 | 0.233 +/- 0.075 | 0.958 +/- 0.093 | 0.233 +/- 0.075 | 29.3 +/- 0.7 | 0 |
+| abrupt drift | BM25 Cabinet | 0.250 +/- 0.000 | 0.200 +/- 0.000 | 1.000 +/- 0.000 | 0.200 +/- 0.000 | 907.3 +/- 30.6 | 0 |
+| gradual drift | FERNme pure | 0.625 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 48.7 +/- 0.5 | 0 |
+| gradual drift | FERNme entities | 0.625 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 48.7 +/- 0.5 | 0 |
+| gradual drift | recency | 0.562 +/- 0.062 | 0.900 +/- 0.100 | 0.000 +/- 0.000 | 0.900 +/- 0.100 | 31.0 +/- 0.6 | 0 |
+| gradual drift | frequency | 0.562 +/- 0.062 | 0.900 +/- 0.100 | 0.167 +/- 0.167 | 0.900 +/- 0.100 | 32.5 +/- 0.5 | 0 |
+| gradual drift | BM25 Cabinet | 0.479 +/- 0.047 | 0.767 +/- 0.075 | 0.389 +/- 0.124 | 0.767 +/- 0.075 | 86.0 +/- 17.0 | 0 |
+| staleness | FERNme pure | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 36.7 +/- 2.7 | 0 |
+| staleness | FERNme entities | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 36.7 +/- 2.7 | 0 |
+| staleness | recency | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 32.0 +/- 0.6 | 0 |
+| staleness | frequency | 0.571 +/- 0.000 | 0.800 +/- 0.000 | 0.250 +/- 0.000 | 0.800 +/- 0.000 | 31.8 +/- 0.4 | 0 |
+| staleness | BM25 Cabinet | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 58.7 +/- 16.6 | 0 |
+| contextual | FERNme pure | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 0.600 +/- 0.115 | 42.5 +/- 0.5 | 0 |
+| contextual | FERNme entities | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 0.600 +/- 0.115 | 42.5 +/- 0.5 | 0 |
+| contextual | recency | 0.542 +/- 0.093 | 0.433 +/- 0.075 | 0.000 +/- 0.000 | 0.433 +/- 0.075 | 28.5 +/- 1.0 | 0 |
+| contextual | frequency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 0.467 +/- 0.094 | 28.5 +/- 0.5 | 0 |
+| contextual | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 842.0 +/- 0.0 | 0 |
+| fragmented entity | FERNme pure | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 47.7 +/- 0.9 | 0 |
+| fragmented entity | FERNme entities | 0.500 +/- 0.500 | 0.100 +/- 0.100 | 0.000 +/- 0.000 | 0.100 +/- 0.100 | 43.8 +/- 3.0 | 0 |
+| fragmented entity | recency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 30.2 +/- 1.8 | 0 |
+| fragmented entity | frequency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 31.0 +/- 0.0 | 0 |
+| fragmented entity | BM25 Cabinet | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 90.0 +/- 0.0 | 0 |
+| outcome | FERNme pure | 0.500 +/- 0.000 | 0.500 +/- 0.000 | 0.000 +/- 0.000 | 0.500 +/- 0.000 | 30.0 +/- 0.0 | 0 |
+| outcome | FERNme entities | 0.500 +/- 0.000 | 0.500 +/- 0.000 | 0.000 +/- 0.000 | 0.500 +/- 0.000 | 30.0 +/- 0.0 | 0 |
+| outcome | recency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 28.0 +/- 0.0 | 0 |
+| outcome | frequency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 28.0 +/- 0.0 | 0 |
+| outcome | BM25 Cabinet | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 60.0 +/- 0.0 | 0 |
 
 Read this as a quality gate, not a victory lap: BM25 wins when query text directly
 matches Cabinet prose but spends far more context tokens; recency wins the deliberately
-abrupt drift fixture; frequency fails staleness; FERNme stays compact and zero-call but
-does not dominate every synthetic regime.
+abrupt drift fixture; frequency fails staleness; entity flags matter on fragmented
+identity; and only FERNme exercises the outcome loop. FERNme stays compact and
+zero-call, but it does not dominate every synthetic regime.
 
 **Cost** — per-turn memory tokens vs. profile size (5 seeds):
 
@@ -130,19 +153,8 @@ does not dominate every synthetic regime.
 | at 120 interactions | **1×** | **77.4× ± 1.3** larger |
 | LLM calls per write | **0** | ~2 (extraction memory) |
 
-**Legacy focused recall evals** — precision@5 vs. ground-truth preferences
-(5 seeds × 40 users). These older single-purpose modules remain regression checks;
-the unified harness above is the Phase 8 gate.
-
-| regime | 🌿 FERNme | frequency | recency |
-|---|:---:|:---:|:---:|
-| static recall | 0.739 | 0.739 | 0.465 |
-| **drift** (taste shifts) | **0.718** ✅ | 0.128 ❌ | 0.586 |
-| **context** (precision@3) | **0.617** ✅ | 0.513 (blind) | — |
-
-> **Legacy read:** in these narrower fixtures, FERNme is strong across static,
-> drift, and context; the unified harness above intentionally adds BM25 Cabinet
-> retrieval and a harsher abrupt-drift case where other baselines can win.
+Older focused recall modules remain regression checks, but the unified harness
+above is the README source of truth for cross-method quality claims.
 
 **Cold-start ablation** — population prior gives **+0.06 precision@5 at turns 1–3**, washing out by turn 10 (a real but modest, cold-start-only benefit).
 
@@ -374,7 +386,7 @@ aliases and enrich card slots with compact entity context. It is validated on
 synthetic acceptance fixtures and the `python -m fernme.eval.entities` micro-eval;
 First real-profile validation (n=1, maintainer's own 722-tag profile): with entity flags on, a fragmented person's card rank improved 11→6, a previously-missed contact_of relationship surfaced in the card, and token cost stayed flat (~150 vs ~155). Synthetic-vs-real caveat applies: one profile, one probe set. Structured-field ingest now retains email, phone, URL, handle, and ISO-date extractions in event payloads as Cabinet data; entity-field writes are available through the service API, with automatic promotion left for a later pass.
 
-🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. The drift gate stays intact at **0.718 +/- 0.008**.
+🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. Legacy focused drift checks remain regression coverage; cross-method claims use the unified harness above.
 
 🆕 **Verify scope:** contradiction-scoped verify is on for genuine single-value-slot conflicts and marks only the older side of the contradiction. Synthetic R5 eval: contradicted-stale verify precision **1.000**, recall **1.000**, nag **0.000**, with **0.959 +/- 0.156** conflict pairs/user. The perfect contradicted-stale score is by construction, so it validates wiring, not real-world conflict-detector quality. Confidence separates "keep it" from "trust it"; stale-high-confidence-wrong improves in the fixture (**0.070 -> 0.004**) because middle-class confidence no longer decays slower than flat.
 
@@ -401,8 +413,8 @@ fernme/
   relations.py · typed entity/relation vocabulary
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
-  eval/      simulator · cost · quality · drift · context · ablation · pilot · entities
-tests/       195 passing, 3 skipped   ·   *_demo.py walkthroughs
+  eval/      simulator · cost · quality · drift · context · ablation · pilot · entities · harness
+tests/       215 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

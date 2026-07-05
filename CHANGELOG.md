@@ -22,8 +22,12 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Added `python -m fernme.eval.entities`, a reproducible synthetic micro-eval for
   the A2 alias-fragmentation dilution effect with entity aggregation off vs. on.
 - Added `python -m fernme.eval.harness`, a synthetic hidden-answer-key eval gate
-  covering static, drift, and contextual regimes across FERNme, entity flags,
-  recency, frequency, and pure-Python BM25 Cabinet baselines.
+  covering static, abrupt drift, gradual drift, staleness, contextual,
+  fragmented-entity, and outcome regimes across FERNme, entity flags, recency,
+  frequency, and pure-Python BM25 Cabinet baselines.
+- Reconciled README benchmark claims to the unified harness as the public source
+  of truth, including the measured trade-offs, flat token cost, zero LLM calls,
+  entity aggregation, and FERNme-only outcome feedback loop.
 - Added relation facts for typed entity relations in SQLite/Postgres, with
   deduplicated inert notes, explicit fact deletion, and entity-forget cascade.
 - Documented first real-profile validation (n=1, maintainer's own 722-tag profile):
