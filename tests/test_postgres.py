@@ -61,3 +61,17 @@ def test_delete_on_postgres(pg):
     svc.observe("shop", "z", "purchase", {"tags": ["organic"]})
     svc.delete("shop", "z")
     assert svc.store.load_user("shop", "z").n_edges() == 0
+
+
+def test_canonicalization_suggestions_on_postgres(pg):
+    svc = FernService(store=PostgresStore(pg))
+    svc.consent("demo", "alex", True)
+    svc.observe("demo", "alex", "note", {"tags": ["person:dana-reyes"]})
+    svc.observe("demo", "alex", "note", {"tags": ["person:danareyes"]})
+
+    rows = svc.list_suggestions("demo", "alex", now=1.0)
+    rejected = svc.reject_suggestion("demo", "alex", rows[0]["suggestion_id"], ts=2.0)
+
+    assert rows[0]["kind"] == "alias-merge"
+    assert rejected["status"] == "rejected"
+    assert svc.list_suggestions("demo", "alex", now=3.0) == []

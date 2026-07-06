@@ -14,7 +14,8 @@ def _edge_to_dict(e: Edge) -> dict:
 
 
 def save_state(path: str, ug: UserGraph, assoc: AssocGraph,
-               prior: PopulationPrior | None = None) -> None:
+               prior: PopulationPrior | None = None,
+               suggestions: list[dict] | None = None) -> None:
     data = {
         "user_graph": {
             "site": ug.site, "user": ug.user,
@@ -28,14 +29,16 @@ def save_state(path: str, ug: UserGraph, assoc: AssocGraph,
     if prior is not None:
         data["prior"] = {"site": prior.site, "_sum": prior._sum,
                          "_n": prior._n, "n_users": prior.n_users}
+    if suggestions is not None:
+        data["canonicalization_suggestions"] = suggestions
     tmp = path + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     os.replace(tmp, path)
 
 
 def load_state(path: str) -> Tuple[UserGraph, AssocGraph, PopulationPrior | None]:
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     ugd = data["user_graph"]
     ug = UserGraph(ugd["site"], ugd["user"])
@@ -54,3 +57,9 @@ def load_state(path: str) -> Tuple[UserGraph, AssocGraph, PopulationPrior | None
         prior = PopulationPrior(pd["site"])
         prior._sum = pd["_sum"]; prior._n = pd["_n"]; prior.n_users = pd["n_users"]
     return ug, assoc, prior
+
+
+def load_suggestions(path: str) -> list[dict]:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return list(data.get("canonicalization_suggestions", []))

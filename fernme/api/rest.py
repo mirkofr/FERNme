@@ -77,6 +77,12 @@ class UserRef(BaseModel):
 class TriggersIn(BaseModel):
     site: str; user: str; now: float = 0.0
 
+class SuggestionListIn(BaseModel):
+    site: str; user: str; now: float = 0.0; refresh: bool = True
+
+class SuggestionDecisionIn(BaseModel):
+    site: str; user: str; suggestion_id: str; ts: float = 0.0
+
 
 def _guard(fn, *a, **k):
     try:
@@ -120,6 +126,18 @@ def delete(b: UserRef): return svc.delete(b.site, b.user)
 
 @app.post("/triggers")
 def triggers(b: TriggersIn): return _guard(svc.triggers, b.site, b.user, b.now)
+
+@app.post("/suggestions/list")
+def list_suggestions(b: SuggestionListIn):
+    return _guard(svc.list_suggestions, b.site, b.user, b.now, b.refresh)
+
+@app.post("/suggestions/accept")
+def accept_suggestion(b: SuggestionDecisionIn):
+    return _guard(svc.accept_suggestion, b.site, b.user, b.suggestion_id, b.ts)
+
+@app.post("/suggestions/reject")
+def reject_suggestion(b: SuggestionDecisionIn):
+    return _guard(svc.reject_suggestion, b.site, b.user, b.suggestion_id, b.ts)
 
 @app.post("/prior_refresh")
 def prior_refresh(b: UserRef): return svc.prior_refresh(b.site)

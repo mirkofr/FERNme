@@ -1,5 +1,5 @@
 """MCP server exposing FERN as agent tools, so any MCP-capable agent (incl.
-Claude) can give a user persistent, glass-box memory. Run: python -m fern.api.mcp_server
+Claude) can give a user persistent, glass-box memory. Run: python -m fernme.api.mcp_server
 Requires: pip install mcp"""
 from __future__ import annotations
 import os
@@ -69,6 +69,24 @@ if FastMCP is not None:
     def forget_me(site: str, user: str) -> dict:
         """Delete everything stored about a user on a site (right to be forgotten)."""
         return svc.delete(site, user)
+
+    @mcp.tool()
+    def list_canonicalization_suggestions(site: str, user: str, now: float = 0.0,
+                                          refresh: bool = True) -> list[dict]:
+        """List pending alias/entity canonicalization suggestions for human review."""
+        return svc.list_suggestions(site, user, now, refresh)
+
+    @mcp.tool()
+    def accept_canonicalization_suggestion(site: str, user: str, suggestion_id: str,
+                                           ts: float = 0.0) -> dict:
+        """Accept one pending suggestion and apply it through the service API."""
+        return svc.accept_suggestion(site, user, suggestion_id, ts)
+
+    @mcp.tool()
+    def reject_canonicalization_suggestion(site: str, user: str, suggestion_id: str,
+                                           ts: float = 0.0) -> dict:
+        """Reject one pending suggestion so it does not resurface."""
+        return svc.reject_suggestion(site, user, suggestion_id, ts)
 
     def main():
         mcp.run()

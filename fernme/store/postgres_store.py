@@ -75,10 +75,18 @@ CREATE TABLE IF NOT EXISTS relation_facts(
   FOREIGN KEY(site, "user", subject_id, relation, object_id)
     REFERENCES entity_relations(site, "user", subject_id, relation, object_id)
     ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS canonicalization_suggestions(
+  suggestion_id TEXT PRIMARY KEY,
+  site TEXT NOT NULL, "user" TEXT NOT NULL,
+  kind TEXT NOT NULL, payload TEXT NOT NULL, score DOUBLE PRECISION NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_ts DOUBLE PRECISION NOT NULL, decided_ts DOUBLE PRECISION);
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, "user", ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, "user", attr);
 CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
   ON relation_facts(site, "user", subject_id, relation, object_id, ts);
+CREATE INDEX IF NOT EXISTS idx_canonicalization_suggestions_user
+  ON canonicalization_suggestions(site, "user", status, created_ts);
 """
 
 
@@ -159,6 +167,8 @@ class PostgresStore:
                         (site, user, entity_id))
             for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
                 self._q(f'DELETE FROM {t} WHERE site=%s AND "user"=%s', (site, user))
+            self._q('DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s',
+                    (site, user))
 
     def export_user(self, site, user) -> Dict:
         ug = self.load_user(site, user)
@@ -279,6 +289,12 @@ class PostgresStore:
             'AND entity_id=%s ORDER BY alias_attr',
             (site, user, entity_id)).fetchall()]
 
+    def list_entities(self, site, user):
+        return [dict(r) for r in self._q(
+            'SELECT * FROM entities WHERE site=%s AND "user"=%s '
+            'ORDER BY display_name,entity_id',
+            (site, user)).fetchall()]
+
     def set_entity_field(self, entity_id, field, value, provenance, ts):
         with self._lock:
             self._q("INSERT INTO entity_fields(entity_id,field,value,provenance,ts) "
@@ -395,6 +411,9 @@ class PostgresStore:
                     (site, user, entity_id))
             self._q('DELETE FROM entities WHERE site=%s AND "user"=%s AND entity_id=%s',
                     (site, user, entity_id))
+            self._q('DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
+                    'AND payload LIKE %s',
+                    (site, user, f'%"entity_id":"{entity_id}"%'))
 
     def count_entity_references(self, entity_id):
         specs = [
@@ -408,6 +427,87 @@ class PostgresStore:
         for table, where, args in specs:
             total += self._q(f"SELECT COUNT(*) n FROM {table} WHERE {where}", args).fetchone()["n"]
         return total
+
+    # ---- suggest-and-approve canonicalization queue ----
+    @staticmethod
+    def _suggestion_row(row):
+        out = dict(row)
+        out["payload"] = json.loads(out["payload"])
+        return out
+
+    def upsert_suggestion(self, row):
+        payload = json.dumps(row["payload"], sort_keys=True, separators=(",", ":"))
+        with self._lock:
+            existing = self._q(
+                "SELECT status FROM canonicalization_suggestions WHERE suggestion_id=%s",
+                (row["suggestion_id"],)).fetchone()
+            if existing:
+                if existing["status"] == "pending":
+                    self._q(
+                        "UPDATE canonicalization_suggestions SET payload=%s, score=%s "
+                        "WHERE suggestion_id=%s",
+                        (payload, float(row["score"]), row["suggestion_id"]))
+                return self.get_suggestion(row["suggestion_id"])
+            self._q(
+                'INSERT INTO canonicalization_suggestions('
+                'suggestion_id,site,"user",kind,payload,score,status,created_ts,decided_ts) '
+                'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (row["suggestion_id"], row["site"], row["user"], row["kind"],
+                 payload, float(row["score"]), row["status"], float(row["created_ts"]),
+                 row.get("decided_ts")))
+            return self.get_suggestion(row["suggestion_id"])
+
+    def get_suggestion(self, suggestion_id):
+        row = self._q(
+            "SELECT * FROM canonicalization_suggestions WHERE suggestion_id=%s",
+            (suggestion_id,)).fetchone()
+        return self._suggestion_row(row) if row else None
+
+    def list_suggestions(self, site, user, status=None):
+        q = 'SELECT * FROM canonicalization_suggestions WHERE site=%s AND "user"=%s'
+        args = [site, user]
+        if status:
+            q += " AND status=%s"
+            args.append(status)
+        q += " ORDER BY score DESC, created_ts ASC, suggestion_id ASC"
+        return [self._suggestion_row(r) for r in self._q(q, tuple(args)).fetchall()]
+
+    def decide_suggestion(self, suggestion_id, status, decided_ts):
+        with self._lock:
+            self._q(
+                "UPDATE canonicalization_suggestions SET status=%s, decided_ts=%s "
+                "WHERE suggestion_id=%s",
+                (status, float(decided_ts), suggestion_id))
+        return self.get_suggestion(suggestion_id)
+
+    def purge_expired_suggestions(self, site, user, now, ttl_days):
+        cutoff = float(now) - float(ttl_days)
+        with self._lock:
+            cur = self._q(
+                'DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
+                "AND status='pending' AND created_ts<%s",
+                (site, user, cutoff))
+            return cur.rowcount
+
+    def trim_pending_suggestions(self, site, user, cap):
+        pending = self.list_suggestions(site, user, "pending")
+        if len(pending) <= cap:
+            return 0
+        drop = pending[int(cap):]
+        with self._lock:
+            with self._conn.cursor() as c:
+                c.executemany(
+                    "DELETE FROM canonicalization_suggestions WHERE suggestion_id=%s",
+                    [(row["suggestion_id"],) for row in drop])
+        return len(drop)
+
+    def delete_suggestions_for_entity(self, site, user, entity_id):
+        with self._lock:
+            cur = self._q(
+                'DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
+                'AND payload LIKE %s',
+                (site, user, f'%"entity_id":"{entity_id}"%'))
+            return cur.rowcount
 
     def list_users(self, site):
         return [r["user"] for r in self._q(

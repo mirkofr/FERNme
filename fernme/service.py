@@ -19,6 +19,7 @@ from .dp import PrivatePrior
 from . import audit as _audit_mod
 from . import confidence as _confidence
 from . import curation as _curation
+from . import curation_queue as _curation_queue
 from . import glossary as _glossary
 from . import resolution as _resolution
 from .vocabulary import Vocabulary
@@ -426,6 +427,101 @@ class FernService:
         return {"entity_id": entity["entity_id"],
                 "linked_tags": [r["alias_attr"] for r in self.store.list_entity_aliases(
                     site, user, entity["entity_id"])]}
+
+    # ---------- suggest-and-approve canonicalization ----------
+    def _suggestion_context(self, site: str, user: str) -> Dict:
+        ug = self.store.load_user(site, user)
+        ag = self.store.load_assoc(site)
+        attrs = [
+            attr for attr, edge in ug.edges.items()
+            if edge.source != "superseded" and float(edge.weight) > 0.0
+        ]
+        weights = {attr: ug.edges[attr].weight for attr in attrs}
+        assoc_weights = {
+            tuple(sorted((a, b))): w
+            for (a, b), w in ag.edges.items()
+        }
+        entities = self.store.list_entities(site, user) if hasattr(self.store, "list_entities") else []
+        aliases_by_entity = {
+            row["entity_id"]: [
+                alias["alias_attr"]
+                for alias in self.store.list_entity_aliases(site, user, row["entity_id"])
+            ]
+            for row in entities
+        }
+        return {
+            "attrs": attrs,
+            "weights": weights,
+            "assoc_weights": assoc_weights,
+            "entities": entities,
+            "aliases_by_entity": aliases_by_entity,
+        }
+
+    def _refresh_suggestions(self, site: str, user: str, now: float) -> None:
+        ctx = self._suggestion_context(site, user)
+        candidates = _curation_queue.generate_candidates(
+            ctx["attrs"],
+            ctx["weights"],
+            ctx["assoc_weights"],
+            ctx["entities"],
+            ctx["aliases_by_entity"],
+            min_score=self.cfg.canonicalization_min_score,
+        )
+        for cand in candidates:
+            self.store.upsert_suggestion(cand.row(site, user, now))
+        self.store.trim_pending_suggestions(
+            site, user, int(self.cfg.canonicalization_queue_cap))
+
+    def list_suggestions(self, site: str, user: str, now: float = 0.0,
+                         refresh: bool = True) -> List[Dict]:
+        self._require_consent(site, user)
+        self.store.purge_expired_suggestions(
+            site, user, now, self.cfg.canonicalization_ttl_days)
+        if refresh:
+            self._refresh_suggestions(site, user, now)
+        return self.store.list_suggestions(site, user, status="pending")
+
+    def _pending_suggestion_or_raise(self, site: str, user: str,
+                                     suggestion_id: str, now: float) -> Dict:
+        self._require_consent(site, user)
+        self.store.purge_expired_suggestions(
+            site, user, now, self.cfg.canonicalization_ttl_days)
+        row = self.store.get_suggestion(suggestion_id)
+        if row is None or row["site"] != site or row["user"] != user:
+            raise ValueError("suggestion not found")
+        if row["status"] != "pending":
+            raise ValueError("suggestion is not pending")
+        return row
+
+    def accept_suggestion(self, site: str, user: str, suggestion_id: str,
+                          ts: float = 0.0) -> Dict:
+        row = self._pending_suggestion_or_raise(site, user, suggestion_id, ts)
+        payload = row["payload"]
+        if row["kind"] == "entity-link":
+            self.entity_link_alias(site, user, payload["entity_id"], payload["alias_attr"])
+        elif row["kind"] == "alias-merge":
+            entity = self.store.entity_by_alias(site, user, payload["canonical_attr"])
+            if entity is None:
+                entity_id = self.entity_create(
+                    site, user, payload.get("entity_kind", "other"),
+                    payload.get("display_name") or payload["canonical_attr"],
+                )
+            else:
+                entity_id = entity["entity_id"]
+            self.entity_link_alias(site, user, entity_id, payload["canonical_attr"])
+            self.entity_link_alias(site, user, entity_id, payload["alias_attr"])
+        else:
+            raise ValueError("unknown suggestion kind")
+        decided = self.store.decide_suggestion(suggestion_id, "accepted", ts)
+        self._audit(site, user, "suggestion_accept", {"suggestion_id": suggestion_id}, ts)
+        return decided
+
+    def reject_suggestion(self, site: str, user: str, suggestion_id: str,
+                          ts: float = 0.0) -> Dict:
+        row = self._pending_suggestion_or_raise(site, user, suggestion_id, ts)
+        decided = self.store.decide_suggestion(row["suggestion_id"], "rejected", ts)
+        self._audit(site, user, "suggestion_reject", {"suggestion_id": suggestion_id}, ts)
+        return decided
 
     def entity_set_field(self, site: str, user: str, entity_id: str, field: str,
                          value: str, provenance: str = "stated", ts: float = 0.0) -> Dict:

@@ -71,6 +71,12 @@ CREATE TABLE IF NOT EXISTS relation_facts(
   FOREIGN KEY(site, user, subject_id, relation, object_id)
     REFERENCES entity_relations(site, user, subject_id, relation, object_id)
     ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS canonicalization_suggestions(
+  suggestion_id TEXT PRIMARY KEY,
+  site TEXT NOT NULL, user TEXT NOT NULL,
+  kind TEXT NOT NULL, payload TEXT NOT NULL, score REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_ts REAL NOT NULL, decided_ts REAL);
 CREATE TABLE IF NOT EXISTS audit(
   site TEXT, user TEXT, seq INTEGER, ts REAL, action TEXT, detail TEXT,
   prev_hash TEXT, hash TEXT, PRIMARY KEY(site, user, seq));
@@ -78,6 +84,8 @@ CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, user, ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, user, attr);
 CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
   ON relation_facts(site, user, subject_id, relation, object_id, ts);
+CREATE INDEX IF NOT EXISTS idx_canonicalization_suggestions_user
+  ON canonicalization_suggestions(site, user, status, created_ts);
 """
 
 
@@ -186,6 +194,9 @@ class SQLiteStore:
                     (site, user, entity_id))
             for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
                 self._conn.execute(f"DELETE FROM {t} WHERE site=? AND user=?", (site, user))
+            self._conn.execute(
+                "DELETE FROM canonicalization_suggestions WHERE site=? AND user=?",
+                (site, user))
             self._conn.commit()
 
     def export_user(self, site: str, user: str) -> Dict:
@@ -335,6 +346,11 @@ class SQLiteStore:
             "SELECT * FROM entity_aliases WHERE site=? AND user=? AND entity_id=? ORDER BY alias_attr",
             (site, user, entity_id))]
 
+    def list_entities(self, site: str, user: str):
+        return [dict(r) for r in self._conn.execute(
+            "SELECT * FROM entities WHERE site=? AND user=? ORDER BY display_name,entity_id",
+            (site, user))]
+
     def set_entity_field(self, entity_id: str, field: str, value: str,
                          provenance: str, ts: float):
         with self._lock:
@@ -463,6 +479,10 @@ class SQLiteStore:
             self._conn.execute(
                 "DELETE FROM entities WHERE site=? AND user=? AND entity_id=?",
                 (site, user, entity_id))
+            self._conn.execute(
+                "DELETE FROM canonicalization_suggestions WHERE site=? AND user=? "
+                "AND payload LIKE ?",
+                (site, user, f'%"entity_id":"{entity_id}"%'))
             self._conn.commit()
 
     def count_entity_references(self, entity_id: str) -> int:
@@ -479,6 +499,98 @@ class SQLiteStore:
             total += self._conn.execute(
                 f"SELECT COUNT(*) n FROM {table} WHERE {where}", args).fetchone()["n"]
         return total
+
+    # ---- suggest-and-approve canonicalization queue ----
+    @staticmethod
+    def _suggestion_row(row):
+        out = dict(row)
+        out["payload"] = json.loads(out["payload"])
+        return out
+
+    def upsert_suggestion(self, row: Dict):
+        payload = json.dumps(row["payload"], sort_keys=True, separators=(",", ":"))
+        with self._lock:
+            existing = self._conn.execute(
+                "SELECT status FROM canonicalization_suggestions WHERE suggestion_id=?",
+                (row["suggestion_id"],)).fetchone()
+            if existing:
+                if existing["status"] == "pending":
+                    self._conn.execute(
+                        "UPDATE canonicalization_suggestions SET payload=?, score=? "
+                        "WHERE suggestion_id=?",
+                        (payload, float(row["score"]), row["suggestion_id"]))
+                self._conn.commit()
+                return self.get_suggestion(row["suggestion_id"])
+            self._conn.execute(
+                "INSERT INTO canonicalization_suggestions("
+                "suggestion_id,site,user,kind,payload,score,status,created_ts,decided_ts) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
+                (row["suggestion_id"], row["site"], row["user"], row["kind"],
+                 payload, float(row["score"]), row["status"], float(row["created_ts"]),
+                 row.get("decided_ts")))
+            self._conn.commit()
+            return self.get_suggestion(row["suggestion_id"])
+
+    def get_suggestion(self, suggestion_id: str):
+        row = self._conn.execute(
+            "SELECT * FROM canonicalization_suggestions WHERE suggestion_id=?",
+            (suggestion_id,)).fetchone()
+        return self._suggestion_row(row) if row else None
+
+    def list_suggestions(self, site: str, user: str, status: str = None):
+        q = "SELECT * FROM canonicalization_suggestions WHERE site=? AND user=?"
+        args = [site, user]
+        if status:
+            q += " AND status=?"
+            args.append(status)
+        q += " ORDER BY score DESC, created_ts ASC, suggestion_id ASC"
+        return [self._suggestion_row(r) for r in self._conn.execute(q, args)]
+
+    def decide_suggestion(self, suggestion_id: str, status: str, decided_ts: float):
+        with self._lock:
+            self._conn.execute(
+                "UPDATE canonicalization_suggestions SET status=?, decided_ts=? "
+                "WHERE suggestion_id=?",
+                (status, float(decided_ts), suggestion_id))
+            self._conn.commit()
+        return self.get_suggestion(suggestion_id)
+
+    def purge_expired_suggestions(self, site: str, user: str, now: float, ttl_days: float):
+        cutoff = float(now) - float(ttl_days)
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM canonicalization_suggestions WHERE site=? AND user=? "
+                "AND status='pending' AND created_ts<?",
+                (site, user, cutoff))
+            self._conn.commit()
+            return cur.rowcount
+
+    def trim_pending_suggestions(self, site: str, user: str, cap: int):
+        pending = self.list_suggestions(site, user, "pending")
+        if len(pending) <= cap:
+            return 0
+        drop = pending[int(cap):]
+        with self._lock:
+            self._conn.executemany(
+                "DELETE FROM canonicalization_suggestions WHERE suggestion_id=?",
+                [(row["suggestion_id"],) for row in drop])
+            self._conn.commit()
+        return len(drop)
+
+    def delete_suggestions_for_entity(self, site: str, user: str, entity_id: str):
+        rows = self.list_suggestions(site, user)
+        ids = [
+            row["suggestion_id"] for row in rows
+            if row["payload"].get("entity_id") == entity_id
+        ]
+        if not ids:
+            return 0
+        with self._lock:
+            self._conn.executemany(
+                "DELETE FROM canonicalization_suggestions WHERE suggestion_id=?",
+                [(sid,) for sid in ids])
+            self._conn.commit()
+        return len(ids)
 
     # ---- verifiable audit log (#4) ----
     def append_audit(self, site, user, ts, action, detail, key):

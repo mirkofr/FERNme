@@ -33,6 +33,10 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Added memory map v2 entity-kind rendering for the Elena demo: owner/person/org/
   project colors, pink info markers, typed relation edges with relation-fact
   badges, and edge inspection with most-recent facts first.
+- Added suggest-and-approve canonicalization: deterministic alias-merge and
+  entity-link suggestions, persistent per-user review queues in SQLite/Postgres,
+  REST/MCP adapters, and the synthetic `python -m fernme.eval.canonicalization`
+  precision/recall report. Nothing auto-applies to memory truth.
 - Documented first real-profile validation (n=1, maintainer's own 722-tag profile):
   entity flags improved a fragmented person's card rank 11→6, surfaced a
   previously missed `contact_of` relationship, and kept token cost flat.
