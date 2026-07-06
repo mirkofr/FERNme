@@ -127,6 +127,14 @@ def test_elena_fixture_graph_includes_entity_layer():
     relation_edges = [e for e in g["edges"] if e.get("entity_relation")]
     assert {"friend_of", "colleague_of", "works_on"} <= {e["relation"] for e in relation_edges}
     assert all(e.get("label") == e["relation"] for e in relation_edges)
+    daniel_works = next(e for e in relation_edges
+                        if e["relation"] == "works_on"
+                        and e["subject_id"] == entities["Daniel"]["entity_id"])
+    assert daniel_works["fact_count"] == 2
+    assert [fact["note"] for fact in daniel_works["facts"]] == [
+        "Daniel reviews the fictional platform notes before demo sessions.",
+        "Daniel helps Elena shape the fictional memory-journal prototype.",
+    ]
     assert any("user:elena" in (e["source"], e["target"]) for e in relation_edges)
     assert all(e["source"] in node_ids for e in relation_edges)
     assert all(e["target"] in node_ids for e in relation_edges)
@@ -151,6 +159,20 @@ def test_elena_fixture_graph_contains_only_fictional_cast():
         "rel:daniel",
         "project:memory-journal-platform",
     }
+
+
+def test_graph_renderers_expose_entity_kind_view_and_relation_fact_badges():
+    root = os.path.dirname(os.path.dirname(__file__))
+    template = open(os.path.join(root, "demo", "_memory_map_template.html"),
+                    encoding="utf-8").read()
+    live = open(os.path.join(root, "fernme", "web", "graph.html"),
+                encoding="utf-8").read()
+
+    for html in (template, live):
+        assert "ENTITY_KIND_COLORS" in html
+        assert "fact_count" in html
+        assert "inspectEdge" in html
+        assert "×" in html
 
 
 def test_memory_graph_is_cross_surface():

@@ -30,6 +30,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   entity aggregation, and FERNme-only outcome feedback loop.
 - Added relation facts for typed entity relations in SQLite/Postgres, with
   deduplicated inert notes, explicit fact deletion, and entity-forget cascade.
+- Added memory map v2 entity-kind rendering for the Elena demo: owner/person/org/
+  project colors, pink info markers, typed relation edges with relation-fact
+  badges, and edge inspection with most-recent facts first.
 - Documented first real-profile validation (n=1, maintainer's own 722-tag profile):
   entity flags improved a fragmented person's card rank 11→6, surfaced a
   previously missed `contact_of` relationship, and kept token cost flat.

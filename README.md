@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-215%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-216%20passing%20%7C%203%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -263,13 +263,14 @@ flowchart TD
 | ![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)<br/>**Action-aware learning** — good outcomes strengthen connections, bad outcomes weaken them. | ![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)<br/>**Architecture** — ingestion bridge → vocabulary → fuzzy graph → memory card → agent, with LLM fallback only when uncertain. |
 
 **Interactive memory map demo:** the static Elena map in `demo/elena/` is a
-screenshot-ready synthetic graph. It now shows typed entity nodes with alias
-grouping and labeled relation edges (`friend_of`, `colleague_of`, `works_on`)
-while keeping the underlying memories inspectable.
+screenshot-ready synthetic graph. It now shows the entity-kind view (owner,
+person, org, project, and info markers), alias grouping, typed relation edges
+(`friend_of`, `colleague_of`, `works_on`), relation-fact badges, and inspectable
+edge facts.
 
 ![Elena's memory map](docs/elena_memory_map.png)
 
-*Elena's memory (fictional demo) — glass-box memory map with typed entities and labeled relations. Every node inspectable, every edge explainable.*
+*Elena's memory (fictional demo) — glass-box memory map with typed entities, relation facts, and labeled relations. Every node inspectable, every edge explainable.*
 
 ## 🚀 Quickstart
 
@@ -377,7 +378,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (213 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, and the full results suite above.
+Done & tested (216 passing, 3 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -414,7 +415,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot · entities · harness
-tests/       215 passing, 3 skipped   ·   *_demo.py walkthroughs
+tests/       216 passing, 3 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

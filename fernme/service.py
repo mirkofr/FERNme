@@ -983,6 +983,9 @@ class FernService:
                 other_id = row["object_id"] if outbound else row["subject_id"]
                 rel = row["relation"] if outbound else DEFAULT_RELATIONS.relations[row["relation"]].inverse
                 other = self.store.get_entity(site, u, other_id)
+                facts = self.store.list_relation_facts(
+                    site, u, row["subject_id"], row["relation"], row["object_id"],
+                    limit=RELATION_FACTS_PER_RELATION)
                 related.append({
                     "relation": rel,
                     "other_id": other_id,
@@ -991,6 +994,8 @@ class FernService:
                     "confidence": round(float(row["confidence"]), 3),
                     "hits": int(row["hits"]),
                     "provenance": row.get("provenance", ""),
+                    "facts": facts,
+                    "fact_count": len(facts),
                 })
             related.sort(key=lambda r: (r["relation"], r["other_name"]))
             collapsed = [a for a in visible if a != canonical]
@@ -1061,6 +1066,9 @@ class FernService:
                 if key in seen_relations:
                     continue
                 seen_relations.add(key)
+                facts = self.store.list_relation_facts(
+                    site, u, row["subject_id"], row["relation"], row["object_id"],
+                    limit=RELATION_FACTS_PER_RELATION)
                 item = {
                     "source": source,
                     "target": target,
@@ -1074,6 +1082,8 @@ class FernService:
                     "known": float(row["confidence"]) >= self.cfg.conf_known,
                     "provenance": row.get("provenance", ""),
                     "note": row.get("note", ""),
+                    "facts": facts,
+                    "fact_count": len(facts),
                 }
                 relation_payload.append(item)
                 edges.append({**item, "entity_relation": True})

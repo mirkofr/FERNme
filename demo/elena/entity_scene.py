@@ -33,6 +33,17 @@ def populate_elena_entities(svc, site: str = SITE, user: str = USER, ts: float =
     svc.entity_relate(site, user, daniel, "colleague_of", elena, ts=ts + 0.3)
     svc.entity_relate(site, user, elena, "works_on", platform, ts=ts + 0.4)
     svc.entity_relate(site, user, daniel, "works_on", platform, ts=ts + 0.5)
+    svc.entity_add_fact(
+        site, user, jonas, "friend_of", elena,
+        "Jonas is part of Elena's fictional close-support circle.", ts=ts + 0.6)
+    svc.entity_add_fact(
+        site, user, daniel, "works_on", platform,
+        "Daniel helps Elena shape the fictional memory-journal prototype.",
+        ts=ts + 0.7)
+    svc.entity_add_fact(
+        site, user, daniel, "works_on", platform,
+        "Daniel reviews the fictional platform notes before demo sessions.",
+        ts=ts + 0.8)
 
     return {
         "elena": elena,
