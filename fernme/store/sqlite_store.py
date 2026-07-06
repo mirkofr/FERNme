@@ -581,8 +581,9 @@ class SQLiteStore:
                 (site, user, entity_id))
             self._conn.execute(
                 "DELETE FROM canonicalization_suggestions WHERE site=? AND user=? "
-                "AND payload LIKE ?",
-                (site, user, f'%"entity_id":"{entity_id}"%'))
+                "AND (payload LIKE ? OR payload LIKE ? OR payload LIKE ?)",
+                (site, user, f'%"entity_id":"{entity_id}"%',
+                 f'%"subject_id":"{entity_id}"%', f'%"object_id":"{entity_id}"%'))
             self._conn.commit()
 
     def count_entity_references(self, entity_id: str) -> int:
@@ -682,6 +683,8 @@ class SQLiteStore:
         ids = [
             row["suggestion_id"] for row in rows
             if row["payload"].get("entity_id") == entity_id
+            or row["payload"].get("subject_id") == entity_id
+            or row["payload"].get("object_id") == entity_id
         ]
         if not ids:
             return 0

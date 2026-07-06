@@ -1,34 +1,34 @@
 # Architecture
 
-FERNme is one engine with a deterministic hot path; the LLM is an optional, rare fallback.
+FERNme is one engine with a deterministic hot path. Model work is optional, default-off, proposal-only, and outside normal write/recall.
 
 ![FERNme architecture](https://github.com/mirkofr/FERNme/raw/main/explanation%20of%20fern/IMG_7788.PNG)
 
-*Ingestion bridge → namespaced vocabulary → fuzzy Hebbian graph → memory card → agent; the LLM gate only when uncertain.*
+_Ingestion bridge -> namespaced vocabulary -> fuzzy Hebbian graph -> memory card -> agent. The typed entity layer sits beside the graph. Optional enrichment proposes review-queue suggestions; it never writes truth directly._
 
 ## Flow
-1. **Ingestion bridge** turns input into canonical tags — deterministically via a per-site catalog/vocabulary, or (rarely) via a gated LLM for novel free text.
-2. **Hebbian write** bumps fuzzy 0–9 edges; **decay** fades the unused. No LLM.
-3. **Spreading activation** retrieves the relevant slice; the **population prior** fills cold-start gaps (privately).
-4. The **memory card** (~25 tokens) is what the agent sees each turn.
-5. The **Cabinet** keeps the raw event log for specific-fact recall.
-6. **Outcomes** feed back to strengthen/weaken what worked.
+
+1. **Ingestion bridge** turns input into canonical tags deterministically through a per-site catalog/vocabulary.
+2. **Structured extractors** retain regex-only email, phone, URL, handle, and ISO-date values as Cabinet payload data.
+3. **Hebbian write** bumps fuzzy 0-9 edges; decay fades the unused. No model call.
+4. **Entity tables** store entities, aliases, fields, relation facts, and typed relations beside the tag graph.
+5. **Proposal enrichment** can enqueue relation/entity-link suggestions from an agent or caller-supplied model when enabled. Human accept/reject is the only truth write trigger.
+6. **Spreading activation** retrieves the relevant slice; opt-in alias aggregation can lift fragmented entity aliases together.
+7. The **memory card** is the compact prompt-facing view.
+8. The **Cabinet** keeps the raw event log for specific-fact recall.
+9. **Outcomes** feed back to strengthen/weaken what worked.
 
 ## Modules (`fernme/`)
+
 | Module | Role |
 |---|---|
-| `core/` | graph types, fuzzy 0–9 edges, event record |
-| `write/` | event→attr mapping (no LLM), Hebbian update, decay |
-| `retrieve/` | base-level + spreading activation, card compile |
-| `prior/` | population prior, differential encoding, IDF cold-start |
-| `store/` | `sqlite_store`, `postgres_store` (one interface) |
-| `vocabulary.py` | controlled namespaced tag vocabulary (ingestion) |
-| `tagging.py` | deterministic + optional LLM tagger |
-| `confidence.py` | multi-signal confidence + act/observe/ask gate |
-| `dp.py` | k-anonymity + differential-privacy collective priors |
-| `supernode.py` / `auth.py` | user-owned cross-site profile + sign-in linking |
-| `triggers.py` | proactive nudges (reorder, fading favorite) |
-| `safety.py` | untrusted-input sanitization |
-| `audit.py` | tamper-evident HMAC log + right-to-be-forgotten |
-| `service.py` | the consent-gated API tying it together |
-| `api/` | REST (`rest.py`), MCP (`mcp_server.py`), glass-box UI |
+| `core/` | graph types, fuzzy 0-9 edges, event record |
+| `write/` | event-to-attr mapping, Hebbian update, decay |
+| `retrieve/` | spreading activation, card compile, `entity_card.py` |
+| `capture/` | adapters and `extractors.py` structured-field capture |
+| `store/` | SQLite/Postgres stores, including entity tables |
+| `relations.py` | typed entity/relation vocabulary and validation |
+| `enrichment.py` | validation for propose-only enrichment payloads |
+| `curation_queue.py` | persistent human review queue |
+| `service.py` | consent-gated API tying it together |
+| `api/` | REST, MCP, glass-box UI |

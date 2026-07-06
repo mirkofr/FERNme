@@ -1,6 +1,6 @@
 # What FERNme remembers about Elena
 
-*Built by reading her 12 diary stories as an agent, extracting namespaced tags, and feeding them into FERNme (`pure` mode — no LLM in the write path). FERNme did the storing, cross-entry reinforcement, style/mood inference, and association-building.*
+*Built by reading her 12 diary stories as an agent, extracting namespaced tags, and feeding them into FERNme (`pure` mode, zero-model-call write path). FERNme did the storing, cross-entry reinforcement, style/mood inference, and association-building.*
 
 ## At a glance
 

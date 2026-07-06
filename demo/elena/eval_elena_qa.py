@@ -2,7 +2,7 @@
 Builds memory from all 86 entries, then asks fact questions. Each system retrieves
 top-k attributes given the question's context seeds; a question is 'answered' if the
 gold attribute is in the retrieved set (the standard retrieval proxy for QA accuracy:
-with the right fact retrieved, an LLM answers correctly). All systems are LLM-free and
+with the right fact retrieved, an LLM answers correctly). All retrieval systems are zero-model-call and
 runnable; Mem0 (LLM) is cited as an external reference, not run (needs API keys)."""
 import os, re, glob, json, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))

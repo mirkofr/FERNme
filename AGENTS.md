@@ -2,8 +2,10 @@
 
 FERNme gives an agent persistent, user-owned memory. The agent never manages a
 database. It just **recalls** a small card at the start of a turn and **remembers**
-a few tags at the end. The write is near-zero-LLM (graph arithmetic), so the only
-token cost is the handful of tag tokens the agent already emits.
+a few tags at the end. The deterministic write/recall core makes no model calls,
+so the default token cost is the handful of tag tokens the agent already emits.
+Optional enrichment uses explicit proposal tools and still waits for human
+approval before truth changes.
 
 There are two ways to connect, depending on what your agent supports.
 
@@ -19,6 +21,8 @@ FERNme ships an MCP server exposing these tools:
 | `recall_events(site, user, contains)` | search the raw history (the Cabinet) |
 | `edit_memory(site, user, attr, weight)` | glass-box override of one memory |
 | `forget_me(site, user)` | delete everything (right to be forgotten) |
+| `propose_relation(site, user, subject_id, relation, object_id, note)` | enqueue a typed relation suggestion for human review |
+| `propose_entity_link(site, user, alias_attr, entity_id)` | enqueue an entity alias/link suggestion for human review |
 
 Install and run it:
 
@@ -55,7 +59,7 @@ with a `FERN_TAGS:` line as a byproduct of the answer it's already writing:
 FERN_TAGS: pref:concise topic:python !likes:meetings
 ```
 
-A few lines then persist it (0 extra LLM calls, the engine write is free). The
+A few lines then persist it. FERNme makes 0 extra model calls in the engine write. The
 `agent` adapter parses the `FERN_TAGS:` line straight out of the reply text:
 
 ```python

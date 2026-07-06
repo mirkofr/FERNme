@@ -1,6 +1,6 @@
 # Action-Coupled, Cost-Bounded Memory for Multi-Tenant Agents
 
-### FERNme — a user-owned, near-zero-LLM Hebbian preference-graph memory
+### FERNme - a user-owned Hebbian preference-graph memory with a zero-LLM deterministic core
 
 **Mirkomil Sharipov**  ·  **Acquilab Inc.**  ·  Correspondence: mirkosharipov@acquilab.io
 Code: https://github.com/mirkofr/FERNme  ·  Site: https://fernme.dev
@@ -42,7 +42,7 @@ holds a **flat ~40-token card**, **retains 16/16** of the person's stated perman
 facts, exhibits correct **preference drift**, and uses **~10× / ~240× fewer tokens**
 than extraction-based and full-history memory respectively. On a LoCoMo-style QA set
 FERNme's context-seeded retrieval answers **~4×** as many fact questions as frequency/
-recency baselines at equal budget and is the only LLM-free method that resolves
+recency baselines at equal budget and is the only zero-model-call deterministic-core method in this harness that resolves
 preference drift. We argue that for agents
 that act for many users, memory should be **cheap to write** and **evaluated by
 outcomes**, and that a user-owned, per-surface design is both a cleaner trust
@@ -111,7 +111,7 @@ indexing + embeddings). *Ori-Mnemos* packages ACT-R decay + spreading activation
 Hebbian co-occurrence as a **sovereign single-agent note vault**. *HeLa-Mem*
 (arXiv 2026) builds a Hebbian graph over a **single user's conversation** with
 LLM-based "Hebbian Distillation." FERNme uses the same retrieval family but differs in
-purpose (personalization *about end-users*, evaluated on actions), write rule (no LLM
+purpose (personalization *about end-users*, evaluated on actions), write rule (zero-model-call deterministic core
 on the hot path), and deployment (multi-tenant, user-owned, with a private collective
 prior). Its memory is about *whom the agent serves*, not the agent's own knowledge.
 
@@ -119,8 +119,9 @@ prior). Its memory is about *whom the agent serves*, not the agent's own knowled
 reconciliation per interaction and retrieves by vector similarity, benchmarked on
 conversational QA. This is *smarter per write* — it captures nuanced, causal
 preferences a co-occurrence counter misses — but it is costly and adds a write-time
-error surface. FERNme trades that richness for a near-zero write cost and makes the
-trade-off explicit (and recoverable via optional gated/offline modes).
+error surface. FERNme trades that richness for a zero-model-call deterministic core
+and makes the trade-off explicit. Optional enrichment is propose-only and requires
+human approval before memory truth changes.
 
 **Tiered / OS-style and temporal memory.** *MemGPT/Letta* and *MemoryOS* manage
 context in LLM-paged tiers; *Zep/Graphiti* track fact validity over time with a
@@ -145,10 +146,10 @@ deviate from the prior — with numeric side-fields for quantities (`cadence_day
 `size`, mood EMA) that an edge cannot represent. A shared per-surface association graph
 holds attribute↔attribute co-occurrence weights.
 
-### 3.2 Write rule (no per-interaction LLM)
+### 3.2 Write rule (zero-model-call hot path)
 An event maps to active attributes via a deterministic function over structured fields
-+ a catalog/controlled-vocabulary table (no LLM in the hot path; optional offline LLM
-enrichment of the vocabulary is out of the request path). For each active attribute,
++ a catalog/controlled-vocabulary table. Optional enrichment is a separate
+propose-only review-queue tier, not a truth-writing hot-path call. For each active attribute,
 
   w ← w + α·m·(1 − w/9)
 
@@ -204,7 +205,7 @@ vectors. The natural experiment (Section 6) uses an external, free-form dataset.
 - **Cost (Q1).** Per-turn card tokens vs. number of interactions, against a
   full-history-in-context baseline; 5 seeds.
 - **Write cost (Q2).** LLM calls per write: FERNme vs. extraction-style memory.
-- **Recall quality.** Precision@5 vs. ground truth, against LLM-free baselines
+- **Recall quality.** Precision@5 vs. ground truth, against zero-model-call baselines
   (frequency, recency), in three regimes: **static**, **drift**, **context**. 5–6 seeds.
 - **Differential-encoding ablation.** Precision@5 at early turns with vs. without the
   population prior.
@@ -256,7 +257,7 @@ reflections, family calls, complaints, project notes, and state updates) about o
 fictional person, Elena. Facts are embedded in ordinary prose. An agent extracts
 namespaced tags from each entry (using the entries' explicit `Tags:`/`Entities:`
 fields where present); FERNme performs all storage, reinforcement, decay, confidence,
-drift handling, and association-building in `pure` mode (no LLM on the write path).
+drift handling, and association-building in `pure` mode (zero-model-call deterministic write path).
 
 **Headline outcome.** FERNme ingested all 86 entries with **0 write-time LLM calls**,
 remembering **180 facts**, of which **74** were promoted to high confidence by
@@ -297,7 +298,7 @@ extraction grow.*
 ![Flat per-turn footprint](demo/elena/figures/02_flat_footprint.png)
 *Fig. 2. Per-turn tokens injected: FERNme holds ~40 tokens; full history balloons.*
 
-![Growth with zero LLM calls](demo/elena/figures/03_growth_zero_llm.png)
+![Growth with zero LLM calls in the deterministic core](demo/elena/figures/03_growth_zero_llm.png)
 *Fig. 3. Memory climbs to 180 facts while the write-path LLM-call count stays pinned at 0.*
 
 ![Drift](demo/elena/figures/04_drift.png)
@@ -334,7 +335,7 @@ spanning identity, preferences, relationships, goals/projects, negation, health,
 **drift** case ("which tea does she reach for in the afternoon *now*?"). Following the
 retrieval-proxy convention (with the right fact retrieved, an LLM answers correctly), a
 question is **answered** if the gold attribute is in the system's top-*k* retrieved
-facts. All compared systems are **LLM-free and runnable**: FERNme (context-seeded
+facts. All compared systems in this section are **zero-model-call retrieval baselines and runnable**: FERNme (context-seeded
 spreading activation), FERNme without context (weight-only ablation), an all-time
 **frequency** counter, and a **recency** ranker. A real *Mem0* (LLM-extraction +
 LLM-answer) run needs API keys and is **not run here**; its published LoCoMo scores
@@ -358,7 +359,7 @@ extraction — not the retrieval: a **budget sweep** shows FERNme climbing to **
 top-20 and ~91% at top-30**, while frequency/recency plateau near **42% / 27%**.
 
 ![QA accuracy](demo/elena/figures/09_qa_accuracy.png)
-*Fig. 9. Answer-retrieval accuracy at top-10: context-seeded FERNme vs LLM-free baselines.*
+*Fig. 9. Answer-retrieval accuracy at top-10: context-seeded FERNme vs zero-model-call baselines.*
 
 ![QA by category](demo/elena/figures/10_qa_by_category.png)
 *Fig. 10. Accuracy by category — FERNme's edge is largest where context matters (drift, projects, relationships).*
@@ -367,7 +368,7 @@ top-20 and ~91% at top-30**, while frequency/recency plateau near **42% / 27%**.
 *Fig. 11. Accuracy vs retrieval budget: FERNme leads at every k and converges toward
 near-perfect recall; cheap counters stay flat-low.*
 
-**Reading.** This is a head-to-head among **LLM-free** memories on real free-form text,
+**Reading.** This is a head-to-head among zero-model-call retrieval memories on real free-form text,
 at equal token budget — exactly the regime FERNme targets. It shows FERNme's
 context-conditioned, decay-aware retrieval clearly beating frequency/recency, decisively
 on drift. It does **not** yet establish parity with an LLM memory (Mem0) on free-text
@@ -415,8 +416,9 @@ the metric that matters for transactional agents, conversion, under explicitly s
   claims about real behavior.
 - **Nuance gap.** A co-occurrence counter misses causal/contextual preferences an LLM
   extractor catches; the Mem0 head-to-head that would quantify this is not yet run.
-- **Mapping dependency.** The no-LLM write depends on catalog/vocabulary quality;
-  thin-metadata surfaces degrade to coarse attributes (or invoke the optional gated LLM).
+- **Mapping dependency.** The deterministic write depends on catalog/vocabulary quality;
+  thin-metadata surfaces degrade to coarse attributes unless optional enrichment
+  proposes human-approved links later.
 - **Token figures are estimates.** tiktoken's vocabulary was unavailable offline; counts
   are chars/4, cross-checked by word count.
 - **Tuning and granularity.** Spreading-activation parameters are hand-set, and
@@ -440,12 +442,11 @@ mitigations, not guarantees; deployments handling regulated data require legal r
 ## 10. Conclusion
 
 For agents that act on people's behalf, memory should be cheap to write, bounded in
-cost, evaluated by outcomes, and owned by the user. FERNme demonstrates that a no-LLM
-Hebbian write over a fuzzy preference graph, with differential encoding and
+cost, evaluated by outcomes, and owned by the user. FERNme demonstrates that a
+zero-model-call Hebbian write over a fuzzy preference graph, with differential encoding and
 spreading-activation retrieval, delivers flat-cost, interpretable, per-surface memory
 that is robust where cheap baselines fail, that lifts a simulated outcome metric, and
-that builds a coherent profile from 86 entries of free-form text at near-zero write
-cost — while keeping the user in control of what is remembered and shared.
+that builds a coherent profile from 86 entries of free-form text while keeping the user in control of what is remembered and shared.
 
 ---
 

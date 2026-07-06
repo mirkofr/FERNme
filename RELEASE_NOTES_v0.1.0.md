@@ -4,7 +4,7 @@ Per-site, user-owned Hebbian preference-graph memory for transactional agents.
 Cheap to write, flat to read, interpretable, and owned by the people it remembers.
 
 ## Highlights
-- **Near-zero-LLM core**: deterministic Hebbian writes, spreading-activation retrieval,
+- **Historical release framing:** deterministic Hebbian writes, spreading-activation retrieval,
   token-minimal memory card (~25 tokens, flat as the profile grows; ~77× smaller than
   full-history-in-context by 120 interactions).
 - **Cost/quality dial** (`memory_mode`: pure / gated / offline) — LLM is an exception,

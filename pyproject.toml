@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fernme"
 version = "0.3.3"
-description = "FERNme — a user-owned, near-zero-LLM memory layer for AI agents (websites today; desktop and mobile on the roadmap)."
+description = "FERNme - a user-owned memory layer for AI agents: zero-LLM deterministic core with optional human-approved enrichment."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }

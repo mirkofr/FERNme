@@ -61,12 +61,20 @@ def test_catalog_path_normalized():
     assert "pref:organic" in edges and "organic" not in edges   # catalog tag canonicalized
 
 
-def test_llm_tagger_output_normalized():
+def test_legacy_tagger_output_not_used_for_truth_writes():
     v = Vocabulary.from_spec(SPEC)
-    tagger = LLMTagger(lambda p: "prefers_written, invoice")    # messy/alias output
+    calls = {"n": 0}
+    def fake_llm(prompt):
+        calls["n"] += 1
+        return "prefers_written, invoice"
+    tagger = LLMTagger(fake_llm)
     svc = _svc(memory_mode="gated", tagger=tagger, vocabulary=v)
     svc.consent("s", "u", True)
     svc.observe("s", "u", "chat", {"text": "some novel message"})
+    assert calls["n"] == 0 and svc.llm_calls == 0
+    wire = svc.card("s", "u")["wire"]
+    assert "pref:written_communication" not in wire and "topic:billing" not in wire
+    svc.observe("s", "u", "note", {"tags": ["prefers_written", "invoice"]})
     wire = svc.card("s", "u")["wire"]
     assert "pref:written_communication" in wire and "topic:billing" in wire
 

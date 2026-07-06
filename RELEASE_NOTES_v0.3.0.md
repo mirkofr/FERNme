@@ -44,7 +44,7 @@ A tag like `topic:salience` used to carry no context. Now every memory can have:
   local model, or by a deterministic namespace template (0 tokens).
 
 `service.glossary()` returns `{tag: {gloss, context}}`; MCP gains
-`remember(glosses=...)` and `recall_glossary`. Cost stays near-zero: context is
+`remember(glosses=...)` and `recall_glossary`. Cost stays low: context is
 free, templates are 0 tokens, agent glosses are a few byproduct tokens. No
 separate LLM call anywhere.
 

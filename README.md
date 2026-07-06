@@ -6,12 +6,12 @@
 
 *Agent personalization memory that models the user, not the transcript.*
 
-**A user-owned, near-zero-LLM personalization memory layer for AI agents. It turns consented interactions into an inspectable model of each person's preferences, habits, communication style, and constraints — staying token-flat as it grows, while letting people see, edit, delete, and own what agents use to personalize.**
+**A user-owned personalization memory layer for AI agents: zero-LLM deterministic core, with optional low-cost human-approved enrichment. It turns consented interactions into an inspectable model of each person's preferences, habits, communication style, and constraints, staying token-flat as it grows while people can see, edit, delete, and own what agents use to personalize.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-235%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-244%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -26,7 +26,7 @@
 
 ## ✨ The one-paragraph pitch
 
-Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world — agents that *act* for *many* people, in any domain (a sale, a booking, a resolved ticket, a completed lesson, a kept appointment — "outcome" is whatever the goal is). It starts where agents already act today — websites — and builds a user-owned personalization model the person can inspect and control. Each user is a sparse, fuzzily-weighted node in a per-site graph; the graph now also supports opt-in typed entities with labeled, Hebbian-weighted relations — who people are and how they connect — while still keeping zero LLM calls in the write path. Retrieval is **spreading activation**, and the prompt-facing "card" stores only **deviations from a population prior**. The result: per-turn cost stays flat as a profile grows for years, the user can read and correct what agents use to personalize, and the same engine assembles — only with the user's consent — into a cross-site **supernode** they fully control.
+Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world: agents that act for many people, in any domain. It starts where agents already act today, websites, and builds a user-owned personalization model the person can inspect and control. Each user is a sparse, fuzzily-weighted node in a per-site graph; the graph also supports opt-in typed entities with labeled, Hebbian-weighted relations while the deterministic write/recall core stays at zero LLM calls. Optional propose-only enrichment can add connection suggestions powered by the agent you already use or a model you choose; nothing lands in memory truth until a human accepts it. Retrieval is **spreading activation**, and the prompt-facing card stores only **deviations from a population prior**.
 
 ---
 
@@ -47,7 +47,7 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 
 | | |
 |---|---|
-| 🪶 **Zero-LLM writes** | Memory updates are arithmetic on a graph — **0 LLM calls per interaction** vs. ~2 for extraction-based memory. No write-time cost, no write-time hallucination. |
+| **Zero-LLM deterministic core** | Every write and recall runs with no model calls and bounded cost. Optional opt-in enrichment only proposes connections for human approval, powered by the agent you already use or a model you choose. |
 | 📉 **Flat token cost forever** | The prompt card holds **~25 tokens** whether it's a visitor's first day or fifth year. A full-history baseline is **77.4× larger** by 120 interactions. |
 | 🧠 **Measured trade-offs, no collapse** | The unified synthetic harness is the README source of truth: FERNme stays zero-call and token-flat across static, abrupt/gradual drift, staleness, context, fragmented-entity, and outcome regimes. It does not win every table, but it is the only method with entity aggregation and an outcome feedback loop. |
 | 🧬 **Typed people & relations** | Entities with aliases, contact fields, labeled relations (`ceo_of`, `family_of`, ...), and inert relation facts strengthened Hebbian-style; deterministic path queries; opt-in and byte-identical when off. |
@@ -55,7 +55,7 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 | 🪟 **Glass-box & user-owned** | Every preference is visible and editable. People fix what's wrong, delete everything, or export it. Privacy becomes a feature, not a liability. |
 | 🏬 **Built for outcomes** | Evaluated by **conversion**, not QA. A simulated storefront shows **+17% conversion lift** vs. non-personalized recommendations. |
 | 🧩 **User-owned supernode** | Sign in across sites → your memories assemble like Lego into one profile **you control**, default-deny, sensitive data walled off. Not surveillance — the mirror image of it. |
-| 🎚 **Cost/quality dial** | One engine, a `memory_mode` switch: free key-less `pure` by default, opt-in `gated`/`offline` LLM enrichment when you need Mem0-grade nuance — pay only for the compute you use. |
+| **Cost/quality dial** | One engine, a default-off enrichment gate: free key-less `pure` by default, optional agent/model proposal sources when you need typed links and relation candidates, and human approval before truth changes. |
 | 🔐 **Verifiable & unlearnable** | Every action is logged in a tamper-evident HMAC chain the user can replay to detect any alteration; `forget_everywhere` wipes the profile **and** unlearns the person from the population prior — provable right-to-be-forgotten. |
 | 🛡 **Injection-proof by design** | Writes are arithmetic, not LLM extraction, so page/user text can't be "talked into" becoming a belief — tested that injected instructions never enter memory. |
 | 🧠 **Private collective intelligence** | New users benefit from crowd patterns on turn one (cold-start from a population prior), with **k-anonymity + differential privacy** so no individual leaks. A network-effect moat single-user memories can't have. |
@@ -99,10 +99,12 @@ engine is solid; the extraction quality is the agent's.)*
 
 > Canonicalization queue: `python -m fernme.eval.canonicalization --seeds 6 --json reports/canonicalization.json`
 
+> Propose-only enrichment: `python -m fernme.eval.enrichment --seeds 6 --json reports/enrichment.json`
+
 **Unified Phase 8.1 harness** - synthetic hidden-answer-key scenarios for static,
 abrupt drift, gradual drift, staleness, contextual, fragmented-entity, and outcome
 regimes. Same events/probes for every method; BM25 reads Cabinet event text with a
-pure-Python scorer; all methods use 0 LLM calls. Outcome rows include action
+pure-Python scorer; all methods in this table make no model calls. Outcome rows include action
 quality; non-FERN baselines do not have an outcome feedback mechanism.
 
 | regime | method | recall@5 | precision@5 | stale recall | action | tokens | LLM calls |
@@ -178,46 +180,37 @@ propose-only: no candidate changes memory truth unless a human accepts it.
 | suggestion recall | 1.000 +/- 0.000 |
 | suggestions per seed | 4.000 +/- 0.000 |
 
-**Cost / quality Pareto** (`python -m fernme.eval.pareto`) — measured FERNme recall &
-tokens, modeled LLM nuance & price (assumptions in-file). Per 1,000 interactions:
+**Propose-only enrichment eval** (`python -m fernme.eval.enrichment --seeds 6 --json reports/enrichment.json`) - synthetic, fictional relation-link fixture with a mock proposal source. OFF is inert; ON reads Cabinet text in a batch, validates proposals, and enqueues suggestions only.
 
-| strategy | quality | $/1k | vs Mem0 |
-|---|:--:|:--:|:--:|
-| FERNme-pure | 0.52 | $0.008 | 122× cheaper |
-| **FERNme+gated** | 0.66 | $0.023 | **42× cheaper** |
-| **FERNme+offline** | 0.73 | $0.104 | **9× cheaper** |
-| full-history@120 | 0.82 | $0.59 (grows) | — |
-| Mem0-style | 0.82 | $0.95 | 1× |
+| metric | enrichment OFF | enrichment ON |
+|---|---:|---:|
+| precision | 0.000 +/- 0.000 | 1.000 +/- 0.000 |
+| recall | 0.000 +/- 0.000 | 1.000 +/- 0.000 |
+| suggestions | 0.000 +/- 0.000 | 2.000 +/- 0.000 |
+| FERNme-initiated LLM calls | 0.000 +/- 0.000 | 1.000 +/- 0.000 |
+| recall delta |  | 1.000 |
 
-FERNme+gated/offline sit on the efficient knee: **~80–90% of the LLM-ceiling quality
-at 1–2 orders of magnitude less cost.** (Modeled assumptions; shape is the point.)
-
-![Cost/quality Pareto — FERNme+gated/offline on the efficient knee](docs/cost_quality_pareto.png)
-
+Agent-driven proposals spend the caller agent's tokens outside FERNme and leave `svc.llm_calls` at 0. This eval is a harness wiring check, not a real-model quality claim.
+**Cost / quality status for enrichment** - the old gated/offline Pareto table was modeled before Phase 12. The current backed number is the synthetic propose-only enrichment eval above. Real-model quality and cost are deliberately not claimed until an owner-run model eval exists.
 **Simulated outcome pilot** — fake storefront, learn-from-behavior shoppers: **+17% relative conversion lift** over a popularity baseline; tied at visit 1 (cold start), pulling ahead as it learns, recovering through a mid-pilot taste drift.
 
 ---
 
-## 🎚 Memory modes (one engine, a cost/quality dial)
+## Memory modes and enrichment
 
-FERNme ships **one core** with a deployment-level switch — `FernService(memory_mode=...)`.
-The default is free, key-less, and tested; LLM modes are opt-in and pluggable.
+FERNme ships one deterministic memory core with a deployment-level switch: `FernService(memory_mode=...)`. Every hot write and recall stays model-free in every mode. Optional enrichment is a separate, default-off proposal tier.
 
-| mode | LLM use | cost | status |
+| path | model use | cost accounting | status |
 |---|---|---|---|
-| **`pure`** (default) | none | cheapest, flat | ✅ tested, key-less |
-| **`gated`** | one small call **only on novel free-text** | ~tiny | 🧪 experimental — needs a model |
-| **`offline`** | batched `consolidate()` enrichment, off the hot path | ~tiny, amortized | 🧪 experimental — needs a model |
+| `pure` (default) | none | cheapest, flat | tested, key-less |
+| agent proposals | external agent proposes via MCP tools | `svc.llm_calls` remains 0 because FERNme made no call | wired, human-approved |
+| batch `enrich(llm_fn=...)` | caller-supplied model function, off hot path | `svc.llm_calls` counts FERNme-initiated batch calls and returns a token estimate | mock-validated synthetic eval |
+| no source configured | none | clean no-op | tested graceful skip |
 
-- A **pluggable tagger** (`tagging.py`) does the LLM work; you pass `llm_fn`, optionally
-  constrained to a **controlled vocabulary** (the real consistency lever across models).
-- The hot write path stays **LLM-free in every mode**; gated spends a call only when the
-  deterministic mapping finds nothing, and `svc.llm_calls` counts every invocation for
-  cost transparency.
-- See the cost/quality Pareto above for where each mode lands. *Honest note:* the gated/
-  offline quality is **modeled** until run against a real model — the wiring is tested
-  here with a mock LLM, not validated for quality.
-
+- `propose_relation(...)` and `propose_entity_link(...)` enqueue suggestions into the existing human review queue. Accepting applies through `entity_relate` or `entity_link_alias`; rejecting sticks.
+- Model or agent output is untrusted data. Relation vocabulary, entity kind checks, same-surname/low-confidence rules, and injection filters run before anything is enqueued.
+- The old `gated`/`offline` mode names remain for compatibility, but they do not write model-derived truth during `observe`. `consolidate()` is now a compatibility wrapper around propose-only enrichment.
+- See the synthetic enrichment eval above for the current measured ON/OFF delta with a mock proposal source. Real-model numbers are owner-run only.
 ## 🧭 The 9 leapfrog dimensions (status)
 
 FERNme's edge isn't the mechanism (that's now a crowded 2026 category) — it's competing
@@ -250,7 +243,7 @@ flowchart TD
     API --> CONSENT{consent?}
     CONSENT -->|no| STOP[blocked]
     CONSENT -->|yes| ENGINE
-    subgraph ENGINE[Engine - no LLM in the write path]
+    subgraph ENGINE[Engine - zero-LLM write/recall core]
       W[Hebbian write + decay] --> G[(Per-site preference graph<br/>fuzzy 0-9 edges)]
       W --> E[(Entity tables<br/>entities, aliases, fields, relations)]
       E -->|opt-in alias aggregation| R
@@ -271,10 +264,10 @@ flowchart TD
 
 | | |
 |---|---|
-| ![Why FERNme](explanation%20of%20fern/IMG_7794.PNG)<br/>**Why FERNme** — adaptive local memory instead of expensive RAG/vector retrieval in the loop. | ![Seven core principles](explanation%20of%20fern/IMG_7796.PNG)<br/>**Core principles** — near-zero-LLM, deterministic-first, Hebbian, fuzzy, memory cards, action-aware, user-owned. |
+| ![Why FERNme](explanation%20of%20fern/IMG_7794.PNG)<br/>**Why FERNme** - adaptive local memory instead of expensive RAG/vector retrieval in the loop. | ![Seven core principles](explanation%20of%20fern/IMG_7796.PNG)<br/>**Core principles** - zero-LLM deterministic core, optional human-approved enrichment, Hebbian, fuzzy, memory cards, action-aware, user-owned. |
 | ![How memory grows](explanation%20of%20fern/IMG_7797.PNG)<br/>**How memory grows** — new event → connect → strengthen → decay → update the card. | ![Fuzzy Hebbian graph](explanation%20of%20fern/IMG_7799.PNG)<br/>**Fuzzy Hebbian graph** — sparse, weighted (0–9) edges for users, preferences, topics, and goals. |
-| ![The LLM gate](explanation%20of%20fern/IMG_7784.PNG)<br/>**The LLM gate** — an exception, not the default; most events are handled deterministically. | ![Memory card](explanation%20of%20fern/IMG_7802.PNG)<br/>**Memory card** — bounded, interpretable, token-minimal context for the agent. |
-| ![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)<br/>**Action-aware learning** — good outcomes strengthen connections, bad outcomes weaken them. | ![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)<br/>**Architecture** — ingestion bridge → vocabulary → fuzzy graph → memory card → agent, with LLM fallback only when uncertain. |
+| ![The LLM gate](explanation%20of%20fern/IMG_7784.PNG)<br/>**Propose-only enrichment** - agent/model suggestions go to review; nothing auto-writes truth. | ![Memory card](explanation%20of%20fern/IMG_7802.PNG)<br/>**Memory card** - bounded, interpretable, token-minimal context for the agent. |
+| ![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)<br/>**Action-aware learning** - good outcomes strengthen connections, bad outcomes weaken them. | ![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)<br/>**Architecture** - ingestion bridge -> vocabulary -> fuzzy graph -> memory card -> agent, with optional proposal enrichment off the hot path. |
 
 **Interactive memory map demo:** the static Elena map in `demo/elena/` is a
 screenshot-ready synthetic graph. It now shows the entity-kind view (owner,
@@ -293,7 +286,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 235 passing, 2 skipped
+python -m pytest tests -q               # 244 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -347,21 +340,15 @@ print(svc.recall_path("demo.example", "alex", alex, dana))
 
 ## 🧱 What's inside
 
-- **Engine** — saturating Hebbian write (no LLM), ACT-R decay, spreading activation, token-minimal card.
+- **Engine** - zero-model-call Hebbian write/recall core, ACT-R decay, spreading activation, token-minimal card.
 - **Population prior** — IDF cold-start; differential (deviation-only) storage is
   enforced by an explicit `prune_to_prior` pass (redundant edges read through to the prior).
 - **Stores** — `SQLiteStore` (zero-setup) and `PostgresStore` (tested vs real PG 16), one interface.
-- **Ingestion bridge** — a per-site **catalog** (item_id->tags) plus a **controlled,
-  namespaced vocabulary** (`vocabulary.py`) that canonicalizes every tag (catalog,
-  free text, or LLM) to one form (`pref:`, `topic:`, `goal:`, `context:`) so the same
-  concept never drifts across months. Deterministic by default; gated-LLM only for
-  novel free text. *This is the product-critical layer — and the foundation a future
-  recursive/region organization would group on.*
+- **Ingestion bridge** - a per-site **catalog** (item_id->tags) plus a controlled namespaced vocabulary (`vocabulary.py`) that canonicalizes catalog, free-text, and agent-supplied tags to one form (`pref:`, `topic:`, `goal:`, `context:`) so the same concept does not drift across months. Enrichment proposals are separate and human-approved.
 - **Structured-field capture** — regex-only contact/date extraction keeps email,
   phone, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
-- **Typed entity layer** - opt-in service APIs and additive SQLite/Postgres tables for
-  entities, tag aliases, fields, Hebbian typed relations, alias aggregation, and
-  compact entity-aware card enrichment behind default-off flags.
+- **Typed entity layer** - opt-in service APIs and additive SQLite/Postgres tables for entities, tag aliases, fields, Hebbian typed relations, relation facts, alias aggregation, and compact entity-aware card enrichment behind default-off flags.
+- **Propose-only enrichment** - default-off `propose_relation`, `propose_entity_link`, and batch `enrich(llm_fn=...)` validation into the existing suggestion queue; human accept/reject is the only truth write trigger.
 - **The Cabinet** — append-only event log with `recall()` for specific facts.
 - **Edge provenance** — persisted `stated`/`inferred` authority metadata on graph
   edges across SQLite, Postgres, and consolidation undo.
@@ -379,7 +366,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 | | 🌿 FERNme | Mem0 | Zep/Graphiti | Letta | MemOS |
 |---|:--:|:--:|:--:|:--:|:--:|
-| Write | **no LLM** | LLM | LLM → KG | LLM-paged | LLM |
+| Write | **zero-LLM deterministic core; optional propose-only enrichment** | LLM | LLM-built KG | LLM-paged | LLM |
 | Typed relations | deterministic, opt-in entity/relation graph | LLM-extracted memories | LLM-built KG per episode | model-managed pages | hybrid |
 | Retrieval | spreading activation | vector | graph+time | OS paging | hybrid |
 | Eval axis | **outcomes** | QA | temporal QA | long-horizon | QA |
@@ -392,7 +379,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (235 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, and the full results suite above.
+Done & tested (244 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -408,6 +395,7 @@ synthetic-validated by `python -m fernme.eval.canonicalization` (precision
 the service/API layer, and propose-only: rejected suggestions do not resurface,
 and accepted suggestions apply through existing entity alias APIs.
 
+**Propose-only enrichment:** default-off agent/model proposal surfaces enqueue typed relation and entity-link candidates into the same review queue. With enrichment disabled, outputs are byte-identical and `propose_*`/`enrich()` are inert. With enrichment enabled, proposals are sanitized, vocabulary/entity-kind checked, counted when dropped, and never written to memory truth until accepted by a human. Synthetic mock eval: precision 1.000 +/- 0.000, recall 1.000 +/- 0.000, 2.000 suggestions/seed, and 1.000 FERNme-initiated batch LLM call/seed. Agent-driven proposals make 0 FERNme LLM calls.
 **Cross-user assoc isolation:** assoc graph reads are k-suppressed by default
 (`assoc_min_users=2`). This is a deliberate privacy-motivated behavior change on
 multi-user sites: one user's rare co-occurrence pair cannot influence another
@@ -423,7 +411,7 @@ behavior.
 🚧 **Still open (genuinely needs the outside world):**
 - A **real-human per-site pilot** — only live users close the loop a simulator can't.
 - The **Mem0 (LLM) head-to-head** — harness wired; run locally with `OPENAI_API_KEY`.
-- **Embeddings** for context→attribute matching; offline LLM catalog enrichment for messy inputs.
+- **Embeddings** for context-to-attribute matching; optional propose-only enrichment for messy inputs.
 - **Silent staleness verify** -- age-only verify remains off by default. In the synthetic sweep, the best age-only point was still weak (precision **0.461**, recall **0.651**, nag **0.214**), so silent-stale detection needs the next milestone: learned per-edge volatility or outside corroboration.
 
 > Every claim above is backed by a test or a reproducible experiment. Where a result is simulated, it says so — a simulator proves the *mechanism*, not real-world behavior.
@@ -435,7 +423,7 @@ behavior.
 ```
 fernme/
   core/      graph types · fuzzy 0–9 edges · event record
-  write/     event→attr mapping (no LLM) · Hebbian update · decay
+  write/     event->attr mapping (zero-model-call core) · Hebbian update · decay
   retrieve/  base-level + spreading activation · token-minimal card · entity_card.py
   capture/   adapters · extractors.py (regex-only structured fields)
   prior/     population prior · differential encoding · IDF cold-start
@@ -443,8 +431,8 @@ fernme/
   relations.py · typed entity/relation vocabulary
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
-  eval/      simulator · cost · quality · drift · context · ablation · pilot · entities · harness
-tests/       235 passing, 2 skipped   ·   *_demo.py walkthroughs
+  eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
+tests/       244 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

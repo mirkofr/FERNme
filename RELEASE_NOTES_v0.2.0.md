@@ -1,7 +1,7 @@
 # FERNme v0.2.0 — salience, categories, and a memory map you can click
 
 This release deepens FERNme's "see and own your memory" story and hardens the engine,
-while keeping the core promise intact: **near-zero-LLM writes, flat token cost, user-owned.**
+while keeping the core promise intact: **zero-model-call deterministic writes, flat token cost, user-owned.**
 Everything new is additive and off/transparent by default — all prior behaviour and
 benchmarks are unchanged. **91 tests passing.**
 
@@ -37,7 +37,7 @@ Postgres stores now **auto-migrate** missing columns on open. Existing data just
 
 ## Also in this release
 - The **Elena natural-data evaluation** + a LoCoMo-style QA head-to-head (FERNme vs.
-  LLM-free baselines), the **paper** (Markdown + LaTeX), and a **related-work comparison**.
+  zero-model-call baselines), the **paper** (Markdown + LaTeX), and a **related-work comparison**.
 
 ## Honest scope (unchanged)
 Numbers are on synthetic or single-person data; a real-human pilot and a billed Mem0 (LLM)

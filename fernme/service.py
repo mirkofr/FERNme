@@ -20,6 +20,7 @@ from . import audit as _audit_mod
 from . import confidence as _confidence
 from . import curation as _curation
 from . import curation_queue as _curation_queue
+from . import enrichment as _enrichment
 from . import glossary as _glossary
 from . import resolution as _resolution
 from .vocabulary import Vocabulary
@@ -63,6 +64,11 @@ def _assoc_pairs(mapped) -> List[tuple]:
     return out
 
 
+def _suggestion_row(kind: str, payload: Dict, site: str, user: str,
+                    score: float, ts: float) -> Dict:
+    return _curation_queue.SuggestionCandidate(kind, payload, score).row(site, user, ts)
+
+
 def _conflict_for_edge(ug: UserGraph, attr: str, cfg: Config) -> float:
     edge = ug.edges.get(attr)
     if edge is None:
@@ -89,15 +95,15 @@ class FernService:
     def __init__(self, db_path: str = None, cfg: Config = DEFAULT, store=None,
                  memory_mode: str = "pure", tagger=None, enricher=None, catalog=None,
                  vocabulary=None):
-        # memory_mode: "pure" (default, no LLM, key-less, tested) | "gated"
-        # (LLM tags only novel free-text, opt-in/experimental) | "offline"
-        # (pure writes + a batched consolidate() enrichment pass).
+        # memory_mode: "pure" (default, key-less) | "gated" | "offline".
+        # All hot writes and recalls are deterministic. Legacy tagger/enricher
+        # objects are only used by explicit propose-only enrichment wrappers.
         assert memory_mode in ("pure", "gated", "offline")
         self.store = store or SQLiteStore(db_path or default_db_path())
         self.cfg = cfg
         self.memory_mode = memory_mode
-        self.tagger = tagger                  # LLMTagger for gated; None in pure
-        self.enricher = enricher              # LLMTagger for offline consolidation
+        self.tagger = tagger                  # legacy, never called on hot path
+        self.enricher = enricher              # optional offline proposal source
         self.track_style = True               # learn communication style + mood from text
         # per-site catalog/taxonomy: maps item_id -> attribute tags (no LLM).
         self.catalog = catalog if isinstance(catalog, Catalog) else Catalog(catalog)
@@ -106,6 +112,7 @@ class FernService:
         self.audit_key = b"fernme-default-audit-key"  # per-user key in production
         self._ask_count = {}                  # ask-budget rate limit per (site,user)
         self.llm_calls = 0                    # transparency: count LLM invocations
+        self._last_enrich_ts = {}             # in-service watermark for batch fallback
 
     # ---------- consent / governance ----------
     def consent(self, site: str, user: str, granted: bool, ts: float = 0.0) -> Dict:
@@ -156,16 +163,6 @@ class FernService:
             payload["tags"] = sanitize_tags(payload["tags"])
         ev = Event(site, user, ts, type, payload)
         mapped = map_event(ev, self.catalog)
-        # GATED: only when the deterministic path found nothing AND there is
-        # free text to interpret do we spend one (small) LLM call.
-        if (not mapped and self.memory_mode == "gated" and self.tagger is not None
-                and payload.get("text")):
-            tags = self.tagger.tag(payload["text"], payload)
-            self.llm_calls += 1
-            if tags:
-                payload["tags"] = sanitize_tags(list(payload.get("tags", [])) + tags)
-                ev = Event(site, user, ts, type, payload)
-                mapped = map_event(ev, self.catalog)
         ev.attrs = mapped
         st = None
         if self.track_style and payload.get("text"):
@@ -519,6 +516,10 @@ class FernService:
                 entity_id = entity["entity_id"]
             self.entity_link_alias(site, user, entity_id, payload["canonical_attr"])
             self.entity_link_alias(site, user, entity_id, payload["alias_attr"])
+        elif row["kind"] == "relation":
+            self.entity_relate(
+                site, user, payload["subject_id"], payload["relation"],
+                payload["object_id"], note=payload.get("note", ""), ts=ts)
         else:
             raise ValueError("unknown suggestion kind")
         decided = self.store.decide_suggestion(suggestion_id, "accepted", ts)
@@ -531,6 +532,134 @@ class FernService:
         decided = self.store.decide_suggestion(row["suggestion_id"], "rejected", ts)
         self._audit(site, user, "suggestion_reject", {"suggestion_id": suggestion_id}, ts)
         return decided
+
+    # ---------- propose-only enrichment ----------
+    def _enrichment_disabled(self) -> Dict:
+        return {"enqueued": 0, "dropped": 0, "llm_calls": self.llm_calls,
+                "note": "enrichment disabled"}
+
+    def _enqueue_valid_suggestion(self, site: str, user: str, kind: str,
+                                  payload: Dict, score: float, ts: float) -> Dict:
+        row = self.store.upsert_suggestion(
+            _suggestion_row(kind, payload, site, user, score, ts))
+        self.store.trim_pending_suggestions(
+            site, user, int(self.cfg.canonicalization_queue_cap))
+        return row
+
+    def _validate_entity_link_proposal(self, site: str, user: str,
+                                       alias_attr: str, entity_id: str):
+        try:
+            entity = self._entity_or_raise(site, user, entity_id)
+        except Exception as exc:
+            return False, None, str(exc)
+        aliases = [
+            r["alias_attr"] for r in self.store.list_entity_aliases(
+                site, user, entity["entity_id"])
+        ]
+        return _enrichment.validate_entity_link_payload(
+            {"alias_attr": alias_attr, "entity_id": entity["entity_id"]},
+            entity, aliases, self.cfg.canonicalization_min_score)
+
+    def _validate_relation_proposal(self, site: str, user: str, subject_id: str,
+                                    relation: str, object_id: str, note: str = ""):
+        try:
+            subject = self._entity_or_raise(site, user, subject_id)
+            obj = self._entity_or_raise(site, user, object_id)
+        except Exception as exc:
+            return False, None, str(exc)
+        return _enrichment.validate_relation_payload(
+            {"subject_id": subject["entity_id"], "relation": relation,
+             "object_id": obj["entity_id"], "note": note},
+            subject, obj)
+
+    def propose_entity_link(self, site: str, user: str, alias_attr: str,
+                            entity_id: str, ts: float = 0.0) -> Dict:
+        self._require_consent(site, user)
+        if not self.cfg.enrichment_enabled:
+            return self._enrichment_disabled()
+        ok, payload, reason = self._validate_entity_link_proposal(
+            site, user, alias_attr, entity_id)
+        if not ok:
+            return {"enqueued": 0, "dropped": 1, "reason": reason,
+                    "llm_calls": self.llm_calls}
+        row = self._enqueue_valid_suggestion(site, user, "entity-link", payload, 0.95, ts)
+        return {"enqueued": 1, "dropped": 0, "suggestion": row,
+                "llm_calls": self.llm_calls}
+
+    def propose_relation(self, site: str, user: str, subject_id: str,
+                         relation: str, object_id: str, note: str = "",
+                         ts: float = 0.0) -> Dict:
+        self._require_consent(site, user)
+        if not self.cfg.enrichment_enabled:
+            return self._enrichment_disabled()
+        ok, payload, reason = self._validate_relation_proposal(
+            site, user, subject_id, relation, object_id, note)
+        if not ok:
+            return {"enqueued": 0, "dropped": 1, "reason": reason,
+                    "llm_calls": self.llm_calls}
+        row = self._enqueue_valid_suggestion(site, user, "relation", payload, 0.95, ts)
+        return {"enqueued": 1, "dropped": 0, "suggestion": row,
+                "llm_calls": self.llm_calls}
+
+    def _process_proposals(self, site: str, user: str, proposals: List[Dict],
+                           ts: float = 0.0) -> Dict:
+        enqueued = 0
+        dropped = 0
+        reasons: Dict[str, int] = {}
+        suggestions = []
+        for proposal in proposals:
+            kind = proposal.get("kind")
+            if kind == "entity-link":
+                ok, payload, reason = self._validate_entity_link_proposal(
+                    site, user, proposal.get("alias_attr", ""),
+                    proposal.get("entity_id", ""))
+                score = 0.95
+            elif kind == "relation":
+                ok, payload, reason = self._validate_relation_proposal(
+                    site, user, proposal.get("subject_id", ""),
+                    proposal.get("relation", ""), proposal.get("object_id", ""),
+                    proposal.get("note", ""))
+                score = 0.95
+            else:
+                ok, payload, reason, score = False, None, "unknown proposal kind", 0.0
+            if not ok:
+                dropped += 1
+                reasons[reason] = reasons.get(reason, 0) + 1
+                continue
+            row = self._enqueue_valid_suggestion(site, user, kind, payload, score, ts)
+            suggestions.append(row)
+            enqueued += 1
+        return {"enqueued": enqueued, "dropped": dropped, "drop_reasons": reasons,
+                "suggestions": suggestions}
+
+    def enrich(self, site: str, user: str, llm_fn=None, now: float = 0.0) -> Dict:
+        self._require_consent(site, user)
+        if not self.cfg.enrichment_enabled:
+            return self._enrichment_disabled()
+        if llm_fn is None:
+            return {"enqueued": 0, "dropped": 0, "llm_calls": self.llm_calls,
+                    "token_estimate": 0, "note": "no enrichment source, skipping"}
+        watermark_key = (site, user)
+        since = float(self._last_enrich_ts.get(watermark_key, float("-inf")))
+        events = [
+            ev for ev in self.store.recall(site, user, limit=100000)
+            if ev.get("payload", {}).get("text") and float(ev.get("ts", 0.0)) > since
+        ]
+        if not events:
+            return {"enqueued": 0, "dropped": 0, "llm_calls": self.llm_calls,
+                    "token_estimate": 0, "note": "no new free text to enrich"}
+        prompt = _enrichment.prompt_for_events(events)
+        raw = llm_fn(prompt) or ""
+        self.llm_calls += 1
+        proposals = _enrichment.parse_json_proposals(raw)
+        report = self._process_proposals(site, user, proposals, ts=now)
+        report.update({
+            "llm_calls": self.llm_calls,
+            "token_estimate": _enrichment.estimate_tokens(prompt) + _enrichment.estimate_tokens(raw),
+            "source": "caller_supplied_llm_fn",
+        })
+        self._last_enrich_ts[watermark_key] = max(float(ev.get("ts", 0.0)) for ev in events)
+        return report
 
     def entity_set_field(self, site: str, user: str, entity_id: str, field: str,
                          value: str, provenance: str = "stated", ts: float = 0.0) -> Dict:
@@ -645,6 +774,16 @@ class FernService:
                 reinforce=False)
         self._audit(site, user, "entity_relate", {"relation": canonical}, ts)
         return row
+
+    def entity_unrelate(self, site: str, user: str, subject_id: str, relation: str,
+                        object_id: str) -> Dict:
+        self._require_consent(site, user)
+        sub_id, canonical, obj_id = self._canonical_relation_tuple(
+            site, user, subject_id, relation, object_id)
+        self.store.delete_entity_relation(site, user, sub_id, canonical, obj_id)
+        self._audit(site, user, "entity_unrelate", {"relation": canonical}, 0.0)
+        return {"subject_id": sub_id, "relation": canonical, "object_id": obj_id,
+                "deleted": True}
 
     def entity_add_fact(self, site: str, user: str, subject_id: str, relation: str,
                         object_id: str, note: str, provenance: str = "stated",
@@ -832,21 +971,25 @@ class FernService:
         return sn.view_for_site(target_site, self.store.get_shares(person, target_site), self.cfg)
 
     def consolidate(self, site: str, user: str, lookback: int = 200, ts: float = 0.0) -> Dict:
-        """OFFLINE enrichment (run as a batch job): read recent event text, let the
-        enricher propose nuanced/causal attributes, and fold them in via the normal
-        write path. Off the hot path -> ~zero marginal per-interaction cost."""
+        """Compatibility wrapper for propose-only enrichment.
+
+        Older offline consolidation wrote model-derived tags directly. Phase 12
+        keeps enrichment off the hot path and propose-only: model output can only
+        enqueue suggestions for human review.
+        """
         self._require_consent(site, user)
-        if self.memory_mode != "offline" or self.enricher is None:
-            return {"enriched": [], "note": "offline mode + enricher required"}
-        events = self.store.recall(site, user, limit=lookback)
-        text = " . ".join(str(e["payload"].get("text", "")) for e in events if e["payload"].get("text"))
-        if not text.strip():
-            return {"enriched": []}
-        tags = self.enricher.tag(text, {})
-        self.llm_calls += 1
-        if tags:
-            self.observe(site, user, "consolidation", {"tags": tags}, ts=ts)
-        return {"enriched": tags, "llm_calls": self.llm_calls}
+        if self.enricher is None:
+            return self.enrich(site, user, llm_fn=None, now=ts)
+
+        def _llm_fn(_prompt):
+            events = self.store.recall(site, user, limit=lookback)
+            text = " . ".join(
+                str(e["payload"].get("text", ""))
+                for e in events if e["payload"].get("text")
+            )
+            return self.enricher.llm_fn(text) if text.strip() else "[]"
+
+        return self.enrich(site, user, llm_fn=_llm_fn, now=ts)
 
     def style_card(self, site: str, user: str) -> Dict:
         """How this person communicates + current mood/trend + tone guidance.

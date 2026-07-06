@@ -1,14 +1,8 @@
-"""Pluggable taggers — the LLM enrichment layer, kept optional and behind one
-interface so the engine core never changes.
+"""Legacy caller-supplied taggers.
 
-  DeterministicTagger : catalog/payload tags only. No LLM. The default. Key-less.
-  LLMTagger           : turns free text into attributes via a caller-supplied
-                        `llm_fn(prompt)->str`. Constrained to a controlled
-                        vocabulary when provided (the real consistency lever).
-                        EXPERIMENTAL until run against a real model.
-
-The engine stays the source of truth; a tagger only proposes attribute tokens,
-which are then sanitized and fed through the normal (no-LLM) write path."""
+Phase 12 keeps model output off hot writes. LLMTagger remains as a small wrapper
+for compatibility and explicit batch/proposal paths; observe() does not call it.
+"""
 from __future__ import annotations
 from typing import Callable, List, Optional, Sequence
 from .safety import sanitize_tags

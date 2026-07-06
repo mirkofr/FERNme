@@ -22,14 +22,15 @@ All three drive the same engine. Use whichever matches how you'd actually run it
 pip install fernme
 python -m fernme.api.mcp_server      # exposes: remember, recall_card,
                                      # recall_events, recall_glossary,
-                                     # grant_consent, edit_memory, forget_me
+                                     # grant_consent, edit_memory, forget_me,
+                                     # propose_relation, propose_entity_link
 ```
 
 **B) Python, directly**
 
 ```python
 from fernme.service import FernService
-svc = FernService(db_path=":memory:")     # throwaway DB — never test on a real one
+svc = FernService(db_path=":memory:")     # throwaway DB, never test on a real one
 svc.consent("demo.shop", "tester", True)
 ```
 

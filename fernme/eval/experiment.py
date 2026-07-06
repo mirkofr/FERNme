@@ -101,9 +101,9 @@ def main():
     print("=" * 64)
     print("Q2  WRITE COST  (cumulative LLM calls to update memory)")
     print("=" * 64)
-    print(f"FERN (Hebbian, no LLM):        {r['write_llm_fern']:>8} LLM calls")
+    print(f"FERN (deterministic core):        {r['write_llm_fern']:>8} LLM calls")
     print(f"LLM-extraction memory (~Mem0): {r['write_llm_extract']:>8} LLM calls")
-    print("FERN write path is provably LLM-free.")
+    print("FERN deterministic write path makes zero model calls.")
     return r
 
 

@@ -1,0 +1,127 @@
+{
+  "mode": "synthetic-propose-only-enrichment-eval",
+  "rows": [
+    {
+      "off_llm_calls": 0,
+      "off_precision": 0.0,
+      "off_recall": 0.0,
+      "off_suggestions": 0,
+      "on_dropped": 1,
+      "on_llm_calls": 1,
+      "on_precision": 1.0,
+      "on_recall": 1.0,
+      "on_suggestions": 2,
+      "seed": 0
+    },
+    {
+      "off_llm_calls": 0,
+      "off_precision": 0.0,
+      "off_recall": 0.0,
+      "off_suggestions": 0,
+      "on_dropped": 1,
+      "on_llm_calls": 1,
+      "on_precision": 1.0,
+      "on_recall": 1.0,
+      "on_suggestions": 2,
+      "seed": 1
+    },
+    {
+      "off_llm_calls": 0,
+      "off_precision": 0.0,
+      "off_recall": 0.0,
+      "off_suggestions": 0,
+      "on_dropped": 1,
+      "on_llm_calls": 1,
+      "on_precision": 1.0,
+      "on_recall": 1.0,
+      "on_suggestions": 2,
+      "seed": 2
+    },
+    {
+      "off_llm_calls": 0,
+      "off_precision": 0.0,
+      "off_recall": 0.0,
+      "off_suggestions": 0,
+      "on_dropped": 1,
+      "on_llm_calls": 1,
+      "on_precision": 1.0,
+      "on_recall": 1.0,
+      "on_suggestions": 2,
+      "seed": 3
+    },
+    {
+      "off_llm_calls": 0,
+      "off_precision": 0.0,
+      "off_recall": 0.0,
+      "off_suggestions": 0,
+      "on_dropped": 1,
+      "on_llm_calls": 1,
+      "on_precision": 1.0,
+      "on_recall": 1.0,
+      "on_suggestions": 2,
+      "seed": 4
+    },
+    {
+      "off_llm_calls": 0,
+      "off_precision": 0.0,
+      "off_recall": 0.0,
+      "off_suggestions": 0,
+      "on_dropped": 1,
+      "on_llm_calls": 1,
+      "on_precision": 1.0,
+      "on_recall": 1.0,
+      "on_suggestions": 2,
+      "seed": 5
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "summary": {
+    "off_llm_calls": {
+      "mean": 0.0,
+      "sd": 0.0
+    },
+    "off_precision": {
+      "mean": 0.0,
+      "sd": 0.0
+    },
+    "off_recall": {
+      "mean": 0.0,
+      "sd": 0.0
+    },
+    "off_suggestions": {
+      "mean": 0.0,
+      "sd": 0.0
+    },
+    "on_dropped": {
+      "mean": 1.0,
+      "sd": 0.0
+    },
+    "on_llm_calls": {
+      "mean": 1.0,
+      "sd": 0.0
+    },
+    "on_precision": {
+      "mean": 1.0,
+      "sd": 0.0
+    },
+    "on_recall": {
+      "mean": 1.0,
+      "sd": 0.0
+    },
+    "on_suggestions": {
+      "mean": 2.0,
+      "sd": 0.0
+    },
+    "recall_delta": {
+      "mean": 1.0,
+      "sd": 0.0
+    }
+  }
+}

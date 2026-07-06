@@ -1,2 +1,2 @@
-"""FERNme — Fuzzy-Edged Recall Network. A user-owned, near-zero-LLM Hebbian memory layer for AI agents (web today; desktop/mobile on the roadmap)."""
+"""FERNme - Fuzzy-Edged Recall Network. A user-owned memory layer for AI agents: zero-LLM deterministic core with optional human-approved enrichment."""
 __version__ = "0.3.3"

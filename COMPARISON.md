@@ -20,7 +20,7 @@ activation decay, spreading activation). What differs is *what the memory is abo
 
 | System | What the memory is *about* | Who it serves | LLM in the loop | Multi-user / collective | Privacy / ownership model | Evaluated on |
 |---|---|---|---|---|---|---|
-| **FERNme** | each **end-user's** preferences & behavior | **many users**, per site/surface | none on write (optional gated/offline) | **yes** — population prior + k-anon + DP | consent-gated, cross-surface user-owned supernode, scoped sharing | preference recall, drift, simulated conversion (synthetic) |
+| **FERNme** | each **end-user's** preferences & behavior | **many users**, per site/surface | zero-LLM deterministic core; optional propose-only enrichment | **yes** — population prior + k-anon + DP | consent-gated, cross-surface user-owned supernode, scoped sharing | preference recall, drift, simulated conversion (synthetic) |
 | **Ori-Mnemos** | one **agent's** own notes/knowledge | a single agent | heuristic-first; embeddings always; optional LLM | no (single vault) | "your files are portable" (no multi-party sharing) | HotpotQA, LoCoMo (QA) |
 | **HeLa-Mem** | one **conversation history** | a single agent/chat | yes (Hebbian Distillation + embeddings) | no | none stated | LoCoMo (conversational QA) |
 | **HippoRAG / HippoRAG 2** | a **document corpus** | a retrieval pipeline | yes (OpenIE indexing + embeddings) | no | none stated | HotpotQA, MuSiQue, 2Wiki, PopQA, NarrativeQA |
@@ -87,7 +87,7 @@ family is the same.
 - HeLa-Mem remembers a **single user's conversation**; its co-activation is over **dialogue
   turns**. FERNme remembers **many users' preferences/behavior** across surfaces.
 - HeLa-Mem's consolidation **requires an LLM** (Hebbian Distillation) and embeddings for
-  base activation. FERNme's write path is **LLM-free by default**.
+  base activation. FERNme's deterministic write/recall core is model-free; optional enrichment only proposes suggestions for human approval.
 - No multi-tenant layer, no population prior, no privacy/ownership/consent model, no
   outcome learning. FERNme has all four.
 - HeLa-Mem is evaluated on **conversational QA**; FERNme on **preference recall, drift, and
@@ -121,7 +121,7 @@ formalized as Personalized PageRank.
 - HippoRAG is a **document-retrieval engine** — no users, no preferences, no personalization,
   no privacy, no outcomes. It answers "which passages are relevant to this query?"
 - It is **heavy**: LLM-based OpenIE for indexing, large embedding models (NV-Embed), GPUs /
-  vLLM / OpenAI keys. FERNme's default path runs on a laptop with **no LLM and no embeddings**.
+  vLLM / OpenAI keys. FERNme's deterministic core runs on a laptop with no model calls and no embeddings; optional enrichment is separate and propose-only.
 - HippoRAG is stateless about *who* is asking; FERNme's entire point is *whom* it's for.
 
 **Where FERNme is better (in its niche).** It's a personalization/ownership product, not a
@@ -137,7 +137,7 @@ big corpus," HippoRAG is in a different league. FERNme doesn't do corpus retriev
 ## 4. The incumbents it positions against (context)
 
 - **Mem0** — vector store + LLM extraction/update on each turn; widely adopted; cloud
-  (Redis + Qdrant). Architecturally *opposite* to FERNme (LLM-on-write vs LLM-free-on-write).
+  (Redis + Qdrant). Architecturally *opposite* to FERNme (LLM-on-write vs zero-LLM deterministic core with optional propose-only enrichment).
 - **Zep / Graphiti** — temporal knowledge graph with validity windows; strong on
   long-memory benchmarks; Postgres/cloud.
 - **Letta / MemGPT** — OS-inspired tiered memory (core/recall/archival); an agent runtime,

@@ -1,7 +1,7 @@
 """Baselines for the recall-quality comparison. Each receives the SAME catalog
 access FERN has, so tags are resolved from item_id identically (fair comparison).
 
-frequency / recency are LLM-free and run anywhere. A real Mem0 (LLM-extraction)
+frequency / recency are zero-model-call and run anywhere. A real Mem0 (LLM-extraction)
 baseline is the honest head-to-head but needs an API key + the mem0 package; we
 provide the hook and skip cleanly if absent so CI stays deterministic."""
 from __future__ import annotations

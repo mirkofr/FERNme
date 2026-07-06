@@ -1,5 +1,5 @@
-"""MCP server exposing FERN as agent tools, so any MCP-capable agent (incl.
-Claude) can give a user persistent, glass-box memory. Run: python -m fernme.api.mcp_server
+"""MCP server exposing FERNme as agent tools, so any MCP-capable agent can give a
+user persistent, glass-box memory. Run: python -m fernme.api.mcp_server
 Requires: pip install mcp"""
 from __future__ import annotations
 import os
@@ -87,6 +87,18 @@ if FastMCP is not None:
                                            ts: float = 0.0) -> dict:
         """Reject one pending suggestion so it does not resurface."""
         return svc.reject_suggestion(site, user, suggestion_id, ts)
+
+    @mcp.tool()
+    def propose_entity_link(site: str, user: str, alias_attr: str,
+                            entity_id: str, ts: float = 0.0) -> dict:
+        """Propose an entity alias link for human review. Never auto-applies."""
+        return svc.propose_entity_link(site, user, alias_attr, entity_id, ts)
+
+    @mcp.tool()
+    def propose_relation(site: str, user: str, subject_id: str, relation: str,
+                         object_id: str, note: str = "", ts: float = 0.0) -> dict:
+        """Propose a typed entity relation for human review. Never auto-applies."""
+        return svc.propose_relation(site, user, subject_id, relation, object_id, note, ts)
 
     def main():
         mcp.run()

@@ -103,6 +103,7 @@ class Config:
     # --- typed entity layer (entity/card integration remains opt-in) ---
     entities: bool = False
     entity_aggregation: bool = False
+    enrichment_enabled: bool = False
     canonicalization_queue_cap: int = 50
     canonicalization_ttl_days: float = 90.0
     canonicalization_min_score: float = 0.55

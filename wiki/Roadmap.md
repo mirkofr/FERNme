@@ -1,19 +1,26 @@
 # Roadmap
 
-## Built + tested (v0.1.0)
-- ✅ **#9** — Communication-style & mood memory
-- ✅ **#2** — Outcome-learning for any goal
-- ✅ **#8** — Explainable provenance (`why`)
-- ✅ **#1** — Private collective priors (k-anonymity + differential privacy)
-- ✅ **#4** — Verifiable data ownership + right-to-be-forgotten
-- ✅ **#7** — Multi-timescale memory
-- ✅ **#6** — Self-tuning forgetting
-- ✅ **#5** — Injection-resistant by construction
+## Built + tested (v0.4)
+
+- Done: communication-style & mood memory.
+- Done: outcome-learning for any goal.
+- Done: explainable provenance (`why`).
+- Done: private collective priors and cross-user assoc k-suppression.
+- Done: verifiable data ownership + right-to-be-forgotten.
+- Done: class-targeted volatility retention and contradiction-scoped verify.
+- Done: persisted edge provenance (`stated` / `inferred`).
+- Done: deterministic structured-field ingest.
+- Done: typed entity layer with aliases, fields, relation facts, relations, path queries, and opt-in entity-aware retrieval.
+- Done: suggest-and-approve canonicalization queue.
+- Done: default-off propose-only enrichment for typed relations and entity links.
 
 ## Open
-- **#3 — Open user-owned memory protocol**: a portable spec + vocabulary so any agent reads/writes the same consented profile. (Spec stage.)
-- **Embeddings** for context→attribute matching; offline LLM catalog enrichment for messy inputs.
-- **Recursive / supernode organization at scale**: hierarchical (self-similar) routing once a user's memory is large — a post-pilot research item at the supernode level, not the per-site engine.
+
+- Open user-owned memory protocol.
+- Real-human per-site pilot.
+- Real-model enrichment eval, owner-run and labeled separately from synthetic mock results.
+- Obsidian importer, MCP packaging, and UI polish.
 
 ## The real next step
-A **real-human per-site pilot** — one site, real users, instrumented for memory correctness, action lift, LLM-gate frequency, cost, and retrieval usefulness. This is the one thing that turns the synthetic benchmarks into real numbers, and everything else is secondary to it.
+
+A real-human per-site pilot: one site, real users, instrumented for memory correctness, action lift, cost, and retrieval usefulness. This is the step that turns synthetic benchmarks into real numbers.

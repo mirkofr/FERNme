@@ -34,7 +34,7 @@ For production use `PostgresStore` — same interface. Keep SQLite off cloud-syn
 ## Minimal code
 ```python
 from fernme.service import FernService
-svc = FernService()                       # SQLite, pure mode (no LLM)
+svc = FernService()                       # SQLite, pure deterministic core
 svc.consent("mysite", "alice", True)
 svc.observe("mysite", "alice", "purchase", {"tags": ["pref:organic", "pref:mid_range"]})
 print(svc.card("mysite", "alice")["wire"])   # token-minimal memory card

@@ -1,30 +1,29 @@
 # Memory Modes
 
-One engine, a deployment-level dial: `FernService(memory_mode=...)`. The hot write path stays LLM-free in every mode; modes differ only in *when* an LLM is invoked.
+One engine, a deployment-level dial: `FernService(memory_mode=...)`. Every hot write and recall stays model-free in every mode. Optional enrichment is a separate proposal tier.
 
-| mode | LLM use | cost | status |
+| path | model use | cost accounting | status |
 |---|---|---|---|
-| `pure` (default) | none | cheapest, flat | ✅ tested, key-less |
-| `gated` | one small call **only on novel free-text** | ~tiny, occasional | 🧪 experimental — needs a model |
-| `offline` | batched `consolidate()` enrichment, off the hot path | ~tiny, amortized | 🧪 experimental — needs a model |
+| `pure` (default) | none | cheapest, flat | tested, key-less |
+| agent proposals | external agent proposes through MCP tools | `svc.llm_calls` remains 0 | wired, human-approved |
+| batch `enrich(llm_fn=...)` | caller-supplied model function, off hot path | `svc.llm_calls` counts batch calls and reports token estimate | mock-validated synthetic eval |
+| no source configured | none | clean no-op | tested graceful skip |
 
 ## How it works
-- A pluggable **tagger** (`tagging.py`) does any LLM work; you pass `llm_fn`, optionally constrained to a controlled **vocabulary** for cross-model consistency.
-- `gated` calls the LLM only when the deterministic mapping finds nothing and there's free text to interpret.
-- `offline` runs enrichment as a batch job (nightly), so there's ~zero marginal per-interaction cost.
-- `svc.llm_calls` counts every LLM invocation for cost transparency.
+
+- `propose_relation(...)` and `propose_entity_link(...)` enqueue suggestions into the existing human review queue.
+- Accepting applies through existing reversible service paths; rejecting sticks.
+- Model or agent output is untrusted data and must pass the same validation.
+- The old `gated`/`offline` mode names remain for compatibility, but they do not write model-derived truth during `observe`.
 
 ## Configure
+
 ```python
+from dataclasses import replace
+from fernme.config import DEFAULT
 from fernme.service import FernService
-from fernme.tagging import LLMTagger
 
-# pure (default): no LLM, no key
-svc = FernService(memory_mode="pure")
-
-# gated: LLM only on novel free text
-tagger = LLMTagger(my_llm_fn, vocabulary=my_vocab)   # my_llm_fn(prompt)->str
-svc = FernService(memory_mode="gated", tagger=tagger)
+svc = FernService(cfg=replace(DEFAULT, enrichment_enabled=True))
 ```
 
-> The gated/offline **quality** is modeled until run against a real model; the wiring is tested with a mock LLM. See [[Benchmarks]] for the cost/quality Pareto.
+See [[Benchmarks]] for the synthetic mock enrichment eval.

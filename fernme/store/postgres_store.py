@@ -511,8 +511,9 @@ class PostgresStore:
             self._q('DELETE FROM entities WHERE site=%s AND "user"=%s AND entity_id=%s',
                     (site, user, entity_id))
             self._q('DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
-                    'AND payload LIKE %s',
-                    (site, user, f'%"entity_id":"{entity_id}"%'))
+                    'AND (payload LIKE %s OR payload LIKE %s OR payload LIKE %s)',
+                    (site, user, f'%"entity_id":"{entity_id}"%',
+                     f'%"subject_id":"{entity_id}"%', f'%"object_id":"{entity_id}"%'))
 
     def count_entity_references(self, entity_id):
         specs = [
@@ -604,8 +605,9 @@ class PostgresStore:
         with self._lock:
             cur = self._q(
                 'DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
-                'AND payload LIKE %s',
-                (site, user, f'%"entity_id":"{entity_id}"%'))
+                'AND (payload LIKE %s OR payload LIKE %s OR payload LIKE %s)',
+                (site, user, f'%"entity_id":"{entity_id}"%',
+                 f'%"subject_id":"{entity_id}"%', f'%"object_id":"{entity_id}"%'))
             return cur.rowcount
 
     def list_users(self, site):

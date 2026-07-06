@@ -1,5 +1,5 @@
 """Q4 - RECALL QUALITY: does FERN's memory recover each user's TRUE preferences?
-Measured against the simulator's ground-truth latent prefs, vs LLM-free baselines,
+Measured against the simulator's ground-truth latent prefs, vs zero-model-call baselines,
 over multiple seeds with mean+/-std. Run: python -m fern.eval.quality"""
 from __future__ import annotations
 import statistics

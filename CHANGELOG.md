@@ -26,7 +26,7 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   fragmented-entity, and outcome regimes across FERNme, entity flags, recency,
   frequency, and pure-Python BM25 Cabinet baselines.
 - Reconciled README benchmark claims to the unified harness as the public source
-  of truth, including the measured trade-offs, flat token cost, zero LLM calls,
+  of truth, including the measured trade-offs, flat token cost, zero-model-call deterministic core,
   entity aggregation, and FERNme-only outcome feedback loop.
 - Added relation facts for typed entity relations in SQLite/Postgres, with
   deduplicated inert notes, explicit fact deletion, and entity-forget cascade.
@@ -40,6 +40,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Added default-on cross-user assoc k-suppression (`assoc_min_users=2`) so rare
   one-user co-occurrence edges stay self-visible but do not influence other users'
   retrieval on shared sites until enough distinct users reinforce them.
+- Added default-off propose-only enrichment: agent/MCP relation and entity-link
+  proposals plus optional caller-supplied batch `enrich(llm_fn=...)` enqueue
+  suggestions for human approval; deterministic write/recall stays zero-model-call.
 - Documented first real-profile validation (n=1, maintainer's own 722-tag profile):
   entity flags improved a fragmented person's card rank 11→6, surfaced a
   previously missed `contact_of` relationship, and kept token cost flat.
@@ -107,7 +110,7 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 Initial open-source release. A per-site, user-owned Hebbian preference-graph memory
 for transactional agents. Highlights:
 
-- **Near-zero-LLM core** — saturating Hebbian writes (no LLM), spreading-activation
+- **Historical core framing** — saturating Hebbian writes, spreading-activation
   retrieval, ACT-R decay, token-minimal flat memory card.
 - **Ingestion bridge** — per-site catalog + controlled namespaced vocabulary (no tag drift).
 - **Cost/quality dial** — `memory_mode` pure / gated / offline.

@@ -7,12 +7,9 @@ files (images, video, PDFs, audio) as first-class memory before writing any code
 
 ## 1. The principle (and why it doesn't break FERNme)
 
-FERNme's real claim has never been "no LLM exists in the system." It is **no *extra*
-inference call to form memory** — the host agent that is already serving the turn emits
-the tags as a byproduct, and FERNme stores them with arithmetic only.
+FERNme's current claim is the same boundary as Phase 12: the deterministic write/recall core has no model calls, while optional side paths are explicit and off the hot path. For multimodal design, the additional goal is **no extra inference call to form memory**: the host agent that is already serving the turn emits the tags as a byproduct, and FERNme stores them with arithmetic only.
 
 That principle is **modality-agnostic**:
-
 - Text today: the agent reads the user's message to respond → emits tags → FERNme stores. 0 extra calls.
 - Images/video next: the agent *already saw the image* to do what the user asked (edit it, answer about it) → emits tags → FERNme stores. **Still 0 extra calls.**
 
@@ -121,7 +118,7 @@ observe_asset(site, user, asset_bytes_or_uri, tags, meta):
 flowchart TD
   Q[query] --> R[spreading activation over graph]
   R --> T{answer in tags / text?}
-  T -- yes --> A1[return answer + asset pointers · 0 LLM]
+  T -- yes --> A1[return answer + asset pointers · 0 extra model calls]
   T -- no, needs pixels --> C[graph yields candidate asset ids]
   C --> V[on-demand: inspect ONE asset with vision model]
   V --> A2[answer · 1 vision call]
@@ -129,13 +126,13 @@ flowchart TD
   style V fill:#faeeda,stroke:#854f0b
 ```
 
-- Most retrieval: 0 LLM (tags/text already answer it; assets returned as links).
+- Most retrieval: 0 extra model calls (tags/text already answer it; assets returned as links).
 - "What color was the solution?": graph finds the right image via its links, then **one**
   vision call on that single asset. Never a scan of the whole library.
 
 Three levels, made explicit:
-- **L1** text/preferences/facts/relationships/actions — near-zero LLM. *(today)*
-- **L2** images/video/pdf/audio stored as linked assets — near-zero LLM. *(new)*
+- **L1** text/preferences/facts/relationships/actions - zero-LLM deterministic core, optional propose-only enrichment. *(today)*
+- **L2** images/video/pdf/audio stored as linked assets - deterministic storage core, optional perception/enrichment outside the hot path. *(new)*
 - **L3** on-demand understanding — 1 vision call only when a question needs pixels. *(new)*
 
 ---
@@ -151,7 +148,7 @@ Three levels, made explicit:
 | REST + MCP: `upload`, `link_asset`, `inspect` | agent/host integration | none on write |
 | optional `local_perception` (CV/embeddings) | for silent bulk ingestion only | local model, no LLM |
 
-Everything except `inspect()` and the optional local perception is **LLM-free**.
+The deterministic storage and recall core is model-free; `inspect()` and optional local perception/enrichment are explicit side paths.
 
 ---
 
@@ -176,13 +173,13 @@ Media is far more sensitive than tags. The design must treat it as such:
 ## 8. Advantages
 
 - **Kills the "only text" criticism** — the single most common reviewer/HN objection.
-- **Preserves the core claim**: 0 extra inference on write (byproduct of agent perception).
+- **Preserves the core claim**: 0 extra inference on deterministic write (byproduct of agent perception).
 - **Unifies modalities under one graph** — assets link via the same edges/salience/decay;
   no second memory system.
 - **Lazy interpretation** is genuinely cheap and novel-in-combination: graph-linked assets +
   on-demand vision means you pay for understanding only when asked.
 - **PDFs are almost free and high-value** (lab notes, contracts, papers) — deterministic text.
-- **Clean second paper** (FERNme-M) framed as *zero-LLM multimodal formation*, not asset storage.
+- **Clean second paper** (FERNme-M) framed as *zero-LLM deterministic multimodal core plus optional side-path enrichment*, not asset storage.
 
 ## 9. Disadvantages / risks (honest)
 

@@ -148,13 +148,13 @@ ax.set_xlabel("entries ingested"); ax.set_ylabel("tokens injected this turn")
 ax.set_title(f"FERNme stays ~{int(np.mean(hist['card']))} tokens/turn while history balloons")
 ax.legend(fontsize=9); fig.tight_layout(); fig.savefig(f"{OUT}/02_flat_footprint.png"); plt.close(fig)
 
-# 3) attributes learned + zero LLM
+# 3) attributes learned + zero model calls in the core
 fig,ax=plt.subplots(figsize=(7,4))
 ax.plot(x, hist["attrs"], color=VIO, lw=2.4, label="facts remembered")
 ax.set_xlabel("entries ingested"); ax.set_ylabel("facts in memory", color=VIO)
 ax2=ax.twinx(); ax2.plot(x, hist["llm"], color=RED, lw=2.2, label="LLM calls (write path)")
 ax2.set_ylabel("cumulative LLM calls", color=RED); ax2.set_ylim(-0.5, max(2,max(hist["llm"])+1)); ax2.grid(False)
-ax.set_title("Memory grows to %d facts with 0 LLM calls"%hist["attrs"][-1])
+ax.set_title("Memory grows to %d facts with 0 core model calls"%hist["attrs"][-1])
 fig.tight_layout(); fig.savefig(f"{OUT}/03_growth_zero_llm.png"); plt.close(fig)
 
 # 4) drift: CONTROLLED probe following the diary narrative.

@@ -1,4 +1,4 @@
-"""agent — near-zero capture by piggybacking on the host agent's own reply.
+"""agent — low-cost capture by piggybacking on the host agent's own reply.
 
 The realistic FERNme path when you are *already* talking to an LLM agent
 (Claude Cowork, Codex, ...). The agent appends a tiny tag line as a byproduct of

@@ -1,7 +1,7 @@
 """Event -> attribute mapping. THE COST CRUX: this is a pure function over
-structured event fields + a catalog/taxonomy table. NO LLM call in the hot path.
-(Optional offline LLM enrichment of the catalog is a separate batch job and is
-deliberately not implemented here, to keep the write path provably LLM-free.)"""
+structured event fields + a catalog/taxonomy table. No model call in the hot path.
+Optional propose-only enrichment is a separate review-queue path and is deliberately
+not implemented here, keeping the write path zero-model-call."""
 from __future__ import annotations
 from typing import Dict, List, Tuple
 from ..core.graph import Event
