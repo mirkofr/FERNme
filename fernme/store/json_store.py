@@ -15,7 +15,8 @@ def _edge_to_dict(e: Edge) -> dict:
 
 def save_state(path: str, ug: UserGraph, assoc: AssocGraph,
                prior: PopulationPrior | None = None,
-               suggestions: list[dict] | None = None) -> None:
+               suggestions: list[dict] | None = None,
+               assoc_contributors: list[dict] | None = None) -> None:
     data = {
         "user_graph": {
             "site": ug.site, "user": ug.user,
@@ -31,6 +32,8 @@ def save_state(path: str, ug: UserGraph, assoc: AssocGraph,
                          "_n": prior._n, "n_users": prior.n_users}
     if suggestions is not None:
         data["canonicalization_suggestions"] = suggestions
+    if assoc_contributors is not None:
+        data["assoc_contributors"] = assoc_contributors
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -63,3 +66,9 @@ def load_suggestions(path: str) -> list[dict]:
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     return list(data.get("canonicalization_suggestions", []))
+
+
+def load_assoc_contributors(path: str) -> list[dict]:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return list(data.get("assoc_contributors", []))

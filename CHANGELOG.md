@@ -37,6 +37,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   entity-link suggestions, persistent per-user review queues in SQLite/Postgres,
   REST/MCP adapters, and the synthetic `python -m fernme.eval.canonicalization`
   precision/recall report. Nothing auto-applies to memory truth.
+- Added default-on cross-user assoc k-suppression (`assoc_min_users=2`) so rare
+  one-user co-occurrence edges stay self-visible but do not influence other users'
+  retrieval on shared sites until enough distinct users reinforce them.
 - Documented first real-profile validation (n=1, maintainer's own 722-tag profile):
   entity flags improved a fragmented person's card rank 11→6, surfaced a
   previously missed `contact_of` relationship, and kept token cost flat.

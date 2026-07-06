@@ -13,7 +13,7 @@ from fernme.config import DEFAULT
 from fernme.core.graph import AssocGraph, Edge, UserGraph
 from fernme.curation_queue import alias_score, entity_link_score
 from fernme.service import ConsentError, FernService
-from fernme.store.json_store import load_suggestions, save_state
+from fernme.store.json_store import load_assoc_contributors, load_suggestions, save_state
 from fernme.store.sqlite_store import SCHEMA, SQLiteStore
 
 
@@ -247,7 +247,16 @@ def test_json_store_persists_suggestion_rows_when_supplied():
         "created_ts": 1.0,
         "decided_ts": None,
     }]
+    assoc_contributors = [{
+        "site": "demo",
+        "user": "alex",
+        "a": "person:dana-reyes",
+        "b": "person:dana_reyes",
+        "hits": 1,
+    }]
 
-    save_state(path, ug, assoc, suggestions=suggestions)
+    save_state(path, ug, assoc, suggestions=suggestions,
+               assoc_contributors=assoc_contributors)
 
     assert load_suggestions(path) == suggestions
+    assert load_assoc_contributors(path) == assoc_contributors

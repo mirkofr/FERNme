@@ -27,7 +27,12 @@ CREATE TABLE IF NOT EXISTS user_history(
   site TEXT, "user" TEXT, attr TEXT, ts DOUBLE PRECISION);
 CREATE TABLE IF NOT EXISTS assoc_edges(
   site TEXT, a TEXT, b TEXT, weight DOUBLE PRECISION,
+  users INT NOT NULL DEFAULT 0,
   PRIMARY KEY(site, a, b));
+CREATE TABLE IF NOT EXISTS assoc_edge_users(
+  site TEXT NOT NULL, "user" TEXT NOT NULL, a TEXT NOT NULL, b TEXT NOT NULL,
+  hits INT NOT NULL DEFAULT 0,
+  PRIMARY KEY(site, "user", a, b));
 CREATE TABLE IF NOT EXISTS events(
   id BIGSERIAL PRIMARY KEY,
   site TEXT, "user" TEXT, ts DOUBLE PRECISION, type TEXT, payload TEXT, attrs TEXT);
@@ -83,6 +88,8 @@ CREATE TABLE IF NOT EXISTS canonicalization_suggestions(
   created_ts DOUBLE PRECISION NOT NULL, decided_ts DOUBLE PRECISION);
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, "user", ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, "user", attr);
+CREATE INDEX IF NOT EXISTS idx_assoc_edge_users_edge
+  ON assoc_edge_users(site, a, b);
 CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
   ON relation_facts(site, "user", subject_id, relation, object_id, ts);
 CREATE INDEX IF NOT EXISTS idx_canonicalization_suggestions_user
@@ -101,9 +108,70 @@ class PostgresStore:
         self._conn.execute(
             "ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'inferred'"
         )
+        self._conn.execute(
+            "ALTER TABLE assoc_edges ADD COLUMN IF NOT EXISTS users INT NOT NULL DEFAULT 0"
+        )
+        self._backfill_assoc_contributors()
 
     def _q(self, sql, args=()):
         return self._conn.execute(sql, args)
+
+    @staticmethod
+    def _assoc_key(a, b):
+        return (a, b) if a <= b else (b, a)
+
+    @staticmethod
+    def _pairs_from_attrs(attrs):
+        names = []
+        for item in attrs:
+            if not item:
+                continue
+            if isinstance(item, (list, tuple)):
+                names.append(str(item[0]))
+            else:
+                names.append(str(item))
+        out = []
+        for i in range(len(names)):
+            for j in range(i + 1, len(names)):
+                out.append(PostgresStore._assoc_key(names[i], names[j]))
+        return out
+
+    def _refresh_assoc_user_counts(self, site, pairs=None, delete_empty=False):
+        pairs = list(dict.fromkeys(pairs or []))
+        if not pairs:
+            return
+        for a, b in pairs:
+            count = self._q(
+                'SELECT COUNT(*) n FROM assoc_edge_users WHERE site=%s AND a=%s AND b=%s',
+                (site, a, b)).fetchone()["n"]
+            if delete_empty and count == 0:
+                self._q(
+                    "DELETE FROM assoc_edges WHERE site=%s AND a=%s AND b=%s",
+                    (site, a, b))
+            else:
+                self._q(
+                    "UPDATE assoc_edges SET users=%s WHERE site=%s AND a=%s AND b=%s",
+                    (int(count), site, a, b))
+
+    def _backfill_assoc_contributors(self):
+        existing = self._q("SELECT COUNT(*) n FROM assoc_edge_users").fetchone()["n"]
+        if existing:
+            return
+        pairs_by_site = {}
+        for r in self._q('SELECT site,"user",attrs FROM events').fetchall():
+            try:
+                attrs = json.loads(r["attrs"])
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            for a, b in self._pairs_from_attrs(attrs):
+                pairs_by_site.setdefault(r["site"], set()).add((a, b))
+                self._q(
+                    'INSERT INTO assoc_edge_users(site,"user",a,b,hits) '
+                    'VALUES(%s,%s,%s,%s,1) '
+                    'ON CONFLICT(site,"user",a,b) DO UPDATE SET hits=assoc_edge_users.hits+1',
+                    (r["site"], r["user"], a, b))
+        for site, pairs in pairs_by_site.items():
+            self._refresh_assoc_user_counts(site, pairs)
 
     # ---- consent ----
     def set_consent(self, site, user, granted, ts=0.0):
@@ -165,6 +233,14 @@ class PostgresStore:
                         (site, user, entity_id))
                 self._q('DELETE FROM entities WHERE site=%s AND "user"=%s AND entity_id=%s',
                         (site, user, entity_id))
+            assoc_pairs = [
+                (r["a"], r["b"]) for r in self._q(
+                    'SELECT a,b FROM assoc_edge_users WHERE site=%s AND "user"=%s',
+                    (site, user)).fetchall()
+            ]
+            self._q('DELETE FROM assoc_edge_users WHERE site=%s AND "user"=%s',
+                    (site, user))
+            self._refresh_assoc_user_counts(site, assoc_pairs, delete_empty=True)
             for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
                 self._q(f'DELETE FROM {t} WHERE site=%s AND "user"=%s', (site, user))
             self._q('DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s',
@@ -178,17 +254,40 @@ class PostgresStore:
                 "consent": self.has_consent(site, user)}
 
     # ---- assoc ----
-    def load_assoc(self, site) -> AssocGraph:
+    def load_assoc(self, site, user=None, min_users=1) -> AssocGraph:
         ag = AssocGraph(site)
-        for r in self._q("SELECT a,b,weight FROM assoc_edges WHERE site=%s", (site,)).fetchall():
+        min_users = int(min_users or 1)
+        if min_users <= 1:
+            rows = self._q(
+                "SELECT a,b,weight FROM assoc_edges WHERE site=%s", (site,)).fetchall()
+        elif user is None:
+            rows = self._q(
+                "SELECT a,b,weight FROM assoc_edges WHERE site=%s AND users>=%s",
+                (site, min_users)).fetchall()
+        else:
+            rows = self._q(
+                "SELECT e.a,e.b,e.weight FROM assoc_edges e "
+                "LEFT JOIN assoc_edge_users u ON u.site=e.site AND u.a=e.a "
+                'AND u.b=e.b AND u."user"=%s '
+                "WHERE e.site=%s AND (e.users>=%s OR u.\"user\" IS NOT NULL)",
+                (user, site, min_users)).fetchall()
+        for r in rows:
             ag.edges[(r["a"], r["b"])] = r["weight"]
         return ag
 
-    def save_assoc(self, ag: AssocGraph):
+    def save_assoc(self, ag: AssocGraph, contributor_user=None, touched_pairs=None):
+        touched_pairs = [self._assoc_key(a, b) for a, b in (touched_pairs or [])]
         with self._lock, self._conn.cursor() as c:
-            c.executemany("INSERT INTO assoc_edges VALUES(%s,%s,%s,%s) "
+            c.executemany("INSERT INTO assoc_edges(site,a,b,weight) VALUES(%s,%s,%s,%s) "
                           "ON CONFLICT(site,a,b) DO UPDATE SET weight=EXCLUDED.weight",
                           [(ag.site, k[0], k[1], v) for k, v in ag.edges.items()])
+            if contributor_user and touched_pairs:
+                c.executemany(
+                    'INSERT INTO assoc_edge_users(site,"user",a,b,hits) '
+                    'VALUES(%s,%s,%s,%s,1) '
+                    'ON CONFLICT(site,"user",a,b) DO UPDATE SET hits=assoc_edge_users.hits+1',
+                    [(ag.site, contributor_user, a, b) for a, b in touched_pairs])
+                self._refresh_assoc_user_counts(ag.site, touched_pairs)
 
     # ---- cabinet ----
     def append_event(self, ev: Event):

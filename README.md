@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-230%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-235%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -59,6 +59,7 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 | 🔐 **Verifiable & unlearnable** | Every action is logged in a tamper-evident HMAC chain the user can replay to detect any alteration; `forget_everywhere` wipes the profile **and** unlearns the person from the population prior — provable right-to-be-forgotten. |
 | 🛡 **Injection-proof by design** | Writes are arithmetic, not LLM extraction, so page/user text can't be "talked into" becoming a belief — tested that injected instructions never enter memory. |
 | 🧠 **Private collective intelligence** | New users benefit from crowd patterns on turn one (cold-start from a population prior), with **k-anonymity + differential privacy** so no individual leaks. A network-effect moat single-user memories can't have. |
+| **Cross-user assoc isolation** | Shared co-occurrence edges are k-suppressed by default (`assoc_min_users=2`): a rare pair from one user stays visible to that user, but cannot influence another user's retrieval until at least two users reinforce it. |
 | 🗣 **Style & mood memory** | Learns *how* each person communicates (terse/verbose, formal/casual, energy) and tracks their **mood with trend detection**, so the agent can match tone and notice when someone's frustration is rising — in any domain. |
 | 🎯 **Outcome-learning, any goal** | Memory is reinforced by *results* — not just recall. `record_outcome(success)` strengthens what worked and weakens what backfired, where "success" is any goal (purchase, booking, resolved ticket, completed lesson…). |
 | 🔍 **Explainable** | Ask `why(user, attr)` — get the evidence (observations + good/bad outcomes + dates). No black box. |
@@ -292,7 +293,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 230 passing, 2 skipped
+python -m pytest tests -q               # 235 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -391,7 +392,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (230 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, and the full results suite above.
+Done & tested (235 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -406,6 +407,14 @@ synthetic-validated by `python -m fernme.eval.canonicalization` (precision
 1.000 +/- 0.000, recall 1.000 +/- 0.000 on planted duplicate aliases), opt-in at
 the service/API layer, and propose-only: rejected suggestions do not resurface,
 and accepted suggestions apply through existing entity alias APIs.
+
+**Cross-user assoc isolation:** assoc graph reads are k-suppressed by default
+(`assoc_min_users=2`). This is a deliberate privacy-motivated behavior change on
+multi-user sites: one user's rare co-occurrence pair cannot influence another
+user's retrieval until at least two distinct users reinforce it. Single-user sites
+are unchanged because each user's own assoc contributions remain visible to them;
+`assoc_min_users=1` is the compatibility escape hatch for the old shared-site
+behavior.
 
 🆕 **New default behavior:** class-targeted volatility retention is on by default. Permanent facts use very long retention, volatile/current facts fade fast, and drift-tested taste classes stay short. Synthetic R5 retention eval: permanent facts above floor at day 700 improve **0.000 -> 1.000**, stale volatile weight improves **2.114 -> 0.000**, and slow changed facts still prefer the new value **1.000**. Legacy focused drift checks remain regression coverage; cross-method claims use the unified harness above.
 
@@ -435,7 +444,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator · cost · quality · drift · context · ablation · pilot · entities · harness
-tests/       230 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       235 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

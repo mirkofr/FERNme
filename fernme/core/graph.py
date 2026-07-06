@@ -42,7 +42,8 @@ class UserGraph:
 @dataclass
 class AssocGraph:
     """Shared per-site attribute<->attribute association weights (Hebbian
-    co-use). Most users read this directly; rare per-user overrides not in v0.
+    co-use). Stores may materialize a user-filtered view for retrieval so rare
+    cross-user edges stay suppressed while the reader's own edges remain visible.
 
     `edges` is the source of truth. `_adj` is a parallel adjacency index so
     neighbors() is O(degree) instead of O(all edges) -- without it, spreading

@@ -75,3 +75,18 @@ def test_canonicalization_suggestions_on_postgres(pg):
     assert rows[0]["kind"] == "alias-merge"
     assert rejected["status"] == "rejected"
     assert svc.list_suggestions("demo", "alex", now=3.0) == []
+
+
+def test_assoc_k_suppression_on_postgres(pg):
+    svc = FernService(store=PostgresStore(pg))
+    for user in ("alex", "bea", "cora"):
+        svc.consent("privacy", user, True)
+    svc.observe("privacy", "alex", "note", {"tags": ["topic:rain", "pref:mint"]}, ts=1.0)
+
+    pair = ("pref:mint", "topic:rain")
+    assert pair in svc.store.load_assoc("privacy", user="alex", min_users=2).edges
+    assert pair not in svc.store.load_assoc("privacy", user="bea", min_users=2).edges
+
+    svc.observe("privacy", "bea", "note", {"tags": ["topic:rain", "pref:mint"]}, ts=2.0)
+
+    assert pair in svc.store.load_assoc("privacy", user="cora", min_users=2).edges

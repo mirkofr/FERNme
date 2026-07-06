@@ -85,7 +85,7 @@ def _dump_graph_tables(path):
             "user_history": [dict(r) for r in conn.execute(
                 "SELECT * FROM user_history ORDER BY site,user,attr,ts")],
             "assoc_edges": [dict(r) for r in conn.execute(
-                "SELECT * FROM assoc_edges ORDER BY site,a,b")],
+                "SELECT site,a,b,weight FROM assoc_edges ORDER BY site,a,b")],
         }
     finally:
         conn.close()

@@ -39,6 +39,7 @@ class Config:
     # --- Hebbian write (write/hebbian.py) ---
     alpha: float = 1.5        # user->attr learn rate
     beta: float = 1.0         # attr<->attr (associative) learn rate
+    assoc_min_users: int = 2  # cross-user assoc visibility threshold
     w_max: float = 9.0        # fuzzy scale ceiling (Zadeh, single-digit on the wire)
     gamma: float = 0.6        # confidence growth rate: conf = 1 - exp(-gamma * hits)
 

@@ -34,6 +34,7 @@ EDGE_COLUMNS = (
 )
 HISTORY_COLUMNS = ("site", "user", "attr", "ts")
 ASSOC_COLUMNS = ("site", "a", "b", "weight")
+ASSOC_USER_COLUMNS = ("site", "user", "a", "b", "hits")
 
 
 class ConsolidationError(RuntimeError):
@@ -244,6 +245,9 @@ def _snapshot(store: SQLiteStore, plan: ConsolidationPlan) -> Dict:
             "assoc_edges": _dicts(conn.execute(
                 "SELECT * FROM assoc_edges WHERE site=?", (site,)
             )),
+            "assoc_edge_users": _dicts(conn.execute(
+                "SELECT * FROM assoc_edge_users WHERE site=?", (site,)
+            )),
         })
     return {"version": 1, "users": users, "assoc": assoc}
 
@@ -302,11 +306,29 @@ def _apply_assoc_groups(store: SQLiteStore, groups: Sequence[MergeGroup]) -> Non
                 continue
             key = (a, b) if a <= b else (b, a)
             merged[key] = merged.get(key, 0.0) + float(row["weight"])
+        merged_users: Dict[Tuple[str, str, str], int] = {}
+        for row in store._conn.execute(
+            "SELECT user,a,b,hits FROM assoc_edge_users WHERE site=?", (site,)
+        ):
+            a = mapping.get(row["a"], row["a"])
+            b = mapping.get(row["b"], row["b"])
+            if a == b:
+                continue
+            a, b = (a, b) if a <= b else (b, a)
+            key = (row["user"], a, b)
+            merged_users[key] = merged_users.get(key, 0) + int(row["hits"])
         store._conn.execute("DELETE FROM assoc_edges WHERE site=?", (site,))
+        store._conn.execute("DELETE FROM assoc_edge_users WHERE site=?", (site,))
         store._conn.executemany(
-            "INSERT INTO assoc_edges VALUES(?,?,?,?)",
+            "INSERT INTO assoc_edges(site,a,b,weight) VALUES(?,?,?,?)",
             [(site, a, b, weight) for (a, b), weight in sorted(merged.items())],
         )
+        store._conn.executemany(
+            "INSERT INTO assoc_edge_users(site,user,a,b,hits) VALUES(?,?,?,?,?)",
+            [(site, user, a, b, hits)
+             for (user, a, b), hits in sorted(merged_users.items())],
+        )
+        store._refresh_assoc_user_counts(site, sorted(merged))
 
 
 def apply_consolidation(
@@ -402,10 +424,16 @@ def undo_consolidation(db_path: str | Path, run_id: str) -> Dict:
         for assoc_snapshot in snapshot["assoc"]:
             site = assoc_snapshot["site"]
             conn.execute("DELETE FROM assoc_edges WHERE site=?", (site,))
+            conn.execute("DELETE FROM assoc_edge_users WHERE site=?", (site,))
             conn.executemany(
-                "INSERT INTO assoc_edges VALUES(?,?,?,?)",
-                [tuple(r[c] for c in ASSOC_COLUMNS)
+                "INSERT INTO assoc_edges(site,a,b,weight,users) VALUES(?,?,?,?,?)",
+                [tuple(r[c] for c in ASSOC_COLUMNS) + (int(r.get("users", 0)),)
                  for r in assoc_snapshot["assoc_edges"]],
+            )
+            conn.executemany(
+                "INSERT INTO assoc_edge_users(site,user,a,b,hits) VALUES(?,?,?,?,?)",
+                [tuple(r[c] for c in ASSOC_USER_COLUMNS)
+                 for r in assoc_snapshot.get("assoc_edge_users", [])],
             )
         _delete_consolidation_events(conn, run_id)
         conn.execute("DELETE FROM consolidation_runs WHERE run_id=?", (run_id,))

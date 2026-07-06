@@ -54,6 +54,15 @@ def _valid_uuid(value: str) -> str:
     return str(parsed)
 
 
+def _assoc_pairs(mapped) -> List[tuple]:
+    attrs = [a for a, _ in mapped]
+    out = []
+    for i in range(len(attrs)):
+        for j in range(i + 1, len(attrs)):
+            out.append(AssocGraph.key(attrs[i], attrs[j]))
+    return out
+
+
 def _conflict_for_edge(ug: UserGraph, attr: str, cfg: Config) -> float:
     edge = ug.edges.get(attr)
     if edge is None:
@@ -195,7 +204,7 @@ class FernService:
             ug.numeric["mood_prev"] = old if old is not None else new
             ug.numeric["mood_ema"] = new
         self.store.save_user(ug)
-        self.store.save_assoc(ag)
+        self.store.save_assoc(ag, contributor_user=user, touched_pairs=_assoc_pairs(mapped))
         self.store.append_event(ev)
         self._audit(site, user, "observe", {"type": type, "n_attrs": len(mapped)}, ts)
         out = {"stored_attrs": [a for a, _ in mapped], "edges": ug.n_edges()}
@@ -247,7 +256,7 @@ class FernService:
              now: float = 0.0, cold_start: bool = True) -> Dict:
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
-        ag = self.store.load_assoc(site)
+        ag = self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
         prior = self.store.load_prior(site)
         if cold_start and ug.n_edges() == 0 and prior.n_users > 0:
             prior.cold_start(ug, self.cfg)     # turn-one usefulness from the population
@@ -431,7 +440,7 @@ class FernService:
     # ---------- suggest-and-approve canonicalization ----------
     def _suggestion_context(self, site: str, user: str) -> Dict:
         ug = self.store.load_user(site, user)
-        ag = self.store.load_assoc(site)
+        ag = self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
         attrs = [
             attr for attr, edge in ug.edges.items()
             if edge.source != "superseded" and float(edge.weight) > 0.0
@@ -1013,7 +1022,8 @@ class FernService:
                               "known": (e.confidence >= self.cfg.conf_known or e.source == "override"),
                               "negative": neg})
         present = {n for n, v in nodes.items() if v["kind"] != "user"}
-        ag = self.store.load_assoc(site)
+        graph_user = user if user is not None and len(users) == 1 else None
+        ag = self.store.load_assoc(site, user=graph_user, min_users=self.cfg.assoc_min_users)
         for (a, b), w in ag.edges.items():
             if a in present and b in present and w >= assoc_floor:
                 edges.append({"source": a, "target": b, "weight": round(w, 1), "assoc": True})
