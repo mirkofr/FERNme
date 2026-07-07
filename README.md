@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-246%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-247%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -286,7 +286,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 246 passing, 2 skipped
+python -m pytest tests -q               # 247 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -320,9 +320,23 @@ claude plugin marketplace add ./packaging/claude
 
 The Codex package includes `.codex-plugin/plugin.json`, `.mcp.json`, and a
 `fernme-memory` skill. The Claude Code/Cowork package follows the current
-`.claude-plugin/plugin.json` plus `.mcp.json` layout; CLI validation depends on a
-local `claude` install. Both launch the same `fernme-mcp` console script and use
-environment-only configuration. See `docs/mcp.md`.
+`.claude-plugin/plugin.json` plus `.mcp.json` layout, and the repo root includes
+`.claude-plugin/marketplace.json` for GitHub marketplace discovery.
+
+For Cowork after the owner pushes the repo: Customize > Plugins > "+" > Add
+marketplace from GitHub > enter the repo URL > Install `fernme-memory` >
+authorize the MCP server. For Claude Code CLI: `/plugin marketplace add
+mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
+
+The shipped MCP configs run:
+
+```bash
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@main" fernme-mcp
+```
+
+No PyPI publish is required. The repo must be pushed and reachable, and the
+`main` ref should be pinned to a release tag or commit before sharing. See
+`docs/mcp.md` for local development alternatives.
 
 ---
 
@@ -401,7 +415,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (246 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, MCP packaging smoke coverage, and the full results suite above.
+Done & tested (247 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, MCP packaging smoke coverage, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -454,7 +468,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
-tests/       246 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       247 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

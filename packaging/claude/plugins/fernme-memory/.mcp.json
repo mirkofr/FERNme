@@ -1,8 +1,12 @@
 {
   "mcpServers": {
     "fernme": {
-      "command": "fernme-mcp",
-      "args": [],
+      "command": "uvx",
+      "args": [
+        "--from",
+        "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@main",
+        "fernme-mcp"
+      ],
       "env": {}
     }
   }

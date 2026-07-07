@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "fernme-memory",
-      "source": "./plugins/fernme-memory",
+      "source": "./packaging/claude/plugins/fernme-memory",
       "description": "Local FERNme memory MCP server and standing memory skill."
     }
   ]

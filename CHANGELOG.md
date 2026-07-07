@@ -49,6 +49,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Added MCP packaging: `fernme-mcp` console script, bundled Codex and Claude
   Code/Cowork plugin manifests, a standing memory skill, docs, and stdio smoke
   coverage using a temporary synthetic SQLite database.
+- Made the Claude/Cowork plugin GitHub-marketplace installable without PyPI by
+  adding a repo-root marketplace and switching shipped MCP configs to `uvx`
+  from the Git repo with the `mcp` extra.
 
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 

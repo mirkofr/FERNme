@@ -10,10 +10,26 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+UVX_FROM = "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@main"
 
 
 def _read_json(path):
     return json.loads((ROOT / path).read_text(encoding="utf-8"))
+
+
+def _assert_uvx_git_mcp(mcp):
+    server = mcp["mcpServers"]["fernme"]
+    assert server["command"] == "uvx"
+    assert server["args"] == ["--from", UVX_FROM, "fernme-mcp"]
+    assert "[mcp]" in server["args"][1]
+    assert "git+https://github.com/mirkofr/FERNme@main" in server["args"][1]
+
+
+def test_packaging_json_files_are_valid():
+    json_files = sorted((ROOT / "packaging").rglob("*.json"))
+    json_files.append(ROOT / ".claude-plugin/marketplace.json")
+    for path in json_files:
+        json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_console_script_and_plugin_manifests_reference_mcp_server():
@@ -23,23 +39,34 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     codex_plugin = _read_json(
         "packaging/codex/plugins/fernme-memory/.codex-plugin/plugin.json")
     codex_mcp = _read_json("packaging/codex/plugins/fernme-memory/.mcp.json")
+    codex_local_mcp = _read_json(
+        "packaging/codex/plugins/fernme-memory/.mcp.local.json")
     codex_marketplace = _read_json("packaging/codex/.agents/plugins/marketplace.json")
 
     assert codex_plugin["name"] == "fernme-memory"
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
-    assert codex_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
+    _assert_uvx_git_mcp(codex_mcp)
+    assert codex_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
     assert codex_marketplace["plugins"][0]["source"]["path"] == "./plugins/fernme-memory"
 
     claude_plugin = _read_json(
         "packaging/claude/plugins/fernme-memory/.claude-plugin/plugin.json")
     claude_mcp = _read_json("packaging/claude/plugins/fernme-memory/.mcp.json")
+    claude_local_mcp = _read_json(
+        "packaging/claude/plugins/fernme-memory/.mcp.local.json")
     claude_marketplace = _read_json("packaging/claude/.claude-plugin/marketplace.json")
+    root_claude_marketplace = _read_json(".claude-plugin/marketplace.json")
 
     assert claude_plugin["name"] == "fernme-memory"
     assert claude_plugin["skills"] == "./skills/"
-    assert claude_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
+    _assert_uvx_git_mcp(claude_mcp)
+    assert claude_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
     assert claude_marketplace["plugins"][0]["source"] == "./plugins/fernme-memory"
+    assert root_claude_marketplace["interface"]["displayName"] == "FERNme Local"
+    root_source = root_claude_marketplace["plugins"][0]["source"]
+    assert root_source == "./packaging/claude/plugins/fernme-memory"
+    assert (ROOT / root_source).is_dir()
     assert (
         ROOT / "packaging/codex/plugins/fernme-memory/skills/fernme-memory/SKILL.md"
     ).read_text(encoding="utf-8") == (
