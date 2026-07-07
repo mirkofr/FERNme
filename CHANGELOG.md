@@ -57,6 +57,10 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Added deterministic Obsidian vault import via service, CLI, and MCP: note text
   is stored as Cabinet data, frontmatter tags use the existing vocabulary, and
   wikilinks/aliases queue human-reviewed suggestions only.
+- Made installs self-configuring for `0.4.0b1`: the default package includes MCP,
+  all entry points share `~/.fernme/fernme.db` unless `FERNME_DB` overrides it,
+  `fernme-mcp --print-db-path` exposes the path, and plugin configs pin
+  `v0.4.0b1`.
 
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 

@@ -286,7 +286,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 253 passing, 2 skipped
+python -m pytest tests -q               # 257 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -297,6 +297,7 @@ python -m fernme.eval.pilot               # +17% simulated conversion lift
 FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077   # REST API (docs at /docs)
 open http://localhost:8077/ui                               # glass-box memory editor
 open http://localhost:8077/graph                            # your memory as a graph — focus by site / PC / phone
+fernme-mcp --print-db-path                                   # show the shared SQLite DB path
 fernme-mcp                                                   # MCP server for agents/Codex/Claude
 python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
 ```
@@ -305,12 +306,22 @@ python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
 
 ### MCP and plugin packaging
 
-Install the MCP extra before running the packaged server:
+Install and find your database:
 
 ```bash
-pip install -e ".[mcp]"
+pip install fernme
+fernme-mcp --print-db-path
 fernme-mcp
 ```
+
+The default install includes the MCP server. On first use, FERNme creates one
+SQLite database at `~/.fernme/fernme.db` unless `FERNME_DB` points somewhere
+else. `fernme-mcp --print-db-path` prints the resolved path to stdout and exits;
+normal MCP startup logs the path to stderr so stdout remains clean for JSON-RPC.
+Set that same `FERNME_DB` in Codex/Cowork MCP config `env`, the CLI importer, and
+the UI process when you want the agent and graph to use the same memory. Optional
+`FERNME_SITE` and `FERNME_USER` provide local defaults for tools that omit them.
+For the graph UI dependencies, install `pip install "fernme[ui]"`.
 
 Bundled local plugin manifests live under `packaging/`:
 
@@ -332,15 +343,14 @@ mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
 The shipped MCP configs run:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@0.4.0-beta.1" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b1" fernme-mcp
 ```
 
-No PyPI publish is required. The plugin is pinned to the reproducible test
-release `0.4.0-beta.1`, so external testers get the same server build. The owner
-must push `main` and create plus push the `0.4.0-beta.1` tag on a public or
-otherwise reachable repo before testers can fetch it. The package version is
-`0.4.0b1`; the non-`v` tag is intentional because only `v*` tags publish to
-PyPI and enable the shorter `uvx --from "fernme[mcp]" fernme-mcp` path later.
+No PyPI publish is required for the plugin route. The plugin is pinned to the
+reproducible release ref `v0.4.0b1`, so external testers get the same server
+build. The owner must push `main` and create plus push the `v0.4.0b1` tag on a
+public or otherwise reachable repo before testers can fetch it. PyPI publish is
+an owner action triggered by that `v*` tag after trusted publishing is configured.
 See `docs/mcp.md` for local development alternatives.
 
 ### Import your Obsidian vault
@@ -436,7 +446,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (253 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, deterministic Obsidian import, MCP packaging smoke coverage, and the full results suite above.
+Done & tested (257 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, deterministic Obsidian import, MCP packaging smoke coverage, self-configuring install paths, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -489,7 +499,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
-tests/       253 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       257 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

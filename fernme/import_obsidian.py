@@ -5,13 +5,14 @@ import argparse
 import json
 
 from .service import FernService
+from .runtime_config import default_site, default_user
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("vault")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--user", required=True)
+    parser.add_argument("--site", default=default_site())
+    parser.add_argument("--user", default=default_user())
     parser.add_argument("--db")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--include", action="append", default=[])

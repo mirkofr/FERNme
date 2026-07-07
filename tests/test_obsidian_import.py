@@ -183,31 +183,32 @@ def test_mcp_import_obsidian_round_trip_is_redacted(tmp_path):
             encoding="utf-8",
             encoding_error_handler="replace",
         )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                tools = await session.list_tools()
-                assert "import_obsidian" in {tool.name for tool in tools.tools}
-                denied = await session.call_tool(
-                    "import_obsidian",
-                    {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
-                )
-                assert denied.isError
-                await session.call_tool(
-                    "grant_consent",
-                    {"site": "demo.local", "user": "elena", "granted": True},
-                )
-                result = await session.call_tool(
-                    "import_obsidian",
-                    {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
-                )
-                text = result.content[0].text
-                report = json.loads(text)
-                assert report["content_redacted"] is True
-                assert report["events_added"] == 3
-                assert report["candidates_queued"] >= 3
-                assert "Mira prefers concise updates" not in text
-                assert "mira@example.test" not in text
-                assert "Jonas reviews notes" not in text
+        with open(os.devnull, "w", encoding="utf-8") as errlog:
+            async with stdio_client(params, errlog=errlog) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools = await session.list_tools()
+                    assert "import_obsidian" in {tool.name for tool in tools.tools}
+                    denied = await session.call_tool(
+                        "import_obsidian",
+                        {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
+                    )
+                    assert denied.isError
+                    await session.call_tool(
+                        "grant_consent",
+                        {"site": "demo.local", "user": "elena", "granted": True},
+                    )
+                    result = await session.call_tool(
+                        "import_obsidian",
+                        {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
+                    )
+                    text = result.content[0].text
+                    report = json.loads(text)
+                    assert report["content_redacted"] is True
+                    assert report["events_added"] == 3
+                    assert report["candidates_queued"] >= 3
+                    assert "Mira prefers concise updates" not in text
+                    assert "mira@example.test" not in text
+                    assert "Jonas reviews notes" not in text
 
     anyio.run(run)

@@ -6,36 +6,51 @@ path or bypass consent.
 
 ## Install
 
-For local development:
+For normal installs:
 
 ```bash
-pip install -e ".[mcp]"
+pip install fernme
+fernme-mcp --print-db-path
 fernme-mcp
 ```
 
-For GitHub marketplace installs before a PyPI release, the shipped plugin MCP
+The default install includes the MCP server and creates its SQLite database at
+`~/.fernme/fernme.db` on first use. `fernme-mcp --print-db-path` prints the
+resolved path to stdout and exits without starting the server. Normal startup
+logs the same path to stderr so stdout stays reserved for MCP JSON-RPC.
+
+To make Codex, Cowork, CLI import, and the graph UI share one memory, set the
+same `FERNME_DB` path in each environment. `FERNME_SITE` and `FERNME_USER`
+provide optional local defaults for tools or CLIs that omit explicit values.
+
+For local development from a checkout:
+
+```bash
+pip install -e ".[dev,ui]"
+fernme-mcp
+```
+
+For GitHub marketplace installs before or alongside PyPI, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@0.4.0-beta.1" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b1" fernme-mcp
 ```
 
-The shipped plugin is pinned to the reproducible test release `0.4.0-beta.1`,
-so testers fetch the same server build. The git tag `0.4.0-beta.1` maps to the
-package version `0.4.0b1` in PEP 440 form. The non-`v` tag is intentional:
-the PyPI publish workflow triggers only on `v*`, so test builds do not publish
-to PyPI.
+The shipped plugin is pinned to the reproducible release ref `v0.4.0b1`, so
+testers fetch the same server build. The git tag `v0.4.0b1` maps to the package
+version `0.4.0b1` in PEP 440 form. The owner pushes this tag; Codex does not tag
+or publish.
 
 This path works only after the owner has pushed `main` and created plus pushed
-the `0.4.0-beta.1` tag to GitHub, and the repo is reachable from the target
-machine, either publicly or with git credentials. No PyPI publish is required
-for this path.
+the `v0.4.0b1` tag to GitHub, and the repo is reachable from the target machine,
+either publicly or with git credentials. No PyPI publish is required for this
+path.
 
-Optional later PyPI path:
+Optional graph UI install:
 
 ```bash
-uvx --from "fernme[mcp]" fernme-mcp
-pipx run --spec "fernme[mcp]" fernme-mcp
+pip install "fernme[ui]"
 ```
 
 The package name is `fernme`; the console script is `fernme-mcp`.
@@ -47,6 +62,8 @@ Configuration is environment-variable only.
 | variable | default | purpose |
 |---|---|---|
 | `FERNME_DB` | `~/.fernme/fernme.db` | SQLite database path used by the MCP server |
+| `FERNME_SITE` | `default` | Optional local default site for tools that omit `site` |
+| `FERNME_USER` | `local` | Optional local default user for tools that omit `user` |
 
 The server has keyless local defaults. Agents still pass explicit `site` and
 `user` arguments to every tool call, and writes remain consent-gated.
@@ -108,11 +125,13 @@ The marketplace entry points to `./plugins/fernme-memory`, which contains:
 - `skills/fernme-memory/SKILL.md`
 
 The shipped MCP config launches `uvx` from the pinned GitHub tag with the `mcp` extra.
+It includes an empty `FERNME_DB` env slot that users can fill with the path from
+`fernme-mcp --print-db-path` when they want the plugin to use a specific DB.
 For local development before the repo is pushed, use the adjacent
 `.mcp.local.json` shape instead, or run the smoke test from a checkout after:
 
 ```bash
-pip install -e ".[mcp]"
+pip install -e ".[dev,ui]"
 python packaging/smoke_mcp.py --command fernme-mcp
 ```
 
@@ -154,7 +173,7 @@ is documented as unrun. The schema and layout were checked against current Claud
 Code plugin documentation.
 
 The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path,
-pinned to `0.4.0-beta.1`. Actual Cowork UI installation requires the pushed,
+pinned to `v0.4.0b1`. Actual Cowork UI installation requires the pushed,
 reachable repo and the pushed tag, and is not exercised in CI.
 
 ## Smoke Test

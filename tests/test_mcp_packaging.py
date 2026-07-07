@@ -10,9 +10,10 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEST_RELEASE_TAG = "0.4.0-beta.1"
+TEST_RELEASE_TAG = "v0.4.0b1"
 PACKAGE_VERSION = "0.4.0b1"
 UVX_FROM = f"fernme[mcp] @ git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}"
+PLUGIN_VERSION = "0.4.0b1"
 
 
 def _read_json(path):
@@ -25,6 +26,7 @@ def _assert_uvx_git_mcp(mcp):
     assert server["args"] == ["--from", UVX_FROM, "fernme-mcp"]
     assert "[mcp]" in server["args"][1]
     assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][1]
+    assert server["env"]["FERNME_DB"] == ""
 
 
 def test_packaging_json_files_are_valid():
@@ -38,6 +40,13 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert pyproject["project"]["version"] == PACKAGE_VERSION
     assert pyproject["project"]["scripts"]["fernme-mcp"] == "fernme.api.mcp_server:main"
+    assert "mcp>=1.0" in pyproject["project"]["dependencies"]
+    assert pyproject["project"]["readme"] == "README.md"
+    assert pyproject["project"]["license"] == "Apache-2.0"
+    assert "Development Status :: 4 - Beta" in pyproject["project"]["classifiers"]
+    assert "Homepage" in pyproject["project"]["urls"]
+    assert pyproject["project"]["optional-dependencies"]["ui"] == [
+        "fastapi>=0.110", "uvicorn[standard]>=0.27"]
 
     codex_plugin = _read_json(
         "packaging/codex/plugins/fernme-memory/.codex-plugin/plugin.json")
@@ -47,7 +56,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     codex_marketplace = _read_json("packaging/codex/.agents/plugins/marketplace.json")
 
     assert codex_plugin["name"] == "fernme-memory"
-    assert codex_plugin["version"] == TEST_RELEASE_TAG
+    assert codex_plugin["version"] == PLUGIN_VERSION
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
     _assert_uvx_git_mcp(codex_mcp)
@@ -63,7 +72,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     root_claude_marketplace = _read_json(".claude-plugin/marketplace.json")
 
     assert claude_plugin["name"] == "fernme-memory"
-    assert claude_plugin["version"] == TEST_RELEASE_TAG
+    assert claude_plugin["version"] == PLUGIN_VERSION
     assert claude_plugin["skills"] == "./skills/"
     _assert_uvx_git_mcp(claude_mcp)
     assert claude_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
@@ -96,35 +105,36 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
             encoding="utf-8",
             encoding_error_handler="replace",
         )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                tools = await session.list_tools()
-                assert "remember" in {tool.name for tool in tools.tools}
-                await session.call_tool(
-                    "grant_consent",
-                    {"site": "demo.local", "user": "elena", "granted": True},
-                )
-                await session.call_tool(
-                    "remember",
-                    {
-                        "site": "demo.local",
-                        "user": "elena",
-                        "type": "note",
-                        "tags": ["pref:concise"],
-                        "text": "Elena prefers concise updates.",
-                        "ts": 1.0,
-                    },
-                )
-                card = await session.call_tool(
-                    "recall_card",
-                    {
-                        "site": "demo.local",
-                        "user": "elena",
-                        "context": ["pref:concise"],
-                        "now": 2.0,
-                    },
-                )
-                assert "pref:concise" in card.content[0].text
+        with open(os.devnull, "w", encoding="utf-8") as errlog:
+            async with stdio_client(params, errlog=errlog) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    tools = await session.list_tools()
+                    assert "remember" in {tool.name for tool in tools.tools}
+                    await session.call_tool(
+                        "grant_consent",
+                        {"site": "demo.local", "user": "elena", "granted": True},
+                    )
+                    await session.call_tool(
+                        "remember",
+                        {
+                            "site": "demo.local",
+                            "user": "elena",
+                            "type": "note",
+                            "tags": ["pref:concise"],
+                            "text": "Elena prefers concise updates.",
+                            "ts": 1.0,
+                        },
+                    )
+                    card = await session.call_tool(
+                        "recall_card",
+                        {
+                            "site": "demo.local",
+                            "user": "elena",
+                            "context": ["pref:concise"],
+                            "now": 2.0,
+                        },
+                    )
+                    assert "pref:concise" in card.content[0].text
 
     anyio.run(run)

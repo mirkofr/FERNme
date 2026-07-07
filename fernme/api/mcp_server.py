@@ -3,13 +3,22 @@ user persistent, glass-box memory.
 
 Run from an installed package with: fernme-mcp
 Development fallback: python -m fernme.api.mcp_server
-Requires: pip install "fernme[mcp]"
+Requires: pip install fernme
 """
 from __future__ import annotations
-import os
+import argparse
+import sys
 from ..service import FernService
+from ..runtime_config import default_db_path, default_site, default_user, ensure_default_db_path
 
-svc = FernService()  # default: $FERNME_DB or ~/.fernme/fernme.db
+svc = None
+
+
+def _service() -> FernService:
+    global svc
+    if svc is None:
+        svc = FernService()
+    return svc
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -20,7 +29,8 @@ if FastMCP is not None:
     mcp = FastMCP("fernme")
 
     @mcp.tool()
-    def remember(site: str, user: str, type: str = "note", tags: list[str] = [],
+    def remember(site: str = default_site(), user: str = default_user(),
+                 type: str = "note", tags: list[str] = [],
                  text: str = "", source: str = "stated", glosses: dict = {},
                  ts: float = 0.0) -> dict:
         """Record an interaction/preference for a user on a site (consent required).
@@ -41,31 +51,35 @@ if FastMCP is not None:
             payload["text"] = text
         if glosses:
             payload["glosses"] = glosses
-        return svc.observe(site, user, type, payload, ts)
+        return _service().observe(site, user, type, payload, ts)
 
     @mcp.tool()
-    def recall_glossary(site: str, user: str) -> dict:
+    def recall_glossary(site: str = default_site(), user: str = default_user()) -> dict:
         """What each remembered tag MEANS: {tag: {gloss, context}}. Context is the
         sentence it came from; gloss is the supplied or templated one-liner."""
-        return svc.glossary(site, user)
+        return _service().glossary(site, user)
 
     @mcp.tool()
-    def grant_consent(site: str, user: str, granted: bool = True) -> dict:
+    def grant_consent(site: str = default_site(), user: str = default_user(),
+                      granted: bool = True) -> dict:
         """Grant or withdraw a user's consent to be remembered on a site."""
-        return svc.consent(site, user, granted)
+        return _service().consent(site, user, granted)
 
     @mcp.tool()
-    def recall_card(site: str, user: str, context: list[str] = [], now: float = 0.0) -> dict:
+    def recall_card(site: str = default_site(), user: str = default_user(),
+                    context: list[str] = [], now: float = 0.0) -> dict:
         """Get the token-minimal memory card for a user (what to inject into the prompt)."""
-        return svc.card(site, user, context, now)
+        return _service().card(site, user, context, now)
 
     @mcp.tool()
-    def recall_events(site: str, user: str, contains: str = "", limit: int = 20) -> list:
+    def recall_events(site: str = default_site(), user: str = default_user(),
+                      contains: str = "", limit: int = 20) -> list:
         """Open the Cabinet: search a user's raw interaction history for specifics."""
-        return svc.recall(site, user, contains=contains or None, limit=limit)
+        return _service().recall(site, user, contains=contains or None, limit=limit)
 
     @mcp.tool()
-    def import_obsidian(site: str, user: str, path: str, dry_run: bool = False,
+    def import_obsidian(path: str, site: str = default_site(), user: str = default_user(),
+                        dry_run: bool = False,
                         max_notes: int = None, include: list[str] = [],
                         exclude: list[str] = []) -> dict:
         """Import an Obsidian vault from the MCP server machine.
@@ -73,55 +87,75 @@ if FastMCP is not None:
         Returns a redacted count summary only. Note text is stored as data, and
         wikilinks are queued as human-reviewed suggestions rather than applied.
         """
-        return svc.import_obsidian(
+        return _service().import_obsidian(
             site, user, path, dry_run=dry_run, max_notes=max_notes,
             include=include or None, exclude=exclude or None)
 
     @mcp.tool()
-    def edit_memory(site: str, user: str, attr: str, weight: float) -> dict:
+    def edit_memory(attr: str, weight: float, site: str = default_site(),
+                    user: str = default_user()) -> dict:
         """Glass-box override of a single preference (locked, never decays)."""
-        return svc.edit(site, user, attr, weight)
+        return _service().edit(site, user, attr, weight)
 
     @mcp.tool()
-    def forget_me(site: str, user: str) -> dict:
+    def forget_me(site: str = default_site(), user: str = default_user()) -> dict:
         """Delete everything stored about a user on a site (right to be forgotten)."""
-        return svc.delete(site, user)
+        return _service().delete(site, user)
 
     @mcp.tool()
-    def list_canonicalization_suggestions(site: str, user: str, now: float = 0.0,
+    def list_canonicalization_suggestions(site: str = default_site(),
+                                          user: str = default_user(), now: float = 0.0,
                                           refresh: bool = True) -> list[dict]:
         """List pending alias/entity canonicalization suggestions for human review."""
-        return svc.list_suggestions(site, user, now, refresh)
+        return _service().list_suggestions(site, user, now, refresh)
 
     @mcp.tool()
-    def accept_canonicalization_suggestion(site: str, user: str, suggestion_id: str,
+    def accept_canonicalization_suggestion(suggestion_id: str,
+                                           site: str = default_site(),
+                                           user: str = default_user(),
                                            ts: float = 0.0) -> dict:
         """Accept one pending suggestion and apply it through the service API."""
-        return svc.accept_suggestion(site, user, suggestion_id, ts)
+        return _service().accept_suggestion(site, user, suggestion_id, ts)
 
     @mcp.tool()
-    def reject_canonicalization_suggestion(site: str, user: str, suggestion_id: str,
+    def reject_canonicalization_suggestion(suggestion_id: str,
+                                           site: str = default_site(),
+                                           user: str = default_user(),
                                            ts: float = 0.0) -> dict:
         """Reject one pending suggestion so it does not resurface."""
-        return svc.reject_suggestion(site, user, suggestion_id, ts)
+        return _service().reject_suggestion(site, user, suggestion_id, ts)
 
     @mcp.tool()
-    def propose_entity_link(site: str, user: str, alias_attr: str,
-                            entity_id: str, ts: float = 0.0) -> dict:
+    def propose_entity_link(alias_attr: str, entity_id: str,
+                            site: str = default_site(), user: str = default_user(),
+                            ts: float = 0.0) -> dict:
         """Propose an entity alias link for human review. Never auto-applies."""
-        return svc.propose_entity_link(site, user, alias_attr, entity_id, ts)
+        return _service().propose_entity_link(site, user, alias_attr, entity_id, ts)
 
     @mcp.tool()
-    def propose_relation(site: str, user: str, subject_id: str, relation: str,
-                         object_id: str, note: str = "", ts: float = 0.0) -> dict:
+    def propose_relation(subject_id: str, relation: str, object_id: str,
+                         site: str = default_site(), user: str = default_user(),
+                         note: str = "", ts: float = 0.0) -> dict:
         """Propose a typed entity relation for human review. Never auto-applies."""
-        return svc.propose_relation(site, user, subject_id, relation, object_id, note, ts)
+        return _service().propose_relation(site, user, subject_id, relation, object_id, note, ts)
 
-    def main():
-        mcp.run()
-else:
-    def main():
+def main(argv=None, run_server: bool = True):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--print-db-path", action="store_true",
+                        help="Print the resolved FERNme SQLite DB path and exit.")
+    ns = parser.parse_args(argv)
+    if ns.print_db_path:
+        print(default_db_path())
+        return 0
+    if FastMCP is None:
         raise SystemExit("Install the 'mcp' package: pip install mcp")
+    resolved = ensure_default_db_path()
+    global svc
+    svc = FernService(db_path=resolved)
+    print(f"FERNme DB: {resolved}", file=sys.stderr)
+    if run_server:
+        mcp.run()
+    return 0
 
 if __name__ == "__main__":
     main()

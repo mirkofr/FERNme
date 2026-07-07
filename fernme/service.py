@@ -11,6 +11,7 @@ from .retrieve.card import compile_card
 from .retrieve.entity_card import compile_entity_card
 from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
+from .runtime_config import default_db_path, ensure_default_db_path
 from .supernode import Supernode
 from .safety import sanitize_tags, cap_numeric
 from .tagging import DeterministicTagger
@@ -82,12 +83,6 @@ def _conflict_for_edge(ug: UserGraph, attr: str, cfg: Config) -> float:
     )
 
 
-def default_db_path() -> str:
-    """Local, non-cloud-synced path. SQLite on iCloud/Dropbox/OneDrive corrupts."""
-    return os.environ.get("FERNME_DB") or os.path.join(
-        os.path.expanduser("~"), ".fernme", "fernme.db")
-
-
 class ConsentError(RuntimeError):
     pass
 
@@ -100,7 +95,7 @@ class FernService:
         # All hot writes and recalls are deterministic. Legacy tagger/enricher
         # objects are only used by explicit propose-only enrichment wrappers.
         assert memory_mode in ("pure", "gated", "offline")
-        self.store = store or SQLiteStore(db_path or default_db_path())
+        self.store = store or SQLiteStore(ensure_default_db_path(db_path))
         self.cfg = cfg
         self.memory_mode = memory_mode
         self.tagger = tagger                  # legacy, never called on hot path
