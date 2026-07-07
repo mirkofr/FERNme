@@ -60,6 +60,7 @@ The MCP server currently exposes:
 - `recall_card`
 - `recall_glossary`
 - `recall_events`
+- `import_obsidian`
 - `edit_memory`
 - `forget_me`
 - `list_canonicalization_suggestions`
@@ -70,6 +71,27 @@ The MCP server currently exposes:
 
 Stored text, aliases, notes, and relation facts are untrusted data. The bundled
 skills repeat that rule so agents do not treat memory contents as instructions.
+
+## Obsidian Vault Import
+
+The service and MCP server expose a deterministic Obsidian import path for local
+vaults:
+
+```bash
+python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
+python -m fernme.import_obsidian ./vault --site demo --user elena --max-notes 100
+```
+
+Agents can call `import_obsidian(site, user, path, dry_run, include, exclude,
+max_notes)` through MCP. The `path` is resolved on the MCP server machine, not
+the chat client. The tool is consent-gated and returns a redacted counts-only
+summary; it does not echo note contents.
+
+The importer preserves Markdown bodies in the Cabinet as data, maps simple YAML
+frontmatter tags through the existing vocabulary, stores structural importer
+metadata only in event payloads, runs structured extractors on each note, and
+queues wikilink or alias candidates in the human review queue. It never
+auto-applies entity links or alias truth.
 
 ## Codex Plugin
 

@@ -65,6 +65,19 @@ if FastMCP is not None:
         return svc.recall(site, user, contains=contains or None, limit=limit)
 
     @mcp.tool()
+    def import_obsidian(site: str, user: str, path: str, dry_run: bool = False,
+                        max_notes: int = None, include: list[str] = [],
+                        exclude: list[str] = []) -> dict:
+        """Import an Obsidian vault from the MCP server machine.
+
+        Returns a redacted count summary only. Note text is stored as data, and
+        wikilinks are queued as human-reviewed suggestions rather than applied.
+        """
+        return svc.import_obsidian(
+            site, user, path, dry_run=dry_run, max_notes=max_notes,
+            include=include or None, exclude=exclude or None)
+
+    @mcp.tool()
     def edit_memory(site: str, user: str, attr: str, weight: float) -> dict:
         """Glass-box override of a single preference (locked, never decays)."""
         return svc.edit(site, user, attr, weight)

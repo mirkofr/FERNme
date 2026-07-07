@@ -286,7 +286,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 247 passing, 2 skipped
+python -m pytest tests -q               # 253 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -298,6 +298,7 @@ FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077   # REST API (docs
 open http://localhost:8077/ui                               # glass-box memory editor
 open http://localhost:8077/graph                            # your memory as a graph — focus by site / PC / phone
 fernme-mcp                                                   # MCP server for agents/Codex/Claude
+python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
 ```
 
 > 🗄 **Storage:** defaults to `~/.fernme/fernme.db` (SQLite). For production use `PostgresStore` — same interface, tested against a real Postgres 16. Keep SQLite off cloud-synced folders.
@@ -342,6 +343,22 @@ otherwise reachable repo before testers can fetch it. The package version is
 PyPI and enable the shorter `uvx --from "fernme[mcp]" fernme-mcp` path later.
 See `docs/mcp.md` for local development alternatives.
 
+### Import your Obsidian vault
+
+FERNme can import a local Obsidian vault deterministically:
+
+```bash
+python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
+python -m fernme.import_obsidian ./vault --site demo --user elena --max-notes 100
+```
+
+The importer requires consent, preserves Markdown note bodies in the Cabinet as
+data, maps simple frontmatter tags through the existing vocabulary, extracts
+structured fields such as email and ISO dates into event payloads, and queues
+wikilink or alias candidates for human review. It never auto-applies entity
+truth. Through MCP, agents call `import_obsidian(site, user, path, ...)`; the
+path is on the MCP server machine and the returned summary is counts-only.
+
 ---
 
 ## Minimal API example
@@ -384,7 +401,7 @@ print(svc.recall_path("demo.example", "alex", alex, dana))
 - **Population prior** — IDF cold-start; differential (deviation-only) storage is
   enforced by an explicit `prune_to_prior` pass (redundant edges read through to the prior).
 - **Stores** — `SQLiteStore` (zero-setup) and `PostgresStore` (tested vs real PG 16), one interface.
-- **Ingestion bridge** - a per-site **catalog** (item_id->tags) plus a controlled namespaced vocabulary (`vocabulary.py`) that canonicalizes catalog, free-text, and agent-supplied tags to one form (`pref:`, `topic:`, `goal:`, `context:`) so the same concept does not drift across months. Enrichment proposals are separate and human-approved.
+- **Ingestion bridge** - a per-site **catalog** (item_id->tags) plus a controlled namespaced vocabulary (`vocabulary.py`) that canonicalizes catalog, free-text, and agent-supplied tags to one form (`pref:`, `topic:`, `goal:`, `context:`) so the same concept does not drift across months. The deterministic Obsidian importer uses the same vocabulary and queues wikilink aliases for review. Enrichment proposals are separate and human-approved.
 - **Structured-field capture** — regex-only contact/date extraction keeps email,
   phone, URL, handle, and ISO-date values in the Cabinet payload as data, not tags.
 - **Typed entity layer** - opt-in service APIs and additive SQLite/Postgres tables for entities, tag aliases, fields, Hebbian typed relations, relation facts, alias aggregation, and compact entity-aware card enrichment behind default-off flags.
@@ -419,7 +436,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (247 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, MCP packaging smoke coverage, and the full results suite above.
+Done & tested (253 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, deterministic Obsidian import, MCP packaging smoke coverage, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -472,7 +489,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
-tests/       247 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       253 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

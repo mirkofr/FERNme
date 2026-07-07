@@ -22,6 +22,7 @@ from . import curation as _curation
 from . import curation_queue as _curation_queue
 from . import enrichment as _enrichment
 from . import glossary as _glossary
+from .capture import obsidian as _obsidian
 from . import resolution as _resolution
 from .vocabulary import Vocabulary
 from .identity import is_identity_attr
@@ -309,6 +310,75 @@ class FernService:
         """Open the Cabinet: structured query over raw events (specific facts)."""
         self._require_consent(site, user)
         return self.store.recall(site, user, type, contains, limit)
+
+    def import_obsidian(self, site: str, user: str, path: str, dry_run: bool = False,
+                        include=None, exclude=None, max_notes: int = None,
+                        now: float = 0.0) -> Dict:
+        """Import an Obsidian vault deterministically.
+
+        Note contents are stored as Cabinet data. Wiki links and aliases enqueue
+        human-reviewed suggestions only; no entity truth is auto-applied.
+        """
+        self._require_consent(site, user)
+        notes, skipped = _obsidian.parse_vault(
+            path,
+            include=include,
+            exclude=exclude,
+            max_notes=max_notes,
+            vocabulary=self.vocabulary or Vocabulary(default_namespace="topic"),
+        )
+        existing = _obsidian.imported_keys_from_events(
+            self.store.recall(site, user, type=_obsidian.IMPORT_EVENT_TYPE, limit=100000))
+        report = {
+            "dry_run": bool(dry_run),
+            "notes_read": len(notes),
+            "notes_imported": 0,
+            "events_added": 0,
+            "tags_added": 0,
+            "tags_found": 0,
+            "structured_fields": 0,
+            "candidates_found": 0,
+            "candidates_queued": 0,
+            "skipped": {
+                "already_imported": 0,
+                "include": int(skipped.get("include", 0)),
+                "exclude": int(skipped.get("exclude", 0)),
+                "cap": int(skipped.get("cap", 0)),
+            },
+            "content_redacted": True,
+        }
+        for note in notes:
+            if _obsidian.imported_key(note) in existing:
+                report["skipped"]["already_imported"] += 1
+                continue
+            report["notes_imported"] += 1
+            report["structured_fields"] += len(note.structured)
+            report["tags_found"] += len(note.tags)
+            report["candidates_found"] += len(note.candidates)
+            if dry_run:
+                continue
+            out = self.observe(
+                site,
+                user,
+                _obsidian.IMPORT_EVENT_TYPE,
+                note.payload(),
+                ts=now,
+            )
+            report["events_added"] += 1
+            report["tags_added"] += len(out.get("stored_attrs", []))
+            for cand in note.candidates:
+                self.store.upsert_suggestion(cand.row(site, user, now))
+                report["candidates_queued"] += 1
+            self.store.trim_pending_suggestions(
+                site, user, int(self.cfg.canonicalization_queue_cap))
+        if not dry_run:
+            self._audit(site, user, "import_obsidian", {
+                "notes_imported": report["notes_imported"],
+                "events_added": report["events_added"],
+                "candidates_queued": report["candidates_queued"],
+                "content_redacted": True,
+            }, now)
+        return report
 
     def defaults(self, site: str, user: str, now: float = 0.0) -> Dict:
         """Baked-in: known links -> tool defaults / ranking bias."""

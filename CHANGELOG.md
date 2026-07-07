@@ -54,6 +54,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   from the Git repo with the `mcp` extra.
 - Pinned shipped plugin MCP configs to the reproducible test release
   `0.4.0-beta.1` and aligned the package/plugin versions for external testers.
+- Added deterministic Obsidian vault import via service, CLI, and MCP: note text
+  is stored as Cabinet data, frontmatter tags use the existing vocabulary, and
+  wikilinks/aliases queue human-reviewed suggestions only.
 
 ## [0.3.0] — curation, capture adapters, and per-memory meaning
 
