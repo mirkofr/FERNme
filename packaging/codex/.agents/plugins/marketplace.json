@@ -1,0 +1,21 @@
+{
+  "name": "fernme-local",
+  "interface": {
+    "displayName": "FERNme Local"
+  },
+  "plugins": [
+    {
+      "name": "fernme-memory",
+      "description": "Local FERNme memory MCP server and standing memory skill.",
+      "source": {
+        "source": "local",
+        "path": "./plugins/fernme-memory"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

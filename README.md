@@ -11,7 +11,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-244%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
+[![Tests](https://img.shields.io/badge/tests-246%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
 [![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
@@ -286,7 +286,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 244 passing, 2 skipped
+python -m pytest tests -q               # 246 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -297,10 +297,32 @@ python -m fernme.eval.pilot               # +17% simulated conversion lift
 FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077   # REST API (docs at /docs)
 open http://localhost:8077/ui                               # glass-box memory editor
 open http://localhost:8077/graph                            # your memory as a graph — focus by site / PC / phone
-python -m fernme.api.mcp_server                               # MCP server for agents/Claude
+fernme-mcp                                                   # MCP server for agents/Codex/Claude
 ```
 
 > 🗄 **Storage:** defaults to `~/.fernme/fernme.db` (SQLite). For production use `PostgresStore` — same interface, tested against a real Postgres 16. Keep SQLite off cloud-synced folders.
+
+### MCP and plugin packaging
+
+Install the MCP extra before running the packaged server:
+
+```bash
+pip install -e ".[mcp]"
+fernme-mcp
+```
+
+Bundled local plugin manifests live under `packaging/`:
+
+```bash
+codex plugin marketplace add ./packaging/codex
+claude plugin marketplace add ./packaging/claude
+```
+
+The Codex package includes `.codex-plugin/plugin.json`, `.mcp.json`, and a
+`fernme-memory` skill. The Claude Code/Cowork package follows the current
+`.claude-plugin/plugin.json` plus `.mcp.json` layout; CLI validation depends on a
+local `claude` install. Both launch the same `fernme-mcp` console script and use
+environment-only configuration. See `docs/mcp.md`.
 
 ---
 
@@ -379,7 +401,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (244 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, and the full results suite above.
+Done & tested (246 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, MCP packaging smoke coverage, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -432,7 +454,7 @@ fernme/
   supernode.py · auth.py · triggers.py · safety.py · service.py
   api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
   eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
-tests/       244 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       246 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---

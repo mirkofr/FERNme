@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "fernme": {
+      "command": "fernme-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}

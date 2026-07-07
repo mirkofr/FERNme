@@ -1,6 +1,10 @@
 """MCP server exposing FERNme as agent tools, so any MCP-capable agent can give a
-user persistent, glass-box memory. Run: python -m fernme.api.mcp_server
-Requires: pip install mcp"""
+user persistent, glass-box memory.
+
+Run from an installed package with: fernme-mcp
+Development fallback: python -m fernme.api.mcp_server
+Requires: pip install "fernme[mcp]"
+"""
 from __future__ import annotations
 import os
 from ..service import FernService

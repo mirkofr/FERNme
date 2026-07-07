@@ -1,0 +1,13 @@
+{
+  "name": "fernme-local",
+  "owner": {
+    "name": "Acquilab Inc."
+  },
+  "plugins": [
+    {
+      "name": "fernme-memory",
+      "source": "./plugins/fernme-memory",
+      "description": "Local FERNme memory MCP server and standing memory skill."
+    }
+  ]
+}

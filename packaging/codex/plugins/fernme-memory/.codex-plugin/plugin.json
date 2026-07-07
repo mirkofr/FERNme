@@ -1,0 +1,22 @@
+{
+  "name": "fernme-memory",
+  "version": "0.4.0",
+  "description": "Local FERNme memory MCP server and standing memory skill.",
+  "author": {
+    "name": "Acquilab Inc."
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "FERNme Memory",
+    "shortDescription": "Use local, consent-gated FERNme memory from Codex.",
+    "longDescription": "Adds a local MCP server for consent-gated FERNme memory plus a standing skill that tells Codex how to recall, remember, and review suggestions without auto-applying memory truth.",
+    "developerName": "Acquilab Inc.",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Memory"
+    ],
+    "defaultPrompt": "Use FERNme memory for this project. Recall before acting and only remember consented facts."
+  },
+  "mcpServers": "./.mcp.json"
+}
