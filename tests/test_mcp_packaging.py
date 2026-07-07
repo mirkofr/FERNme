@@ -2,11 +2,15 @@ import importlib.util
 import json
 import os
 import sys
-import tomllib
 from pathlib import Path
 
 import anyio
 import pytest
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
