@@ -331,12 +331,16 @@ mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
 The shipped MCP configs run:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@main" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@0.4.0-beta.1" fernme-mcp
 ```
 
-No PyPI publish is required. The repo must be pushed and reachable, and the
-`main` ref should be pinned to a release tag or commit before sharing. See
-`docs/mcp.md` for local development alternatives.
+No PyPI publish is required. The plugin is pinned to the reproducible test
+release `0.4.0-beta.1`, so external testers get the same server build. The owner
+must push `main` and create plus push the `0.4.0-beta.1` tag on a public or
+otherwise reachable repo before testers can fetch it. The package version is
+`0.4.0b1`; the non-`v` tag is intentional because only `v*` tags publish to
+PyPI and enable the shorter `uvx --from "fernme[mcp]" fernme-mcp` path later.
+See `docs/mcp.md` for local development alternatives.
 
 ---
 

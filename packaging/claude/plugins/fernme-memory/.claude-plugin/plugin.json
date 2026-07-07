@@ -1,7 +1,7 @@
 {
   "name": "fernme-memory",
   "displayName": "FERNme Memory",
-  "version": "0.4.0",
+  "version": "0.4.0-beta.1",
   "description": "Local FERNme memory MCP server and standing memory skill.",
   "author": {
     "name": "Acquilab Inc."

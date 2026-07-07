@@ -17,13 +17,19 @@ For GitHub marketplace installs before a PyPI release, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@main" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@0.4.0-beta.1" fernme-mcp
 ```
 
-The `main` ref is a placeholder for owner setup. Pin it to a release tag or
-commit before sharing the marketplace broadly. This path works only after the
-repo has been pushed to GitHub and is reachable from the target machine, either
-publicly or with git credentials. No PyPI publish is required for this path.
+The shipped plugin is pinned to the reproducible test release `0.4.0-beta.1`,
+so testers fetch the same server build. The git tag `0.4.0-beta.1` maps to the
+package version `0.4.0b1` in PEP 440 form. The non-`v` tag is intentional:
+the PyPI publish workflow triggers only on `v*`, so test builds do not publish
+to PyPI.
+
+This path works only after the owner has pushed `main` and created plus pushed
+the `0.4.0-beta.1` tag to GitHub, and the repo is reachable from the target
+machine, either publicly or with git credentials. No PyPI publish is required
+for this path.
 
 Optional later PyPI path:
 
@@ -79,7 +85,7 @@ The marketplace entry points to `./plugins/fernme-memory`, which contains:
 - `.mcp.json`
 - `skills/fernme-memory/SKILL.md`
 
-The shipped MCP config launches `uvx` from the GitHub repo with the `mcp` extra.
+The shipped MCP config launches `uvx` from the pinned GitHub tag with the `mcp` extra.
 For local development before the repo is pushed, use the adjacent
 `.mcp.local.json` shape instead, or run the smoke test from a checkout after:
 
@@ -125,9 +131,9 @@ for this packaging pass did not have the `claude` CLI installed, so CLI validati
 is documented as unrun. The schema and layout were checked against current Claude
 Code plugin documentation.
 
-The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path. Pin
-the `main` ref to a release tag or commit before sharing. Actual Cowork UI
-installation requires the pushed, reachable repo and is not exercised in CI.
+The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path,
+pinned to `0.4.0-beta.1`. Actual Cowork UI installation requires the pushed,
+reachable repo and the pushed tag, and is not exercised in CI.
 
 ## Smoke Test
 

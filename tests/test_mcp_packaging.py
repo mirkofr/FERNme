@@ -10,7 +10,9 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UVX_FROM = "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@main"
+TEST_RELEASE_TAG = "0.4.0-beta.1"
+PACKAGE_VERSION = "0.4.0b1"
+UVX_FROM = f"fernme[mcp] @ git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}"
 
 
 def _read_json(path):
@@ -22,7 +24,7 @@ def _assert_uvx_git_mcp(mcp):
     assert server["command"] == "uvx"
     assert server["args"] == ["--from", UVX_FROM, "fernme-mcp"]
     assert "[mcp]" in server["args"][1]
-    assert "git+https://github.com/mirkofr/FERNme@main" in server["args"][1]
+    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][1]
 
 
 def test_packaging_json_files_are_valid():
@@ -34,6 +36,7 @@ def test_packaging_json_files_are_valid():
 
 def test_console_script_and_plugin_manifests_reference_mcp_server():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert pyproject["project"]["version"] == PACKAGE_VERSION
     assert pyproject["project"]["scripts"]["fernme-mcp"] == "fernme.api.mcp_server:main"
 
     codex_plugin = _read_json(
@@ -44,6 +47,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     codex_marketplace = _read_json("packaging/codex/.agents/plugins/marketplace.json")
 
     assert codex_plugin["name"] == "fernme-memory"
+    assert codex_plugin["version"] == TEST_RELEASE_TAG
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
     _assert_uvx_git_mcp(codex_mcp)
@@ -59,6 +63,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     root_claude_marketplace = _read_json(".claude-plugin/marketplace.json")
 
     assert claude_plugin["name"] == "fernme-memory"
+    assert claude_plugin["version"] == TEST_RELEASE_TAG
     assert claude_plugin["skills"] == "./skills/"
     _assert_uvx_git_mcp(claude_mcp)
     assert claude_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
