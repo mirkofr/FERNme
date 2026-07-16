@@ -220,6 +220,10 @@ def test_spa_graph_source_is_local_force_directed_shell():
     assert "canvasIconKind" in graph_view
     assert "linkDirectionalParticles" in graph_view
     assert "linkDirectionalParticleSpeed" in graph_view
+    assert "SelectedNodeCard" in graph_view
+    assert "selected-card" in graph_view
+    assert "Why this appears" in graph_view
+    assert "legend-card" not in graph_view
     assert "graphHostRef" in graph_view
     assert 'viewMode !== "2d"' in graph_view
     assert "_destructor" in graph_view
@@ -233,6 +237,9 @@ def test_spa_graph_source_is_local_force_directed_shell():
     assert "grid-template-columns: auto minmax(330px, 1fr) minmax(430px, 44vw)" in styles
     assert "fern-topbar-height" in styles
     assert "scrollbar-width: thin" in theme
+    assert "fern-card-flip" in theme
+    assert ".selected-card" in theme
+    assert ".legend-card" not in theme
     assert "radial-gradient(circle, var(--fern-grid-dot)" not in theme
 
 

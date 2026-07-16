@@ -22,6 +22,7 @@ import {
   UserRound,
   UserRoundCheck,
   WandSparkles,
+  X,
   Zap
 } from "lucide-react";
 import { GraphEdge, GraphNode, nodeId, postJson } from "./api";
@@ -836,8 +837,10 @@ export default function GraphView() {
         totalNodes={fern.graph?.nodes?.length || 0}
         totalEdges={fern.graph?.edges?.length || 0}
         suggestions={fern.suggestions.length}
+        selected={selected}
+        onCloseSelection={() => setSelected(null)}
+        onEdit={fern.editAttr}
       />
-      <Inspector node={selected} onClose={() => setSelected(null)} onEdit={fern.editAttr} />
     </section>
   );
 }
@@ -900,13 +903,19 @@ function GraphInsights({
   edges,
   totalNodes,
   totalEdges,
-  suggestions
+  suggestions,
+  selected,
+  onCloseSelection,
+  onEdit
 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
   totalNodes: number;
   totalEdges: number;
   suggestions: number;
+  selected: GraphNode | null;
+  onCloseSelection: () => void;
+  onEdit: (attr: string, weight: number) => Promise<void>;
 }) {
   const topNode = useMemo(() => {
     const degree = new Map<string, number>();
@@ -931,15 +940,6 @@ function GraphInsights({
     }
     return projects.sort((a, b) => (degree.get(b.id) || 0) - (degree.get(a.id) || 0))[0];
   }, [edges, nodes]);
-
-  const legend = [
-    ["Person", "var(--fern-graph-person)"],
-    ["Organization", "var(--fern-graph-organization)"],
-    ["Project", "var(--fern-graph-project)"],
-    ["Concept", "var(--fern-graph-concept)"],
-    ["Place", "var(--fern-graph-place)"],
-    ["Event / Milestone", "var(--fern-graph-event)"],
-  ];
 
   return (
     <aside className="insight-rail" aria-label="Graph insights">
@@ -991,26 +991,24 @@ function GraphInsights({
           </li>
         </ul>
       </section>
-      <section className="panel legend-card">
-        <ul className="legend-list">
-          {legend.map(([label, color]) => (
-            <li className="legend-item" key={label}>
-              <span className="legend-dot" style={{ "--legend-color": color } as React.CSSProperties} />
-              <span>{label}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <SelectedNodeCard
+        node={selected}
+        edges={edges}
+        onClose={onCloseSelection}
+        onEdit={onEdit}
+      />
     </aside>
   );
 }
 
-function Inspector({
+function SelectedNodeCard({
   node,
+  edges,
   onClose,
   onEdit
 }: {
   node: GraphNode | null;
+  edges: GraphEdge[];
   onClose: () => void;
   onEdit: (attr: string, weight: number) => Promise<void>;
 }) {
@@ -1032,38 +1030,86 @@ function Inspector({
     });
   }, [fern.site, fern.user, node]);
 
-  if (!node) return null;
-  const attr = String(node.label || node.id);
-  return (
-    <aside className="inspector">
-      <div className="inspector-head">
-        <h2 title={labelFor(node)}>{labelFor(node)}</h2>
-        <button type="button" onClick={onClose}>Close</button>
+  if (!node) {
+    return (
+      <div className="selected-card-shell">
+        <section className="panel selected-card selected-card--empty" aria-live="polite">
+          <div className="selected-card__empty-icon"><Crosshair aria-hidden="true" /></div>
+          <div>
+            <div className="selected-card__eyebrow">Selection</div>
+            <h2 className="selected-card__title">Click a tag or entity</h2>
+            <p className="selected-card__hint">Its card will flip into this space with strength, links, and evidence.</p>
+          </div>
+        </section>
       </div>
-      <dl>
-        <dt>Kind</dt>
-        <dd>{entityKindOf(node) || node.kind || "attribute"}</dd>
-        <dt>Strength</dt>
-        <dd>{String(node.weight || node.size || "n/a")}</dd>
-        <dt>Aliases</dt>
-        <dd>{(node.entity_aliases || node.collapsed_aliases || []).join(", ") || "none"}</dd>
-      </dl>
-      {node.kind !== "user" ? (
-        <label className="weight-edit">
-          <span>Set weight</span>
-          <input
-            type="number"
-            min="0"
-            max="9"
-            defaultValue={Number(node.weight || node.size || 1)}
-            onBlur={(event) => onEdit(attr, Number(event.target.value))}
-          />
-        </label>
-      ) : null}
-      <h3>Why</h3>
-      <pre>{JSON.stringify(why || {}, null, 2)}</pre>
-      <h3>Confidence</h3>
-      <pre>{JSON.stringify(confidence || {}, null, 2)}</pre>
-    </aside>
+    );
+  }
+
+  const attr = String(node.label || node.id);
+  const aliases = node.entity_aliases || node.collapsed_aliases || [];
+  const kind = entityKindOf(node) || node.kind || "attribute";
+  const degree = edges.reduce((total, edge) => {
+    const source = edgeEndpoint(edge, "source");
+    const target = edgeEndpoint(edge, "target");
+    return total + (source === node.id || target === node.id ? 1 : 0);
+  }, 0);
+  const strength = Number(node.weight || node.size || 0);
+  const color = colorFor(node);
+
+  return (
+    <div className="selected-card-shell">
+      <section
+        key={node.id}
+        className="panel selected-card"
+        style={{ "--node-color": color } as React.CSSProperties}
+        aria-live="polite"
+      >
+        <div className="selected-card__header">
+          <span className="selected-card__mark" aria-hidden="true" />
+          <div className="selected-card__heading">
+            <div className="selected-card__eyebrow">{kind}</div>
+            <h2 className="selected-card__title" title={labelFor(node)}>{labelFor(node)}</h2>
+          </div>
+          <button type="button" className="button button--icon selected-card__close" onClick={onClose} aria-label="Close selected card">
+            <X aria-hidden="true" />
+          </button>
+        </div>
+        <div className="selected-card__metrics">
+          <span>
+            <strong>{Number.isFinite(strength) && strength > 0 ? strength.toFixed(strength % 1 ? 1 : 0) : "n/a"}</strong>
+            <small>strength</small>
+          </span>
+          <span>
+            <strong>{degree}</strong>
+            <small>visible links</small>
+          </span>
+        </div>
+        {aliases.length ? (
+          <div className="selected-card__aliases" title={aliases.join(", ")}>
+            {aliases.slice(0, 3).map((alias) => <span key={alias}>{stripNamespace(alias)}</span>)}
+          </div>
+        ) : null}
+        {node.kind !== "user" ? (
+          <label className="selected-card__edit">
+            <span>Set weight</span>
+            <input
+              type="number"
+              min="0"
+              max="9"
+              defaultValue={Number(node.weight || node.size || 1)}
+              onBlur={(event) => onEdit(attr, Number(event.target.value))}
+            />
+          </label>
+        ) : null}
+        <details className="selected-card__details">
+          <summary>Why this appears</summary>
+          <pre>{JSON.stringify(why || {}, null, 2)}</pre>
+        </details>
+        <details className="selected-card__details">
+          <summary>Confidence</summary>
+          <pre>{JSON.stringify(confidence || {}, null, 2)}</pre>
+        </details>
+      </section>
+    </div>
   );
 }
