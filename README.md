@@ -269,15 +269,19 @@ flowchart TD
 | ![The LLM gate](explanation%20of%20fern/IMG_7784.PNG)<br/>**Propose-only enrichment** - agent/model suggestions go to review; nothing auto-writes truth. | ![Memory card](explanation%20of%20fern/IMG_7802.PNG)<br/>**Memory card** - bounded, interpretable, token-minimal context for the agent. |
 | ![Action-aware learning](explanation%20of%20fern/IMG_7781.PNG)<br/>**Action-aware learning** - good outcomes strengthen connections, bad outcomes weaken them. | ![FERNme architecture](explanation%20of%20fern/IMG_7788.PNG)<br/>**Architecture** - ingestion bridge -> vocabulary -> fuzzy graph -> memory card -> agent, with optional proposal enrichment off the hot path. |
 
-**Interactive memory map demo:** the static Elena map in `demo/elena/` is a
-screenshot-ready synthetic graph. It now shows the entity-kind view (owner,
-person, org, project, and info markers), alias grouping, typed relation edges
-(`friend_of`, `colleague_of`, `works_on`), relation-fact badges, and inspectable
-edge facts.
+**Local graph UI demo:** FERNme now ships a bundled React SPA at `/ui/graph`
+instead of the old single-file HTML graph. The screenshot below is generated
+only from the checked-in synthetic Elena fixture, not from a private database.
+The UI has source-owned assets, remembered site/user defaults, canonical
+entity-kind filters, category filters, known-only filtering, search/focus,
+relation hover labels, animated focused links, 2D plus optional spatial mode,
+and a flip-in selected tag/entity card with evidence and confidence details.
 
-![Elena's memory map](docs/elena_memory_map.png)
+![FERNme local graph UI with Elena synthetic memory](docs/elena_spa_graph.png)
 
-*Elena's memory (fictional demo) — glass-box memory map with typed entities, relation facts, and labeled relations. Every node inspectable, every edge explainable.*
+*Elena's memory (fictional demo) — local SPA graph UI with canonical entity
+filters, focused relation animation, and an inspectable project card. Every
+visible node stays synthetic and every relation remains explainable.*
 
 ## 🚀 Quickstart
 
@@ -286,7 +290,7 @@ pip install -e ".[dev,api]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 257 passing, 2 skipped
+python -m pytest tests -q               # 274 passing, 2 skipped
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -295,8 +299,9 @@ python -m fernme.eval.pilot               # +17% simulated conversion lift
 
 # run it live
 FERNME_API_KEY=secret uvicorn fernme.api.rest:app --port 8077   # REST API (docs at /docs)
-open http://localhost:8077/ui                               # glass-box memory editor
-open http://localhost:8077/graph                            # your memory as a graph — focus by site / PC / phone
+fernme-ui --site demo --user elena --port 8077 --no-open    # local SPA + graph UI
+open http://localhost:8077/ui/graph                         # graph, review queue, editor, feed, health
+open http://localhost:8077/graph                            # legacy redirect to /ui/graph
 fernme-mcp --print-db-path                                   # show the shared SQLite DB path
 fernme-mcp                                                   # MCP server for agents/Codex/Claude
 python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
@@ -422,7 +427,7 @@ print(svc.recall_path("demo.example", "alex", alex, dana))
 - **Supernode** (`supernode.py` + `auth.py`) — user-owned cross-site profile, built by **sign-in** (verified token → opaque person id), default-deny scoped views, sensitive categories walled off.
 - **Proactive triggers** — due-to-reorder + fading-favorite nudges.
 - **Safety** — event tags treated as untrusted data: injection-pattern dropping, size/value caps.
-- **Interfaces** — REST (`/observe /card /recall /edit /export /delete /triggers …`) + MCP tools + a **glass-box web UI** (editor at `/ui`, cross-surface memory graph at `/graph` — one memory, focusable by site / PC / phone).
+- **Interfaces** — REST (`/observe /card /recall /edit /export /delete /triggers …`) + MCP tools + a bundled **local React SPA** at `/ui/graph` (graph, review queue, memory editor, feed, health; `/graph` redirects for old bookmarks).
 - **Governance** — consent-gated everywhere; export & right-to-be-forgotten built in.
 
 ---
@@ -446,7 +451,7 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (257 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, glass-box UI + memory-graph view, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, deterministic Obsidian import, MCP packaging smoke coverage, self-configuring install paths, and the full results suite above.
+Done & tested (274 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, bundled local SPA, 2D/spatial memory graph view, canonical entity-kind filters, review-backed re-kind suggestions, selected-node evidence cards, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, deterministic Obsidian import, MCP packaging smoke coverage, self-configuring install paths, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert
@@ -497,9 +502,10 @@ fernme/
   store/     sqlite_store · postgres_store (one interface)
   relations.py · typed entity/relation vocabulary
   supernode.py · auth.py · triggers.py · safety.py · service.py
-  api/       rest.py (FastAPI) · mcp_server.py · web/glassbox.html · web/graph.html
+  api/       rest.py (FastAPI) · mcp_server.py · serve.py
+  web/       app/ (React SPA source) · static/app/ (bundled local UI assets)
   eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
-tests/       257 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       274 passing, 2 skipped   ·   *_demo.py walkthroughs
 ```
 
 ---
