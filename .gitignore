@@ -2,11 +2,15 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
+*.tsbuildinfo
 build/
 dist/
 .pytest_cache/
 .venv/
 venv/
+node_modules/
+fernme/web/app/node_modules/
+layer3_synthetic_*/
 # local data + run artifacts (never commit personal data or DBs)
 *.db
 *.db-*

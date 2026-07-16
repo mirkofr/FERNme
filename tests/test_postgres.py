@@ -1,6 +1,7 @@
 """PostgresStore against a REAL Postgres (rootless pgserver). Skips if pgserver
 isn't installed. Run: pytest -q tests/test_postgres.py"""
 import sys, os, tempfile, shutil
+import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pytest
 
@@ -19,16 +20,16 @@ def pg():
 
 def test_full_lifecycle_on_postgres(pg):
     svc = FernService(store=PostgresStore(pg))
-    svc.consent("shop", "mirko", True)
+    svc.consent("shop", "demo-user", True)
     for w in range(5):
-        svc.observe("shop", "mirko", "purchase", {"tags": ["organic", "mid_range"]}, ts=w)
-    svc.set_numeric("shop", "mirko", "restock_cadence_days", 7)
-    card = svc.card("shop", "mirko", now=40)
+        svc.observe("shop", "demo-user", "purchase", {"tags": ["organic", "mid_range"]}, ts=w)
+    svc.set_numeric("shop", "demo-user", "restock_cadence_days", 7)
+    card = svc.card("shop", "demo-user", now=40)
     assert "organic" in card["wire"] and "restock_cadence_days" in card["wire"]
-    assert len(svc.recall("shop", "mirko", type="purchase")) == 5
+    assert len(svc.recall("shop", "demo-user", type="purchase")) == 5
     # glass-box override persists in PG
-    svc.edit("shop", "mirko", "dairy", 0)
-    assert FernService(store=PostgresStore(pg)).store.load_user("shop", "mirko").edges["dairy"].source == "override"
+    svc.edit("shop", "demo-user", "dairy", 0)
+    assert FernService(store=PostgresStore(pg)).store.load_user("shop", "demo-user").edges["dairy"].source == "override"
 
 
 def test_tenant_isolation_on_postgres(pg):
@@ -75,6 +76,22 @@ def test_canonicalization_suggestions_on_postgres(pg):
     assert rows[0]["kind"] == "alias-merge"
     assert rejected["status"] == "rejected"
     assert svc.list_suggestions("demo", "alex", now=3.0) == []
+
+
+def test_entity_rekind_suggestion_on_postgres(pg):
+    svc = FernService(store=PostgresStore(pg))
+    svc.consent("demo", "casey", True)
+    entity_id = str(uuid.uuid4())
+    svc.store.create_entity(entity_id, "demo", "casey", "workflow", "Synthetic Workflow", 1.0)
+
+    row = next(r for r in svc.list_suggestions("demo", "casey", now=2.0)
+               if r["kind"] == "entity-rekind")
+    accepted = svc.accept_suggestion("demo", "casey", row["suggestion_id"], ts=3.0)
+
+    assert row["payload"]["old_kind"] == "workflow"
+    assert row["payload"]["proposed_kind"] == "other"
+    assert accepted["status"] == "accepted"
+    assert svc.store.get_entity("demo", "casey", entity_id)["kind"] == "other"
 
 
 def test_assoc_k_suppression_on_postgres(pg):

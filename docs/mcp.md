@@ -51,9 +51,14 @@ Optional graph UI install:
 
 ```bash
 pip install "fernme[ui]"
+fernme-ui --db "/path/to/fernme.db"
 ```
 
-The package name is `fernme`; the console script is `fernme-mcp`.
+The package name is `fernme`; the console scripts are `fernme-mcp` for MCP and
+`fernme-ui` for the local REST/graph UI. `fernme-ui` starts the local server,
+opens `/graph` by default, and accepts `--db`, `--site`, `--user`, `--host`,
+`--port`, and `--no-open`. If `--site` and `--user` are omitted, the graph UI
+uses environment defaults or the single granted consent context in the DB.
 
 ## Configuration
 
@@ -83,6 +88,7 @@ The MCP server currently exposes:
 - `list_canonicalization_suggestions`
 - `accept_canonicalization_suggestion`
 - `reject_canonicalization_suggestion`
+- `propose_tags`
 - `propose_entity_link`
 - `propose_relation`
 
@@ -109,6 +115,13 @@ frontmatter tags through the existing vocabulary, stores structural importer
 metadata only in event payloads, runs structured extractors on each note, and
 queues wikilink or alias candidates in the human review queue. It never
 auto-applies entity links or alias truth.
+
+If the imported notes have no explicit tags, the import still succeeds but the
+graph can remain empty. Agents should then recall a small batch of imported
+Cabinet events and use `propose_tags` to queue concise namespaced tags inferred
+from the prose for human review. Accepted tag proposals write through the normal
+`observe()` path and become active graph memory; rejected proposals never touch
+memory truth.
 
 ## Codex Plugin
 

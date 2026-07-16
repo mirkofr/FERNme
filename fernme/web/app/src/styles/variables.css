@@ -1,0 +1,205 @@
+:root {
+  color-scheme: dark;
+
+  /* Brand */
+  --fern-brand-50: #e8fff8;
+  --fern-brand-100: #c6f9e9;
+  --fern-brand-200: #8ff1d4;
+  --fern-brand-300: #58e8bf;
+  --fern-brand-400: #2de5b6;
+  --fern-brand-500: #16c99d;
+  --fern-brand-600: #0ca47f;
+  --fern-brand-700: #0b8065;
+  --fern-brand-800: #0b624f;
+  --fern-brand-900: #08473b;
+
+  /* Neutral scale */
+  --fern-ink-0: #ffffff;
+  --fern-ink-50: #f5f8fc;
+  --fern-ink-100: #e8edf4;
+  --fern-ink-200: #cdd7e3;
+  --fern-ink-300: #a8b5c5;
+  --fern-ink-400: #7f8da0;
+  --fern-ink-500: #5e6b7c;
+  --fern-ink-600: #455162;
+  --fern-ink-700: #303b49;
+  --fern-ink-800: #1e2834;
+  --fern-ink-900: #121a24;
+  --fern-ink-950: #081019;
+
+  /* Application surfaces */
+  --fern-bg-root: #050a10;
+  --fern-bg-topbar: rgba(6, 13, 21, 0.96);
+  --fern-bg-canvas: #06101a;
+  --fern-surface-1: #091521;
+  --fern-surface-2: #0c1926;
+  --fern-surface-3: #10202f;
+  --fern-surface-hover: #132536;
+  --fern-surface-active: #153146;
+  --fern-surface-elevated: rgba(12, 25, 38, 0.94);
+  --fern-surface-glass: rgba(11, 23, 35, 0.78);
+  --fern-surface-scrim: rgba(2, 7, 12, 0.72);
+
+  /* Text */
+  --fern-text-primary: #f3f7fb;
+  --fern-text-secondary: #b6c1ce;
+  --fern-text-muted: #7f8da0;
+  --fern-text-subtle: #5e6d7f;
+  --fern-text-on-accent: #04110d;
+
+  /* Borders */
+  --fern-border-subtle: rgba(163, 184, 207, 0.14);
+  --fern-border-default: rgba(163, 184, 207, 0.22);
+  --fern-border-strong: rgba(163, 184, 207, 0.34);
+  --fern-border-brand: rgba(45, 229, 182, 0.48);
+
+  /* States */
+  --fern-info: #4cc9f0;
+  --fern-success: #2de5b6;
+  --fern-warning: #f4c95d;
+  --fern-danger: #ff6f91;
+
+  /* Graph semantic colors */
+  --fern-graph-owner: #2de5b6;
+  --fern-graph-person: #5f7dff;
+  --fern-graph-organization: #24cdb2;
+  --fern-graph-project: #ff9b55;
+  --fern-graph-concept: #a979f7;
+  --fern-graph-place: #39c7e8;
+  --fern-graph-event: #f4c95d;
+  --fern-graph-fact: #40d5bb;
+  --fern-graph-habit: #2ed18c;
+  --fern-graph-knowledge: #46b9e8;
+  --fern-graph-value: #f2aa4c;
+  --fern-graph-proposed: #ff78bd;
+  --fern-graph-unknown: #657386;
+
+  /* Semantic soft fills */
+  --fern-owner-soft: rgba(45, 229, 182, 0.12);
+  --fern-person-soft: rgba(95, 125, 255, 0.13);
+  --fern-org-soft: rgba(36, 205, 178, 0.12);
+  --fern-project-soft: rgba(255, 155, 85, 0.12);
+  --fern-concept-soft: rgba(169, 121, 247, 0.12);
+  --fern-place-soft: rgba(57, 199, 232, 0.12);
+  --fern-event-soft: rgba(244, 201, 93, 0.12);
+  --fern-danger-soft: rgba(255, 111, 145, 0.12);
+
+  /* Typography */
+  --fern-font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --fern-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --fern-font-size-10: 0.625rem;
+  --fern-font-size-11: 0.6875rem;
+  --fern-font-size-12: 0.75rem;
+  --fern-font-size-13: 0.8125rem;
+  --fern-font-size-14: 0.875rem;
+  --fern-font-size-15: 0.9375rem;
+  --fern-font-size-16: 1rem;
+  --fern-font-size-18: 1.125rem;
+  --fern-font-size-20: 1.25rem;
+  --fern-font-size-24: 1.5rem;
+  --fern-font-size-28: 1.75rem;
+
+  --fern-line-tight: 1.15;
+  --fern-line-snug: 1.3;
+  --fern-line-normal: 1.5;
+  --fern-line-relaxed: 1.65;
+
+  --fern-weight-regular: 400;
+  --fern-weight-medium: 500;
+  --fern-weight-semibold: 600;
+  --fern-weight-bold: 700;
+
+  /* Spacing */
+  --fern-space-0: 0;
+  --fern-space-1: 0.25rem;
+  --fern-space-2: 0.5rem;
+  --fern-space-3: 0.75rem;
+  --fern-space-4: 1rem;
+  --fern-space-5: 1.25rem;
+  --fern-space-6: 1.5rem;
+  --fern-space-7: 1.75rem;
+  --fern-space-8: 2rem;
+  --fern-space-10: 2.5rem;
+  --fern-space-12: 3rem;
+
+  /* Radius */
+  --fern-radius-4: 0.25rem;
+  --fern-radius-6: 0.375rem;
+  --fern-radius-8: 0.5rem;
+  --fern-radius-9: 0.5625rem;
+  --fern-radius-10: 0.625rem;
+  --fern-radius-12: 0.75rem;
+  --fern-radius-14: 0.875rem;
+  --fern-radius-16: 1rem;
+  --fern-radius-pill: 999px;
+
+  /* Shadows */
+  --fern-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.26);
+  --fern-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.28);
+  --fern-shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.42);
+  --fern-shadow-panel:
+    0 0 0 1px rgba(163, 184, 207, 0.06),
+    0 16px 42px rgba(0, 0, 0, 0.26);
+  --fern-shadow-brand:
+    0 0 0 1px rgba(45, 229, 182, 0.12),
+    0 0 24px rgba(45, 229, 182, 0.15);
+
+  /* Focus */
+  --fern-focus-ring:
+    0 0 0 2px var(--fern-bg-root),
+    0 0 0 4px rgba(45, 229, 182, 0.76);
+
+  /* SPA layout */
+  --fern-app-height: 100dvh;
+  --fern-topbar-height: 72px;
+  --fern-left-rail-width: 276px;
+  --fern-right-rail-width: 252px;
+  --fern-inspector-width: 360px;
+  --fern-workspace-gap: 14px;
+  --fern-panel-padding: 14px;
+  --fern-graph-toolbar-height: 58px;
+  --fern-control-height: 36px;
+  --fern-control-height-lg: 40px;
+
+  /* Motion */
+  --fern-duration-instant: 80ms;
+  --fern-duration-fast: 140ms;
+  --fern-duration-normal: 220ms;
+  --fern-duration-slow: 360ms;
+  --fern-duration-pulse: 2400ms;
+  --fern-edge-duration-min: 1800ms;
+  --fern-edge-duration-max: 3200ms;
+  --fern-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --fern-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Graph dimensions */
+  --fern-node-owner: 30px;
+  --fern-node-anchor: 24px;
+  --fern-node-default: 15px;
+  --fern-node-attribute: 11px;
+  --fern-node-satellite: 3px;
+  --fern-owner-halo-inner: 48px;
+  --fern-owner-halo-outer: 72px;
+
+  --fern-edge-default-width: 1px;
+  --fern-edge-important-width: 1.5px;
+  --fern-edge-active-width: 2px;
+  --fern-edge-default-opacity: 0.2;
+  --fern-edge-important-opacity: 0.46;
+  --fern-edge-active-opacity: 0.72;
+  --fern-edge-particle-radius: 1.6px;
+  --fern-edge-particle-glow: 5px;
+  --fern-edge-animation-cap: 80;
+
+  --fern-grid-size: 24px;
+  --fern-grid-dot: rgba(160, 186, 214, 0.13);
+
+  /* Layering */
+  --fern-z-canvas: 0;
+  --fern-z-overlay: 10;
+  --fern-z-topbar: 50;
+  --fern-z-drawer: 70;
+  --fern-z-tooltip: 90;
+  --fern-z-modal: 100;
+}

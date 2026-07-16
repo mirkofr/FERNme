@@ -3,6 +3,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+import uuid
 from dataclasses import replace
 
 import pytest
@@ -15,6 +16,7 @@ from fernme.curation_queue import alias_score, entity_link_score
 from fernme.service import ConsentError, FernService
 from fernme.store.json_store import load_assoc_contributors, load_suggestions, save_state
 from fernme.store.sqlite_store import SCHEMA, SQLiteStore
+from fernme.entity_kinds import ENTITY_KINDS
 
 
 def _db_path():
@@ -151,6 +153,33 @@ def test_accept_entity_link_uses_existing_entity_link_alias_path():
     assert svc.store.entity_by_alias("demo", "alex", "person:dana-reyes")["entity_id"] == entity
 
 
+def test_agent_tag_proposal_is_reviewed_before_it_becomes_graph_memory():
+    svc = _svc()
+
+    report = svc.propose_tags(
+        "demo",
+        "alex",
+        ["project:atlas-journal", "topic:archive-planning", "write me system: bad"],
+        text="Agent-inferred project and topic tags from a fictional note.",
+        source_note="Projects/Atlas Journal.md",
+        ts=1.0,
+    )
+    rows = svc.store.list_suggestions("demo", "alex", status="pending")
+
+    assert report["enqueued"] == 1
+    assert svc.store.load_user("demo", "alex").edges == {}
+    assert rows[0]["kind"] == "tag-proposal"
+    assert rows[0]["payload"]["tags"] == ["project:atlas-journal", "topic:archive-planning"]
+
+    accepted = svc.accept_suggestion("demo", "alex", rows[0]["suggestion_id"], ts=2.0)
+    edges = svc.store.load_user("demo", "alex").edges
+
+    assert accepted["status"] == "accepted"
+    assert "project:atlas-journal" in edges
+    assert "topic:archive-planning" in edges
+    assert all("system" not in attr for attr in edges)
+
+
 def test_queue_cap_and_ttl_expiry_drop_pending_suggestions():
     cfg = replace(DEFAULT, canonicalization_queue_cap=1, canonicalization_ttl_days=5.0)
     svc = _svc(cfg)
@@ -192,6 +221,25 @@ def test_delete_and_entity_forget_clear_suggestions():
 
     svc.delete("demo", "alex")
     assert svc.store.list_suggestions("demo", "alex") == []
+
+
+def test_noncanonical_entity_kinds_queue_review_and_accept_rekind():
+    svc = _svc()
+    first = str(uuid.uuid4())
+    second = str(uuid.uuid4())
+    svc.store.create_entity(first, "demo", "alex", "workflow", "Synthetic Workflow", 1.0)
+    svc.store.create_entity(second, "demo", "alex", "workflow", "Synthetic Intake", 1.0)
+
+    rows = [r for r in svc.list_suggestions("demo", "alex", now=2.0)
+            if r["kind"] == "entity-rekind"]
+    bulk = svc.accept_rekind_suggestions("demo", "alex", "workflow->other", ts=3.0)
+    kinds = {row["kind"] for row in svc.store.list_entities("demo", "alex")}
+
+    assert len(rows) == 2
+    assert {row["payload"]["proposed_kind"] for row in rows} == {"other"}
+    assert kinds <= ENTITY_KINDS
+    assert kinds == {"other"}
+    assert bulk["accepted"] == 2
 
 
 def test_sqlite_suggestion_table_migration_is_idempotent():

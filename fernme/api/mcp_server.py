@@ -133,6 +133,20 @@ if FastMCP is not None:
         return _service().propose_entity_link(site, user, alias_attr, entity_id, ts)
 
     @mcp.tool()
+    def propose_tags(tags: list[str], text: str = "", source_note: str = "",
+                     source_event_id: int = None,
+                     site: str = default_site(), user: str = default_user(),
+                     ts: float = 0.0) -> dict:
+        """Propose tags inferred from text for human review. Never auto-applies.
+
+        Use after recalling/importing Cabinet text when an agent has read prose and
+        wants to turn it into memory graph tags without silently writing truth.
+        """
+        return _service().propose_tags(
+            site, user, tags, text=text, source_note=source_note,
+            source_event_id=source_event_id, ts=ts)
+
+    @mcp.tool()
     def propose_relation(subject_id: str, relation: str, object_id: str,
                          site: str = default_site(), user: str = default_user(),
                          note: str = "", ts: float = 0.0) -> dict:

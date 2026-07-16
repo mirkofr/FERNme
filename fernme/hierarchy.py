@@ -109,6 +109,7 @@ def build_hierarchy(flat_graph: Mapping, overrides: Optional[Mapping] = None) ->
 
     raw_nodes = {str(n.get("id")): dict(n) for n in flat_graph.get("nodes", []) if n.get("id")}
     attr_nodes = {i: n for i, n in raw_nodes.items() if not _is_user_node(n)}
+    user_nodes = {i: n for i, n in raw_nodes.items() if _is_user_node(n)}
     anchor_ids = {i for i, n in attr_nodes.items() if _is_anchor(n, promote, demote)}
 
     adjacency: dict[str, list[tuple[str, float]]] = defaultdict(list)
@@ -191,6 +192,8 @@ def build_hierarchy(flat_graph: Mapping, overrides: Optional[Mapping] = None) ->
             "weight": round(w, 3),
             "cross": ps != pt,
             "assoc": bool(edge.get("assoc", True)),
+            "relation": str(edge.get("relation") or edge.get("label") or "related to"),
+            "label": str(edge.get("label") or edge.get("relation") or "related to"),
         })
         if ps == pt:
             continue
@@ -198,8 +201,38 @@ def build_hierarchy(flat_graph: Mapping, overrides: Optional[Mapping] = None) ->
         agg_edges[key] += w
 
     anchor_edges = [
-        {"source": a, "target": b, "weight": round(w, 3), "aggregated": True}
+        {"source": a, "target": b, "weight": round(w, 3), "aggregated": True,
+         "relation": "related to", "label": "related to"}
         for (a, b), w in sorted(agg_edges.items(), key=lambda item: (-item[1], item[0]))
+    ]
+
+    owner_agg: dict[tuple[str, str], dict] = {}
+    for edge in flat_graph.get("edges", []):
+        source = str(edge.get("source", ""))
+        target = str(edge.get("target", ""))
+        if source in user_nodes and target in assignments:
+            owner, attr = source, target
+        elif target in user_nodes and source in assignments:
+            owner, attr = target, source
+        else:
+            continue
+        parent = assignments[attr]
+        bucket = owner_agg.setdefault((owner, parent), {"weight": 0.0, "known": False})
+        bucket["weight"] += _weight(edge)
+        bucket["known"] = bool(bucket["known"] or edge.get("known"))
+
+    owner_edges = [
+        {
+            "source": owner,
+            "target": parent,
+            "weight": round(payload["weight"], 3),
+            "aggregated": True,
+            "owner_edge": True,
+            "known": bool(payload["known"]),
+            "relation": "related to",
+            "label": "related to",
+        }
+        for (owner, parent), payload in sorted(owner_agg.items(), key=lambda item: (-item[1]["weight"], item[0]))
     ]
 
     return {
@@ -208,11 +241,13 @@ def build_hierarchy(flat_graph: Mapping, overrides: Optional[Mapping] = None) ->
         "subnodes": subnodes,
         "assignments": assignments,
         "edges": anchor_edges,
+        "owner_edges": owner_edges,
         "expanded_edges": expanded_edges,
         "stats": {
             "anchors": len(anchors),
             "subnodes": len(subnodes),
             "anchor_edges": len(anchor_edges),
+            "owner_edges": len(owner_edges),
             "unclustered": len(clusters.get(UNCLUSTERED_ID, set())),
         },
     }

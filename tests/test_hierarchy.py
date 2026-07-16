@@ -35,6 +35,31 @@ def test_hierarchy_collapses_tags_under_strongest_anchor():
     )
 
 
+def test_hierarchy_projects_user_edges_to_collapsed_anchors():
+    flat = {
+        "nodes": [
+            {"id": "user:alex", "kind": "user", "label": "Alex", "size": 9},
+            {"id": "person:dana-reyes", "kind": "person", "label": "Dana", "size": 2},
+            {"id": "project:atlas-journal", "kind": "project", "label": "Atlas", "size": 3},
+            {"id": "topic:archive-planning", "kind": "topic", "label": "Archive", "size": 1},
+        ],
+        "edges": [
+            {"source": "user:alex", "target": "person:dana-reyes", "weight": 4, "known": True},
+            {"source": "user:alex", "target": "project:atlas-journal", "weight": 3, "known": True},
+            {"source": "user:alex", "target": "topic:archive-planning", "weight": 2, "known": False},
+            {"source": "person:dana-reyes", "target": "topic:archive-planning", "weight": 5, "assoc": True},
+        ],
+    }
+
+    h = build_hierarchy(flat)
+
+    owner_edges = {(e["source"], e["target"]): e for e in h["owner_edges"]}
+    assert ("user:alex", "person:dana-reyes") in owner_edges
+    assert ("user:alex", "project:atlas-journal") in owner_edges
+    assert owner_edges[("user:alex", "person:dana-reyes")]["weight"] == 6
+    assert owner_edges[("user:alex", "person:dana-reyes")]["owner_edge"] is True
+
+
 def test_hierarchy_manual_promote_demote_is_presentation_only():
     flat = {
         "nodes": [

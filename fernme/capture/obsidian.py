@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 from ..curation_queue import SuggestionCandidate
+from ..entity_kinds import ENTITY_KINDS, canonical_entity_kind
 from ..safety import sanitize_tags
 from ..vocabulary import Vocabulary
 from .extractors import extract_structured
@@ -20,7 +21,6 @@ from .extractors import extract_structured
 
 IMPORT_EVENT_TYPE = "obsidian_note"
 IMPORTER_NAME = "obsidian"
-ENTITY_KINDS = {"person", "org", "project", "place", "other"}
 _WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]")
 _KEY = re.compile(r"[^a-z0-9]+")
 
@@ -73,9 +73,11 @@ def _slug(text: str, sep: str = "-") -> str:
 
 
 def _kind(value: object, title: str) -> str:
-    raw = str(value or "").strip().lower()
-    if raw in ENTITY_KINDS:
-        return raw
+    kind = canonical_entity_kind(value)
+    if kind != "other":
+        return kind
+    if value not in (None, ""):
+        return "other"
     words = re.findall(r"[A-Z][a-z]+", title)
     if len(words) >= 2:
         return "person"
@@ -83,7 +85,7 @@ def _kind(value: object, title: str) -> str:
 
 
 def _attr(kind: str, label: str, sep: str = "-") -> str:
-    kind = kind if kind in ENTITY_KINDS else "other"
+    kind = canonical_entity_kind(kind)
     cleaned = sanitize_tags([f"{kind}:{_slug(label, sep)}"])
     return cleaned[0] if cleaned else f"{kind}:untitled"
 

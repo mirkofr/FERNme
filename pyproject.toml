@@ -8,7 +8,7 @@ version = "0.4.0b1"
 description = "FERNme - a user-owned memory layer for AI agents: zero-LLM deterministic core with optional human-approved enrichment."
 readme = "README.md"
 requires-python = ">=3.10"
-license = "Apache-2.0"
+license = { text = "Apache-2.0" }
 authors = [{ name = "Mirkomil Sharipov" }]
 maintainers = [{ name = "Acquilab Inc." }]
 keywords = ["llm", "agent", "memory", "hebbian", "spreading-activation", "personalization"]
@@ -38,6 +38,7 @@ pgtest = ["psycopg[binary]>=3.1", "pgserver>=0.1; sys_platform != 'win32'"]
 
 [project.scripts]
 fernme-mcp = "fernme.api.mcp_server:main"
+fernme-ui = "fernme.api.serve:main"
 
 [project.urls]
 Homepage = "https://fernme.dev"
@@ -46,6 +47,13 @@ Documentation = "https://fernme.dev"
 
 [tool.setuptools.packages.find]
 include = ["fernme*"]
+
+[tool.setuptools.package-data]
+fernme = [
+  "web/static/*.js",
+  "web/static/app/*",
+  "web/static/app/assets/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

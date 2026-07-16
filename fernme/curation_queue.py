@@ -11,6 +11,7 @@ import json
 import re
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
+from .entity_kinds import canonical_entity_kind
 
 LOW_CONFIDENCE = 0.40
 
@@ -117,8 +118,7 @@ def _person_surface(surface: str) -> str:
 
 
 def _kind_for_attr(attr: str) -> str:
-    ns = namespace(attr)
-    return ns if ns in {"person", "org", "project", "place", "thing"} else "other"
+    return canonical_entity_kind(namespace(attr))
 
 
 def alias_score(a: str, b: str, assoc_weight: float = 0.0) -> float:

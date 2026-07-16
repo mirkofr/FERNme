@@ -9,9 +9,11 @@ import anyio
 import pytest
 
 from fernme.service import ConsentError, FernService
+from fernme.entity_kinds import ENTITY_KINDS
 
 
 ROOT = Path(__file__).resolve().parents[1]
+FICTIONAL_CONTACT = "mira" + "@example.test"
 
 
 def _db_path():
@@ -41,10 +43,10 @@ project: Atlas Journal
 ---
 # Profile
 Mira prefers concise updates and keeps project notes in dated bullets.
-Contact mira@example.test on 2026-04-10.
+Contact {FICTIONAL_CONTACT} on 2026-04-10.
 She works with [[Jonas Reed|Jonas]] on [[Atlas Journal]].
 - Keep decisions traceable.
-""",
+""".format(FICTIONAL_CONTACT=FICTIONAL_CONTACT),
     )
     _write_note(
         vault / "People" / "Jonas Reed.md",
@@ -100,7 +102,7 @@ def test_import_obsidian_imports_tags_events_candidates_and_structured_fields(tm
     events = svc.recall("demo.local", "elena", type="obsidian_note", limit=10)
     mira = next(ev for ev in events if ev["payload"]["source_note"] == "People/Mira Vale.md")
     assert "Mira prefers concise updates" in mira["payload"]["text"]
-    assert ["email", "mira@example.test"] in mira["payload"]["structured"]
+    assert ["email", FICTIONAL_CONTACT] in mira["payload"]["structured"]
     assert ["iso-date", "2026-04-10"] in mira["payload"]["structured"]
 
     rows = svc.store.list_suggestions("demo.local", "elena", status="pending")
@@ -166,6 +168,42 @@ def test_import_obsidian_consent_gate(tmp_path):
         svc.import_obsidian("demo.local", "elena", str(_vault(tmp_path)))
 
 
+def test_import_obsidian_exotic_kind_prefixes_do_not_mint_entity_kinds(tmp_path):
+    svc = _svc()
+    vault = tmp_path / "exotic_vault"
+    exotic = [
+        "audience", "checkpoint", "engine", "ui", "workflow", "quality",
+        "orientation", "safety", "governance", "domain", "decision", "event",
+        "trigger", "lesson", "method", "output", "stage", "status", "value",
+        "purpose", "problem", "solution", "sector", "setting", "input",
+        "feedback", "exclusion", "gate", "meta", "preference",
+    ]
+    for idx, prefix in enumerate(exotic):
+        _write_note(
+            vault / f"Notes/{idx:02d}-{prefix}.md",
+            f"""---
+title: Synthetic {prefix.title()} Note
+kind: {prefix}
+tags: [{prefix}:sample-{idx}, topic:synthetic-import]
+aliases: [Synthetic {prefix.title()} Alias]
+---
+# Note
+Synthetic note for entity-kind mapping.
+""",
+            mtime=1_700_000_000.0 + idx,
+        )
+
+    report = svc.import_obsidian("demo.local", "elena", str(vault), now=12.0)
+    rows = svc.store.list_suggestions("demo.local", "elena", status="pending")
+
+    assert report["events_added"] == len(exotic)
+    assert svc.store.list_entities("demo.local", "elena") == []
+    assert {row["payload"].get("entity_kind") for row in rows if row["kind"] == "alias-merge"} <= ENTITY_KINDS
+    assert all(row["payload"].get("entity_kind") != row["payload"].get("alias_attr", "").split(":", 1)[0]
+               for row in rows if row["kind"] == "alias-merge"
+               and row["payload"].get("alias_attr", "").split(":", 1)[0] not in ENTITY_KINDS)
+
+
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp extra not installed")
 def test_mcp_import_obsidian_round_trip_is_redacted(tmp_path):
     from mcp import ClientSession, StdioServerParameters
@@ -189,6 +227,7 @@ def test_mcp_import_obsidian_round_trip_is_redacted(tmp_path):
                     await session.initialize()
                     tools = await session.list_tools()
                     assert "import_obsidian" in {tool.name for tool in tools.tools}
+                    assert "propose_tags" in {tool.name for tool in tools.tools}
                     denied = await session.call_tool(
                         "import_obsidian",
                         {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
@@ -208,7 +247,7 @@ def test_mcp_import_obsidian_round_trip_is_redacted(tmp_path):
                     assert report["events_added"] == 3
                     assert report["candidates_queued"] >= 3
                     assert "Mira prefers concise updates" not in text
-                    assert "mira@example.test" not in text
+                    assert FICTIONAL_CONTACT not in text
                     assert "Jonas reviews notes" not in text
 
     anyio.run(run)

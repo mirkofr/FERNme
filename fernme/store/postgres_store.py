@@ -394,6 +394,12 @@ class PostgresStore:
             'ORDER BY display_name,entity_id',
             (site, user)).fetchall()]
 
+    def update_entity_kind(self, site, user, entity_id, kind):
+        with self._lock:
+            self._q(
+                'UPDATE entities SET kind=%s WHERE site=%s AND "user"=%s AND entity_id=%s',
+                (kind, site, user, entity_id))
+
     def set_entity_field(self, entity_id, field, value, provenance, ts):
         with self._lock:
             self._q("INSERT INTO entity_fields(entity_id,field,value,provenance,ts) "

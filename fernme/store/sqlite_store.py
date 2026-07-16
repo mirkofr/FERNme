@@ -202,6 +202,11 @@ class SQLiteStore:
             "SELECT granted FROM consents WHERE site=? AND user=?", (site, user)).fetchone()
         return bool(r["granted"]) if r else False
 
+    def list_consented_contexts(self, limit: int = 20):
+        return [dict(r) for r in self._conn.execute(
+            "SELECT site,user FROM consents WHERE granted=1 ORDER BY ts DESC, site, user LIMIT ?",
+            (int(limit),))]
+
     # ---- user graph ----
     def load_user(self, site: str, user: str) -> UserGraph:
         ug = UserGraph(site, user)
@@ -450,6 +455,13 @@ class SQLiteStore:
         return [dict(r) for r in self._conn.execute(
             "SELECT * FROM entities WHERE site=? AND user=? ORDER BY display_name,entity_id",
             (site, user))]
+
+    def update_entity_kind(self, site: str, user: str, entity_id: str, kind: str):
+        with self._lock:
+            self._conn.execute(
+                "UPDATE entities SET kind=? WHERE site=? AND user=? AND entity_id=?",
+                (kind, site, user, entity_id))
+            self._conn.commit()
 
     def set_entity_field(self, entity_id: str, field: str, value: str,
                          provenance: str, ts: float):

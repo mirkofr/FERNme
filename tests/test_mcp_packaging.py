@@ -44,9 +44,14 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert pyproject["project"]["version"] == PACKAGE_VERSION
     assert pyproject["project"]["scripts"]["fernme-mcp"] == "fernme.api.mcp_server:main"
+    assert pyproject["project"]["scripts"]["fernme-ui"] == "fernme.api.serve:main"
     assert "mcp>=1.0" in pyproject["project"]["dependencies"]
     assert pyproject["project"]["readme"] == "README.md"
-    assert pyproject["project"]["license"] == "Apache-2.0"
+    assert pyproject["project"]["license"] == {"text": "Apache-2.0"}
+    package_data = pyproject["tool"]["setuptools"]["package-data"]["fernme"]
+    assert "web/static/*.js" in pyproject["tool"]["setuptools"]["package-data"]["fernme"]
+    assert "web/static/app/*" in package_data
+    assert "web/static/app/assets/*" in package_data
     assert "Development Status :: 4 - Beta" in pyproject["project"]["classifiers"]
     assert "Homepage" in pyproject["project"]["urls"]
     assert pyproject["project"]["optional-dependencies"]["ui"] == [

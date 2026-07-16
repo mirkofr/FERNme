@@ -5,9 +5,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, Tuple
+from .entity_kinds import ANY_KIND, ENTITY_KINDS
 
-ENTITY_KINDS = {"person", "org", "project", "place", "thing", "other"}
-ANY_KIND = frozenset(ENTITY_KINDS)
 
 
 @dataclass(frozen=True)

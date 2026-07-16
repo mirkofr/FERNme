@@ -8,6 +8,7 @@ from .write import Catalog, map_event, observe, decay
 from .categories import category_of, CATEGORIES
 from .hierarchy import build_hierarchy
 from .retrieve.card import compile_card
+from .retrieve.activation import spread
 from .retrieve.entity_card import compile_entity_card
 from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
@@ -27,7 +28,8 @@ from .capture import obsidian as _obsidian
 from . import resolution as _resolution
 from .vocabulary import Vocabulary
 from .identity import is_identity_attr
-from .relations import DEFAULT_RELATIONS, ENTITY_KINDS, canonical_pair, relation_sort_key
+from .entity_kinds import ENTITY_KINDS, canonical_entity_kind, is_canonical_entity_kind
+from .relations import DEFAULT_RELATIONS, canonical_pair, relation_sort_key
 from .write.hebbian import _saturating_bump
 from dataclasses import replace as _replace
 from .triggers import due_reorders, fading_favorites
@@ -260,6 +262,44 @@ class FernService:
             )
         return compile_card(ug, ag, context or [], now, prior, self.cfg)
 
+    def recall_replay(self, site: str, user: str, context: Optional[List[str]] = None,
+                      now: float = 0.0) -> Dict:
+        """Return a deterministic trace of the activation path used by recall."""
+        self._require_consent(site, user)
+        seeds = list(context or [])
+        ug = self.store.load_user(site, user)
+        ag = self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
+        prior = self.store.load_prior(site)
+        activation = spread(ug, ag, seeds, now, self.cfg)
+        card = self.card(site, user, seeds, now, cold_start=False)
+        card_attrs = {row["attr"] for row in card.get("links", [])}
+        steps = []
+        for attr, score in sorted(activation.items(), key=lambda item: (-item[1], item[0])):
+            edge = ug.edges.get(attr)
+            if edge is None or edge.source == "superseded":
+                continue
+            steps.append({
+                "attr": attr,
+                "activation": round(float(score), 6),
+                "weight": edge.wire_weight(self.cfg.w_max),
+                "confidence": round(float(edge.confidence), 3),
+                "in_card": attr in card_attrs,
+                "neighbors": [
+                    {"attr": nb, "weight": round(float(w), 3)}
+                    for nb, w in sorted(ag.neighbors(attr), key=lambda row: (-row[1], row[0]))[:8]
+                ],
+            })
+        return {
+            "site": site,
+            "user": user,
+            "context": seeds,
+            "seeds": seeds,
+            "steps": steps[: max(self.cfg.top_n * 4, 24)],
+            "card": card,
+            "card_attrs": [row["attr"] for row in card.get("links", [])],
+            "population_prior": {"n_users": int(getattr(prior, "n_users", 0))},
+        }
+
     def _entity_card_context(self, site: str, user: str, ug: UserGraph) -> Dict:
         alias_to_entity = {}
         aliases_by_entity = {}
@@ -463,8 +503,7 @@ class FernService:
     # ---------- typed entity layer ----------
     def entity_create(self, site: str, user: str, kind: str, display_name: str) -> str:
         self._require_consent(site, user)
-        if kind not in ENTITY_KINDS:
-            raise ValueError(f"unknown entity kind {kind}; allowed: {sorted(ENTITY_KINDS)}")
+        kind = canonical_entity_kind(kind)
         name = _clean_data(display_name, 80)
         if not name:
             raise ValueError("display_name is required")
@@ -499,6 +538,20 @@ class FernService:
                 "linked_tags": [r["alias_attr"] for r in self.store.list_entity_aliases(
                     site, user, entity["entity_id"])]}
 
+    def entity_rekind(self, site: str, user: str, entity_id: str, kind: str) -> Dict:
+        self._require_consent(site, user)
+        entity = self._entity_or_raise(site, user, entity_id)
+        new_kind = canonical_entity_kind(kind)
+        old_kind = entity["kind"]
+        if old_kind != new_kind:
+            self.store.update_entity_kind(site, user, entity["entity_id"], new_kind)
+            self._audit(site, user, "entity_rekind", {
+                "entity_id": entity["entity_id"],
+                "old_kind": old_kind,
+                "new_kind": new_kind,
+            }, 0.0)
+        return {"entity_id": entity["entity_id"], "old_kind": old_kind, "new_kind": new_kind}
+
     # ---------- suggest-and-approve canonicalization ----------
     def _suggestion_context(self, site: str, user: str) -> Dict:
         ug = self.store.load_user(site, user)
@@ -530,6 +583,21 @@ class FernService:
 
     def _refresh_suggestions(self, site: str, user: str, now: float) -> None:
         ctx = self._suggestion_context(site, user)
+        for entity in ctx["entities"]:
+            old_kind = str(entity.get("kind", ""))
+            if is_canonical_entity_kind(old_kind):
+                continue
+            proposed = canonical_entity_kind(old_kind)
+            evidence = {
+                "entity_id": entity["entity_id"],
+                "display_name": entity["display_name"],
+                "old_kind": old_kind,
+                "proposed_kind": proposed,
+                "reason": "non-canonical entity kind",
+                "pattern": f"{old_kind}->{proposed}",
+            }
+            self.store.upsert_suggestion(
+                _suggestion_row("entity-rekind", evidence, site, user, 0.99, now))
         candidates = _curation_queue.generate_candidates(
             ctx["attrs"],
             ctx["weights"],
@@ -585,11 +653,38 @@ class FernService:
             self.entity_relate(
                 site, user, payload["subject_id"], payload["relation"],
                 payload["object_id"], note=payload.get("note", ""), ts=ts)
+        elif row["kind"] == "tag-proposal":
+            observe_payload = {
+                "tags": payload.get("tags", []),
+                "source": "inferred",
+            }
+            if payload.get("text"):
+                observe_payload["text"] = payload["text"]
+            if payload.get("source_note"):
+                observe_payload["source_note"] = payload["source_note"]
+            if payload.get("source_event_id") is not None:
+                observe_payload["source_event_id"] = payload["source_event_id"]
+            self.observe(site, user, "tag_proposal", observe_payload, ts=ts)
+        elif row["kind"] == "entity-rekind":
+            self.entity_rekind(
+                site, user, payload["entity_id"], payload.get("proposed_kind", "other"))
         else:
             raise ValueError("unknown suggestion kind")
         decided = self.store.decide_suggestion(suggestion_id, "accepted", ts)
         self._audit(site, user, "suggestion_accept", {"suggestion_id": suggestion_id}, ts)
         return decided
+
+    def accept_rekind_suggestions(self, site: str, user: str, pattern: str,
+                                  ts: float = 0.0) -> Dict:
+        self._require_consent(site, user)
+        accepted = []
+        for row in list(self.store.list_suggestions(site, user, status="pending")):
+            if row["kind"] != "entity-rekind":
+                continue
+            if row["payload"].get("pattern") != pattern:
+                continue
+            accepted.append(self.accept_suggestion(site, user, row["suggestion_id"], ts))
+        return {"pattern": pattern, "accepted": len(accepted), "suggestions": accepted}
 
     def reject_suggestion(self, site: str, user: str, suggestion_id: str,
                           ts: float = 0.0) -> Dict:
@@ -610,6 +705,38 @@ class FernService:
         self.store.trim_pending_suggestions(
             site, user, int(self.cfg.canonicalization_queue_cap))
         return row
+
+    def propose_tags(self, site: str, user: str, tags: List[str],
+                     text: str = "", source_note: str = "",
+                     source_event_id: int = None, ts: float = 0.0) -> Dict:
+        """Queue agent-suggested tags for human review.
+
+        The agent may read unstructured text and propose tags, but this method
+        does not write memory truth. Accepting the suggestion later writes through
+        observe(), so normal graph, audit, consent, curation, and deletion rules
+        still apply.
+        """
+        self._require_consent(site, user)
+        vocab = self.vocabulary or Vocabulary(default_namespace="topic")
+        canonical = []
+        for tag in tags or []:
+            resolved = vocab.canonical(tag)
+            if resolved and resolved not in canonical:
+                canonical.append(resolved)
+        cleaned = sanitize_tags(canonical)
+        if not cleaned:
+            return {"enqueued": 0, "dropped": 1, "reason": "no valid tags",
+                    "llm_calls": self.llm_calls}
+        payload = {
+            "tags": cleaned,
+            "text": _clean_data(text, 280) if text else "",
+            "source_note": _clean_data(source_note, 180) if source_note else "",
+            "source_event_id": int(source_event_id) if source_event_id is not None else None,
+            "source": "agent_tag_proposal",
+        }
+        row = self._enqueue_valid_suggestion(site, user, "tag-proposal", payload, 0.90, ts)
+        return {"enqueued": 1, "dropped": 0, "suggestion": row,
+                "llm_calls": self.llm_calls}
 
     def _validate_entity_link_proposal(self, site: str, user: str,
                                        alias_attr: str, entity_id: str):
@@ -1228,13 +1355,16 @@ class FernService:
                 edges.append({"source": uid, "target": base, "weight": e.wire_weight(self.cfg.w_max),
                               "confidence": round(e.confidence, 2),
                               "known": (e.confidence >= self.cfg.conf_known or e.source == "override"),
-                              "negative": neg})
+                              "negative": neg,
+                              "relation": "related to",
+                              "label": "related to"})
         present = {n for n, v in nodes.items() if v["kind"] != "user"}
         graph_user = user if user is not None and len(users) == 1 else None
         ag = self.store.load_assoc(site, user=graph_user, min_users=self.cfg.assoc_min_users)
         for (a, b), w in ag.edges.items():
             if a in present and b in present and w >= assoc_floor:
-                edges.append({"source": a, "target": b, "weight": round(w, 1), "assoc": True})
+                edges.append({"source": a, "target": b, "weight": round(w, 1),
+                              "assoc": True, "relation": "related to", "label": "related to"})
         entity_overlay = self._entity_graph_overlay(site, users, nodes, edges, present)
         out = {"nodes": list(nodes.values()), "edges": edges,
                "categories": CATEGORIES, "cats": CATEGORIES,
@@ -1406,6 +1536,7 @@ class FernService:
             "entities": entity_payload,
             "entity_aliases": alias_to_entity,
             "entity_relations": relation_payload,
+            "entity_kinds": sorted({row["kind"] for row in entity_payload}),
         }
 
     def confidence(self, site: str, user: str, attr: str, now: float = 0.0,
