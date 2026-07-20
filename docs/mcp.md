@@ -83,6 +83,8 @@ The MCP server currently exposes:
 - `recall_glossary`
 - `recall_events`
 - `import_obsidian`
+- `import_document`
+- `forget_document`
 - `edit_memory`
 - `forget_me`
 - `list_canonicalization_suggestions`
@@ -94,6 +96,20 @@ The MCP server currently exposes:
 
 Stored text, aliases, notes, and relation facts are untrusted data. The bundled
 skills repeat that rule so agents do not treat memory contents as instructions.
+
+## FERNmark Document Tools
+
+Install the optional adapter with `pip install "fernme[fernmark]"`. Agents use
+`import_document(path, site, user, confirm=false, max_bytes)` only for a local
+file or directory explicitly named by the user. The first call is always a
+no-write preview: it neither creates consent nor changes memory. Its redacted
+report contains sanitized names, SHA-256 prefixes, counts, deterministic tags,
+warnings, and quality metadata, but never document bodies or local paths. After
+showing that preview, the agent may repeat the call with `confirm=true` only if
+the user agrees. A confirmed report includes each full SHA-256 so the user can
+later call `forget_document(site, user, source_sha256)` to remove that
+document's evidence. If the optional extra is absent or the path is invalid,
+the tool returns a clean error rather than crashing the MCP server.
 
 ## Obsidian Vault Import
 

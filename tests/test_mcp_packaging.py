@@ -56,6 +56,8 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert "Homepage" in pyproject["project"]["urls"]
     assert pyproject["project"]["optional-dependencies"]["ui"] == [
         "fastapi>=0.110", "uvicorn[standard]>=0.27"]
+    assert pyproject["project"]["optional-dependencies"]["fernmark"] == [
+        "fernmark==0.4.0a9"]
 
     codex_plugin = _read_json(
         "packaging/codex/plugins/fernme-memory/.codex-plugin/plugin.json")
@@ -68,6 +70,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert codex_plugin["version"] == PLUGIN_VERSION
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
+    assert "Document Import" in codex_plugin["interface"]["capabilities"]
     _assert_uvx_git_mcp(codex_mcp)
     assert codex_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
     assert codex_marketplace["plugins"][0]["source"]["path"] == "./plugins/fernme-memory"
@@ -90,11 +93,15 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     root_source = root_claude_marketplace["plugins"][0]["source"]
     assert root_source == "./packaging/claude/plugins/fernme-memory"
     assert (ROOT / root_source).is_dir()
-    assert (
+    skill_text = (
         ROOT / "packaging/codex/plugins/fernme-memory/skills/fernme-memory/SKILL.md"
-    ).read_text(encoding="utf-8") == (
+    ).read_text(encoding="utf-8")
+    assert skill_text == (
         ROOT / "packaging/claude/plugins/fernme-memory/skills/fernme-memory/SKILL.md"
     ).read_text(encoding="utf-8")
+    assert "import_document" in skill_text
+    assert "forget_document" in skill_text
+    assert "confirm=false" in skill_text
 
 
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp extra not installed")
@@ -119,7 +126,10 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     tools = await session.list_tools()
-                    assert "remember" in {tool.name for tool in tools.tools}
+                    tool_names = {tool.name for tool in tools.tools}
+                    assert "remember" in tool_names
+                    assert "import_document" in tool_names
+                    assert "forget_document" in tool_names
                     await session.call_tool(
                         "grant_consent",
                         {"site": "demo.local", "user": "elena", "granted": True},

@@ -38,7 +38,8 @@ def load_envelope(source, max_bytes: int = DEFAULT_MAX_BYTES):
         import fernmark
     except ImportError as exc:
         raise FernmarkDocumentError(
-            "FERNmark document support requires fernmark==0.4.0a9"
+            "FERNmark document support requires the fernme[fernmark] optional "
+            "extra (fernmark==0.4.0a9)"
         ) from exc
 
     try:

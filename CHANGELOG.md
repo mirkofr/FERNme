@@ -10,6 +10,9 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
   existing zero-LLM capture and `observe()` path with per-document SHA-256
   provenance, idempotent same-hash imports, redacted reports, and selective
   document forgetting for events, graph evidence, and review suggestions.
+- Added `import_document` and `forget_document` MCP tools with a mandatory
+  no-write preview before user-confirmed import, redacted metadata-only output,
+  explicit local-path validation, and clean optional-extra errors.
 - Persisted edge provenance (`stated`/`inferred`) in SQLite and Postgres stores,
   including migration defaults and consolidation snapshot/undo preservation.
 - Added deterministic structured-field extraction at capture ingest for email,

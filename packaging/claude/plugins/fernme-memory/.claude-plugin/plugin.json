@@ -2,7 +2,7 @@
   "name": "fernme-memory",
   "displayName": "FERNme Memory",
   "version": "0.4.0b2",
-  "description": "Local FERNme memory MCP server and standing memory skill.",
+  "description": "Local FERNme memory MCP server with safe document previews.",
   "author": {
     "name": "Acquilab Inc."
   },
@@ -12,7 +12,8 @@
   "keywords": [
     "memory",
     "mcp",
-    "personalization"
+    "personalization",
+    "document-import"
   ],
   "skills": "./skills/"
 }

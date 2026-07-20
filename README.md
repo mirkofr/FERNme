@@ -353,6 +353,11 @@ The shipped MCP configs run:
 uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
 ```
 
+With `fernme[fernmark]` installed, the MCP plugin can preview an explicitly
+named local envelope using `import_document(..., confirm=false)` and returns
+only redacted metadata. It imports only after the user agrees to a second call
+with `confirm=true`; `forget_document` removes one confirmed SHA-256 later.
+
 No PyPI publish is required for the plugin route. The plugin is pinned to the
 reproducible release ref `v0.4.0b2`, so external testers get the same server
 build. The owner must push `main` and create plus push the `v0.4.0b2` tag on a

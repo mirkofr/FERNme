@@ -8,7 +8,10 @@ Requires: pip install fernme
 from __future__ import annotations
 import argparse
 import sys
-from ..service import FernService
+from pathlib import Path
+
+from ..capture.fernmark_documents import FernmarkDocumentError
+from ..service import ConsentError, FernService
 from ..runtime_config import default_db_path, default_site, default_user, ensure_default_db_path
 
 svc = None
@@ -19,6 +22,105 @@ def _service() -> FernService:
     if svc is None:
         svc = FernService()
     return svc
+
+
+def _document_tool_error(message: str) -> dict:
+    """Return a stable MCP error payload without exposing a traceback."""
+    return {
+        "ok": False,
+        "error": str(message),
+        "content_redacted": True,
+    }
+
+
+def _resolve_document_path(path: str) -> str:
+    """Resolve an explicit user path and require an existing file or directory."""
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError("path must name an existing regular file or directory")
+    try:
+        resolved = Path(path).expanduser().resolve(strict=True)
+        is_regular_source = resolved.is_file() or resolved.is_dir()
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(
+            "path must name an existing regular file or directory"
+        ) from exc
+    if not is_regular_source:
+        raise ValueError("path must name an existing regular file or directory")
+    return str(resolved)
+
+
+def _safe_source_name(value) -> str:
+    """Keep only a bounded basename suitable for a redacted report."""
+    name = Path(str(value or "document")).name
+    name = "".join(ch for ch in name if ch.isprintable()).strip()
+    return (name or "document")[:255]
+
+
+def _safe_tag(value) -> str:
+    """Bound printable tag metadata before returning it over MCP."""
+    tag = "".join(ch for ch in str(value) if ch.isprintable()).strip()
+    return tag[:160]
+
+
+def _redacted_document_report(report: dict, confirmed: bool) -> dict:
+    """Whitelist document metadata returned over MCP."""
+    safe = {
+        key: report[key]
+        for key in (
+            "dry_run", "envelopes_read", "documents_imported", "events_added",
+            "tags_proposed", "tags_written", "suggestions_queued", "warnings",
+            "quality", "skipped", "repeat_semantics", "content_redacted",
+        )
+        if key in report
+    }
+    safe["ok"] = True
+    safe["documents"] = []
+    for document in report.get("documents", []):
+        source_sha256 = str(document.get("source_sha256", ""))
+        item = {
+            "source_name": _safe_source_name(document.get("source_name")),
+            "source_sha256_prefix": source_sha256[:12],
+            "quality": document.get("quality"),
+            "warning_count": document.get("warning_count", 0),
+            "block_count": document.get("block_count", 0),
+            "tags": [
+                _safe_tag(tag) for tag in document.get("tags", [])
+                if isinstance(tag, str) and _safe_tag(tag)
+            ],
+            "status": document.get("status"),
+        }
+        if confirmed:
+            item["source_sha256"] = source_sha256
+        safe["documents"].append(item)
+    return safe
+
+
+def _import_document(path: str, site: str, user: str, confirm: bool = False,
+                     max_bytes: int = None) -> dict:
+    """Implementation shared by the MCP tool and direct safety tests."""
+    try:
+        resolved = _resolve_document_path(path)
+    except ValueError as exc:
+        return _document_tool_error(str(exc))
+    try:
+        report = _service().import_fernmark(
+            site, user, resolved, dry_run=not confirm, max_bytes=max_bytes)
+    except FernmarkDocumentError as exc:
+        message = str(exc)
+        if "fernme[fernmark]" in message:
+            return _document_tool_error(message)
+        return _document_tool_error("invalid FERNmark document envelope")
+    except (OSError, TypeError, ValueError):
+        return _document_tool_error("invalid document import options or envelope")
+    return _redacted_document_report(report, confirmed=confirm)
+
+
+def _forget_document(site: str, user: str, source_sha256: str) -> dict:
+    """Forget one document while returning clean validation/consent errors."""
+    try:
+        return _service().forget_document(site, user, source_sha256)
+    except (ConsentError, ValueError) as exc:
+        return _document_tool_error(str(exc))
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -90,6 +192,25 @@ if FastMCP is not None:
         return _service().import_obsidian(
             site, user, path, dry_run=dry_run, max_notes=max_notes,
             include=include or None, exclude=exclude or None)
+
+    @mcp.tool()
+    def import_document(path: str, site: str = default_site(),
+                        user: str = default_user(), confirm: bool = False,
+                        max_bytes: int = None) -> dict:
+        """Preview or import explicit user-named local FERNmark envelopes.
+
+        Always call first with confirm=false and show the redacted preview to
+        the user. Call again with confirm=true only after the user agrees; that
+        confirmed call may grant consent and write memory. The path must be an
+        explicit user-named file or directory on the MCP server machine.
+        """
+        return _import_document(path, site, user, confirm, max_bytes)
+
+    @mcp.tool()
+    def forget_document(source_sha256: str, site: str = default_site(),
+                        user: str = default_user()) -> dict:
+        """Forget one imported document by its confirmed SHA-256 identifier."""
+        return _forget_document(site, user, source_sha256)
 
     @mcp.tool()
     def edit_memory(attr: str, weight: float, site: str = default_site(),
