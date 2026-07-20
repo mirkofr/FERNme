@@ -1,11 +1,12 @@
 """fernme.capture — the pluggable *perception* layer above the 0-LLM engine.
 
-Pick how memory gets written without touching the engine. Three adapters, each
+Pick how memory gets written without touching the engine. Four adapters, each
 with an honest token-cost label:
 
     signal   structured events -> rules            0 tokens
     local    text -> local rules or local model    0 API tokens (your CPU/GPU)
     agent    host agent emits a tag line           ~20-40 tokens, no extra call
+    document validated FERNmark metadata           0 tokens
 
 Typical use:
 
@@ -26,6 +27,7 @@ from .base import BaseAdapter
 from .signal_hooks import SignalAdapter
 from .local_tagger import LocalTaggerAdapter
 from .agent_byproduct import AgentByproductAdapter
+from .fernmark_documents import DocumentAdapter
 from .config import load_config, write_config, default_config, VALID
 from .pipeline import CapturePipeline
 from .extractors import extract_structured
@@ -34,6 +36,7 @@ REGISTRY = {
     "signal": SignalAdapter,
     "local": LocalTaggerAdapter,
     "agent": AgentByproductAdapter,
+    "document": DocumentAdapter,
 }
 
 
@@ -64,6 +67,7 @@ def load_pipeline(svc, site: str, user: str, path: str = "fern.toml") -> Capture
 
 __all__ = [
     "BaseAdapter", "SignalAdapter", "LocalTaggerAdapter", "AgentByproductAdapter",
+    "DocumentAdapter",
     "CapturePipeline", "REGISTRY", "VALID",
     "build_adapters", "load_pipeline", "load_config", "write_config",
     "default_config", "extract_structured",

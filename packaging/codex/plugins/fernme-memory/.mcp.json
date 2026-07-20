@@ -4,7 +4,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b1",
+        "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2",
         "fernme-mcp"
       ],
       "env": {

@@ -14,7 +14,7 @@ from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
 from .runtime_config import default_db_path, ensure_default_db_path
 from .supernode import Supernode
-from .safety import sanitize_tags, cap_numeric
+from .safety import sanitize_tags, cap_numeric, sanitize_display_text
 from .tagging import DeterministicTagger
 from . import style as _style
 from .dp import PrivatePrior
@@ -25,6 +25,10 @@ from . import curation_queue as _curation_queue
 from . import enrichment as _enrichment
 from . import glossary as _glossary
 from .capture import obsidian as _obsidian
+from .capture import fernmark_documents as _fernmark_documents
+from .capture.config import load_config as _load_capture_config
+from .capture.local_tagger import LocalTaggerAdapter
+from .capture.pipeline import CapturePipeline
 from . import resolution as _resolution
 from .vocabulary import Vocabulary
 from .identity import is_identity_attr
@@ -43,15 +47,12 @@ def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 
 
-_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _FIELD_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 RELATION_FACTS_PER_RELATION = 5
 
 
 def _clean_data(value: str, limit: int) -> str:
-    value = _CONTROL.sub(" ", str(value)).strip()
-    value = " ".join(value.split())
-    return value[:limit]
+    return sanitize_display_text(value, limit)
 
 
 def _valid_uuid(value: str) -> str:
@@ -414,6 +415,187 @@ class FernService:
                 "content_redacted": True,
             }, now)
         return report
+
+    def import_fernmark(self, site: str, user: str, source, dry_run: bool = False,
+                        config_path: str = "fern.toml", max_bytes: int = None,
+                        now: float = 0.0) -> Dict:
+        """Import validated FERNmark envelopes through the capture pipeline.
+
+        Calling this explicit import API is the consent action for new document
+        evidence. Dry runs validate and propose tags without changing consent or
+        any stored state. Repeated hashes are idempotent per site and user.
+        """
+        paths = _fernmark_documents.envelope_paths(source)
+        limit = (_fernmark_documents.DEFAULT_MAX_BYTES if max_bytes is None
+                 else max_bytes)
+        documents = [
+            _fernmark_documents.load_envelope(path, max_bytes=limit)
+            for path in paths
+        ]
+        existing = {
+            event.get("payload", {}).get("source_sha256")
+            for event in self.store.recall(
+                site, user, type=_fernmark_documents.IMPORT_EVENT_TYPE, limit=100000)
+        } if self.store.has_consent(site, user) else set()
+
+        capture_cfg = _load_capture_config(config_path)
+        adapters = [_fernmark_documents.DocumentAdapter()]
+        if "local" in capture_cfg.get("active", []):
+            # Document import is guaranteed zero-LLM. Even if an interactive
+            # local adapter is configured for a model, document topics use the
+            # existing deterministic rules catalog only.
+            adapters.append(LocalTaggerAdapter(mode="rules"))
+        pipeline = CapturePipeline(self, site, user, adapters)
+        report = {
+            "dry_run": bool(dry_run),
+            "envelopes_read": len(documents),
+            "documents_imported": 0,
+            "events_added": 0,
+            "tags_proposed": 0,
+            "tags_written": 0,
+            "suggestions_queued": 0,
+            "warnings": 0,
+            "quality": {"good": 0, "partial": 0, "poor": 0},
+            "skipped": {"already_imported": 0},
+            "repeat_semantics": "idempotent per site/user/source_sha256",
+            "content_redacted": True,
+            "documents": [],
+        }
+
+        pending = []
+        seen_hashes = set(existing)
+        for document in documents:
+            event = _fernmark_documents.document_event(document)
+            proposed = sorted({
+                tag
+                for adapter in adapters
+                for tag in adapter.extract(event)
+            })
+            duplicate = document.source_sha256 in seen_hashes
+            status = "already_imported" if duplicate else (
+                "would_import" if dry_run else "imported")
+            report["documents"].append({
+                "source_name": event["source_name"],
+                "source_sha256": document.source_sha256,
+                "quality": document.extraction_quality,
+                "warning_count": len(document.warnings),
+                "block_count": len(document.blocks),
+                "tags": proposed,
+                "status": status,
+            })
+            report["warnings"] += len(document.warnings)
+            report["quality"][document.extraction_quality] += 1
+            if duplicate:
+                report["skipped"]["already_imported"] += 1
+                continue
+            report["documents_imported"] += 1
+            report["tags_proposed"] += len(proposed)
+            pending.append((document, event))
+            seen_hashes.add(document.source_sha256)
+
+        if dry_run or not pending:
+            return report
+
+        if not self.store.has_consent(site, user):
+            self.consent(site, user, True, now)
+        imported_hashes = []
+        for document, event in pending:
+            out = pipeline.ingest(event, ts=now)
+            report["events_added"] += 1
+            report["tags_written"] += len(out.get("stored_attrs", []))
+            imported_hashes.append(document.source_sha256)
+        self._audit(site, user, "import_fernmark", {
+            "documents_imported": report["documents_imported"],
+            "events_added": report["events_added"],
+            "source_sha256": imported_hashes,
+            "content_redacted": True,
+        }, now)
+        return report
+
+    def _rebuild_attrs_from_events(self, site: str, user: str,
+                                   attrs: set[str]) -> int:
+        """Rebuild selected non-override edges after evidence deletion."""
+        if not attrs:
+            return 0
+        ug = self.store.load_user(site, user)
+        rebuild = {
+            attr for attr in attrs
+            if ug.edges.get(attr) is None or ug.edges[attr].source != "override"
+        }
+        if not rebuild:
+            return 0
+        for attr in rebuild:
+            ug.edges.pop(attr, None)
+            ug.history.pop(attr, None)
+
+        replay = UserGraph(site, user)
+        scratch_assoc = AssocGraph(site)
+        for row in self.store.events_chronological(site, user):
+            payload = row.get("payload", {})
+            mapped = []
+            for item in row.get("attrs", []):
+                if not isinstance(item, (list, tuple)) or len(item) != 2:
+                    continue
+                attr, magnitude = item
+                if attr in rebuild:
+                    mapped.append((attr, float(magnitude)))
+            if mapped:
+                event = Event(site, user, float(row.get("ts", 0.0)),
+                              str(row.get("type", "event")), payload)
+                style_state = None
+                if self.track_style and payload.get("text"):
+                    style_state = _style.analyze(payload["text"])
+                observe(
+                    replay,
+                    scratch_assoc,
+                    event,
+                    mapped,
+                    self.cfg,
+                    salience=self._salience_of(payload, mapped, style_state),
+                    provenance=payload.get("source", "known"),
+                )
+            if row.get("type") == "supersede":
+                old_attr = payload.get("old")
+                if old_attr in rebuild and old_attr in replay.edges:
+                    replay.edges[old_attr].weight = min(
+                        replay.edges[old_attr].weight, self.cfg.floor)
+                    replay.edges[old_attr].source = "superseded"
+
+        for attr in rebuild:
+            if attr in replay.edges:
+                ug.edges[attr] = replay.edges[attr]
+                ug.history[attr] = list(replay.history.get(attr, []))
+        self.store.save_user(ug)
+        return len(rebuild)
+
+    def forget_document(self, site: str, user: str, source_sha256: str,
+                        ts: float = 0.0) -> Dict:
+        """Forget one document's events, suggestions, and graph evidence."""
+        self._require_consent(site, user)
+        if not isinstance(source_sha256, str) or not re.fullmatch(
+                r"[0-9a-f]{64}", source_sha256):
+            raise ValueError("source_sha256 must be 64 lowercase hexadecimal characters")
+        removed = self.store.delete_document_artifacts(site, user, source_sha256)
+        affected = {
+            str(item[0])
+            for event in removed["events"]
+            for item in event.get("attrs", [])
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        }
+        rebuilt = self._rebuild_attrs_from_events(site, user, affected)
+        self._audit(site, user, "forget_document", {
+            "source_sha256": source_sha256,
+            "events_deleted": len(removed["events"]),
+            "suggestions_deleted": removed["suggestions_deleted"],
+            "attrs_rebuilt": rebuilt,
+        }, ts)
+        return {
+            "forgotten": bool(removed["events"] or removed["suggestions_deleted"]),
+            "source_sha256": source_sha256,
+            "events_deleted": len(removed["events"]),
+            "suggestions_deleted": removed["suggestions_deleted"],
+            "attrs_rebuilt": rebuilt,
+        }
 
     def defaults(self, site: str, user: str, now: float = 0.0) -> Dict:
         """Baked-in: known links -> tool defaults / ranking bias."""

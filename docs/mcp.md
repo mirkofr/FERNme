@@ -34,16 +34,16 @@ For GitHub marketplace installs before or alongside PyPI, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b1" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
 ```
 
-The shipped plugin is pinned to the reproducible release ref `v0.4.0b1`, so
-testers fetch the same server build. The git tag `v0.4.0b1` maps to the package
-version `0.4.0b1` in PEP 440 form. The owner pushes this tag; Codex does not tag
+The shipped plugin is pinned to the reproducible release ref `v0.4.0b2`, so
+testers fetch the same server build. The git tag `v0.4.0b2` maps to the package
+version `0.4.0b2` in PEP 440 form. The owner pushes this tag; Codex does not tag
 or publish.
 
 This path works only after the owner has pushed `main` and created plus pushed
-the `v0.4.0b1` tag to GitHub, and the repo is reachable from the target machine,
+the `v0.4.0b2` tag to GitHub, and the repo is reachable from the target machine,
 either publicly or with git credentials. No PyPI publish is required for this
 path.
 
@@ -186,7 +186,7 @@ is documented as unrun. The schema and layout were checked against current Claud
 Code plugin documentation.
 
 The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path,
-pinned to `v0.4.0b1`. Actual Cowork UI installation requires the pushed,
+pinned to `v0.4.0b2`. Actual Cowork UI installation requires the pushed,
 reachable repo and the pushed tag, and is not exercised in CI.
 
 ## Smoke Test

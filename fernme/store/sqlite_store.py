@@ -351,6 +351,69 @@ class SQLiteStore:
                         "payload": json.loads(r["payload"]), "attrs": json.loads(r["attrs"])})
         return out
 
+    def events_chronological(self, site: str, user: str) -> List[Dict]:
+        """Return stored events in stable replay order for selective forgetting."""
+        rows = self._conn.execute(
+            "SELECT id,ts,type,payload,attrs FROM events "
+            "WHERE site=? AND user=? ORDER BY id ASC",
+            (site, user),
+        )
+        return [
+            {
+                "id": row["id"],
+                "ts": row["ts"],
+                "type": row["type"],
+                "payload": json.loads(row["payload"]),
+                "attrs": json.loads(row["attrs"]),
+            }
+            for row in rows
+        ]
+
+    def delete_document_artifacts(self, site: str, user: str,
+                                  source_sha256: str) -> Dict:
+        """Delete exact document events and queue rows, returning removed events."""
+        with self._lock:
+            event_rows = self._conn.execute(
+                "SELECT id,ts,type,payload,attrs FROM events "
+                "WHERE site=? AND user=? AND type='document' ORDER BY id ASC",
+                (site, user),
+            ).fetchall()
+            removed = []
+            for row in event_rows:
+                payload = json.loads(row["payload"])
+                if payload.get("source_sha256") != source_sha256:
+                    continue
+                removed.append({
+                    "id": row["id"],
+                    "ts": row["ts"],
+                    "type": row["type"],
+                    "payload": payload,
+                    "attrs": json.loads(row["attrs"]),
+                })
+
+            suggestion_rows = self._conn.execute(
+                "SELECT suggestion_id,payload FROM canonicalization_suggestions "
+                "WHERE site=? AND user=?",
+                (site, user),
+            ).fetchall()
+            suggestion_ids = [
+                row["suggestion_id"]
+                for row in suggestion_rows
+                if json.loads(row["payload"]).get("source_sha256") == source_sha256
+            ]
+            if removed:
+                self._conn.executemany(
+                    "DELETE FROM events WHERE id=?",
+                    [(row["id"],) for row in removed],
+                )
+            if suggestion_ids:
+                self._conn.executemany(
+                    "DELETE FROM canonicalization_suggestions WHERE suggestion_id=?",
+                    [(suggestion_id,) for suggestion_id in suggestion_ids],
+                )
+            self._conn.commit()
+        return {"events": removed, "suggestions_deleted": len(suggestion_ids)}
+
     # ---- prior ----
     def load_prior(self, site: str) -> PopulationPrior:
         pp = PopulationPrior(site)

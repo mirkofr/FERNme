@@ -29,17 +29,22 @@ class CapturePipeline:
             adapter_event["structured"] = structured
         tags: List[str] = []
         used: List[str] = []
+        payload_fields = set()
         for ad in self.adapters:
             got = ad.extract(adapter_event)
             if got:
                 tags.extend(got)
                 used.append(ad.name)
+                payload_fields.update(ad.payload_fields)
         tags = sorted(set(tags))
         payload: Dict = {"tags": tags}
         if text:
             payload["text"] = text
         if structured:
             payload["structured"] = structured
+        for key in sorted(payload_fields):
+            if key in adapter_event:
+                payload[key] = adapter_event[key]
         res = self.svc.observe(self.site, self.user, event.get("kind", "chat"),
                                payload, ts=ts)
         res["adapters_fired"] = used

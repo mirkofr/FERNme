@@ -16,11 +16,12 @@ from .base import BaseAdapter
 from . import REGISTRY, VALID, default_config, write_config
 
 # stable display order + one-line "captures" note per method
-_ORDER = ["agent", "signal", "local"]
+_ORDER = ["agent", "signal", "local", "document"]
 _CAPTURES = {
     "agent": "full chat meaning (host agent emits tags)",
     "signal": "behavior only: commands, files, git, apps, calendar",
     "local": "full chat meaning, on your own machine",
+    "document": "validated FERNmark document metadata",
 }
 
 

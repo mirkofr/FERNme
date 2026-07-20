@@ -2,9 +2,14 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
-## [0.4.0-unreleased] — entity layer groundwork
+## [0.4.0b2] - entity layer, local UI, and document import
 
 ### Added
+- Added an optional FERNmark `0.4.0a9` document adapter and consent-action CLI.
+  Schema-v1 envelopes are validated only by FERNmark, then mapped into the
+  existing zero-LLM capture and `observe()` path with per-document SHA-256
+  provenance, idempotent same-hash imports, redacted reports, and selective
+  document forgetting for events, graph evidence, and review suggestions.
 - Persisted edge provenance (`stated`/`inferred`) in SQLite and Postgres stores,
   including migration defaults and consolidation snapshot/undo preservation.
 - Added deterministic structured-field extraction at capture ingest for email,

@@ -286,11 +286,12 @@ visible node stays synthetic and every relation remains explainable.*
 ## 🚀 Quickstart
 
 ```bash
-pip install -e ".[dev,api]"
+pip install <path-to>/fernmark-0.4.0a9-py3-none-any.whl
+pip install -e ".[dev,api,fernmark]"
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 274 passing, 2 skipped
+python -m pytest tests -q               # 283 passing, 2 skipped with FERNmark installed
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -305,6 +306,7 @@ open http://localhost:8077/graph                            # legacy redirect to
 fernme-mcp --print-db-path                                   # show the shared SQLite DB path
 fernme-mcp                                                   # MCP server for agents/Codex/Claude
 python -m fernme.import_obsidian ./vault --site demo --user elena --dry-run
+python -m fernme.import_fernmark ./document.fernmark.json --site demo --user elena --dry-run
 ```
 
 > 🗄 **Storage:** defaults to `~/.fernme/fernme.db` (SQLite). For production use `PostgresStore` — same interface, tested against a real Postgres 16. Keep SQLite off cloud-synced folders.
@@ -348,12 +350,12 @@ mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
 The shipped MCP configs run:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b1" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
 ```
 
 No PyPI publish is required for the plugin route. The plugin is pinned to the
-reproducible release ref `v0.4.0b1`, so external testers get the same server
-build. The owner must push `main` and create plus push the `v0.4.0b1` tag on a
+reproducible release ref `v0.4.0b2`, so external testers get the same server
+build. The owner must push `main` and create plus push the `v0.4.0b2` tag on a
 public or otherwise reachable repo before testers can fetch it. PyPI publish is
 an owner action triggered by that `v*` tag after trusted publishing is configured.
 See `docs/mcp.md` for local development alternatives.
@@ -373,6 +375,30 @@ structured fields such as email and ISO dates into event payloads, and queues
 wikilink or alias candidates for human review. It never auto-applies entity
 truth. Through MCP, agents call `import_obsidian(site, user, path, ...)`; the
 path is on the MCP server machine and the returned summary is counts-only.
+
+### Document import (FERNmark)
+
+FERNme can ingest FERNmark's validated schema-v1 envelope without adding an LLM
+call. Build the FERNmark wheel in its own repository, then install it before the
+FERNme document extra. Use a placeholder path in shared instructions, never a
+machine-specific path:
+
+```bash
+pip install <path-to>/fernmark-0.4.0a9-py3-none-any.whl
+pip install "fernme[fernmark]"
+python -m fernme.import_fernmark ./document.fernmark.json --site demo.com --user elena --dry-run
+python -m fernme.import_fernmark ./document.fernmark.json --site demo.com --user elena
+python -m fernme.import_fernmark --site demo.com --user elena --forget <source-sha256>
+```
+
+The real import command is the consent action for that document and site/user;
+`--dry-run` does not change consent or memory. FERNmark performs envelope
+validation, FERNme stores only sanitized deterministic tags through the normal
+capture path, and reports never print document text by default. Re-importing the
+same SHA-256 is idempotent. `--forget` removes that document's events, review
+suggestions, and graph evidence while leaving unrelated evidence intact. The
+document adapter costs 0 LLM tokens; optional topic tags use the existing local
+rules adapter only when it is active.
 
 ---
 
@@ -451,7 +477,15 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (274 passing, 2 skipped): engine, SQLite + real-Postgres stores, supernode + sign-in, triggers, safety, REST/MCP, bundled local SPA, 2D/spatial memory graph view, canonical entity-kind filters, review-backed re-kind suggestions, selected-node evidence cards, class-targeted volatility retention, contradiction-scoped verify, persisted edge provenance, structured-field ingest, suggest-and-approve canonicalization, cross-user assoc k-suppression, deterministic Obsidian import, MCP packaging smoke coverage, self-configuring install paths, and the full results suite above.
+Done & tested (283 passing, 2 skipped with FERNmark installed; 274 passing,
+11 skipped without the optional extra): engine, SQLite + real-Postgres stores,
+supernode + sign-in, triggers, safety, REST/MCP, bundled local SPA, 2D/spatial
+memory graph view, canonical entity-kind filters, review-backed re-kind
+suggestions, selected-node evidence cards, class-targeted volatility retention,
+contradiction-scoped verify, persisted edge provenance, structured-field ingest,
+suggest-and-approve canonicalization, cross-user assoc k-suppression,
+deterministic Obsidian and FERNmark document import, MCP packaging smoke
+coverage, self-configuring install paths, and the full results suite above.
 
 🆕 **Typed entity layer:** deterministic, consent-gated service APIs plus additive
 SQLite/Postgres tables for entities, aliases, fields, typed relations, and inert

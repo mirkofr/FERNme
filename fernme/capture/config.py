@@ -20,7 +20,7 @@ import re
 from typing import Dict, List
 
 DEFAULT_PATH = "fern.toml"
-VALID = ("signal", "local", "agent")
+VALID = ("signal", "local", "agent", "document")
 
 
 def default_config(active: List[str] = None) -> Dict:

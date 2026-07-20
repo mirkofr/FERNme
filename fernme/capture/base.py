@@ -17,7 +17,7 @@ Adapters only PROPOSE tags. They are sanitized and written through the normal
 no-LLM path, so the engine stays the single source of truth.
 """
 from __future__ import annotations
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # An "event" is a plain dict. Conventional keys:
 #   kind : str  -- "chat" | "command" | "file" | "git" | "app" | "calendar"
@@ -37,6 +37,10 @@ class BaseAdapter:
     cost_tokens: int = 0          # rough billed tokens caused per write
     reads_text: bool = False      # whether it consumes event["text"]
     needs: str = "nothing"        # human note: what must be present to use it
+    # Event fields copied into the stored payload when this adapter fires.
+    # This keeps provenance explicit and adapter-owned instead of forwarding an
+    # arbitrary untrusted event mapping into the Cabinet.
+    payload_fields: Tuple[str, ...] = ()
 
     def extract(self, event: Dict) -> List[str]:
         raise NotImplementedError

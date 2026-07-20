@@ -14,10 +14,10 @@ else:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEST_RELEASE_TAG = "v0.4.0b1"
-PACKAGE_VERSION = "0.4.0b1"
+TEST_RELEASE_TAG = "v0.4.0b2"
+PACKAGE_VERSION = "0.4.0b2"
 UVX_FROM = f"fernme[mcp] @ git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}"
-PLUGIN_VERSION = "0.4.0b1"
+PLUGIN_VERSION = "0.4.0b2"
 
 
 def _read_json(path):

@@ -34,6 +34,17 @@ def sanitize_tags(tags) -> List[str]:
     return out
 
 
+def sanitize_display_text(value, limit: int = 180) -> str:
+    """Normalize untrusted display-only text without treating it as a tag.
+
+    Display strings may retain punctuation and Unicode, but control characters
+    are replaced, whitespace is collapsed, and length is bounded. Callers must
+    still store or render the result as data, never as code, SQL, or a path.
+    """
+    text = re.sub(r"[\x00-\x1f\x7f]", " ", str(value)).strip()
+    return " ".join(text.split())[:max(0, int(limit))]
+
+
 def cap_numeric(value, lo: float = -1e6, hi: float = 1e6):
     """Clamp numeric values; pass through short strings (e.g. size 'M')."""
     try:

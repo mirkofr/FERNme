@@ -34,6 +34,10 @@ class AgentByproductAdapter(BaseAdapter):
         self.marker = marker
 
     def extract(self, event: Dict) -> List[str]:
+        # Document text is untrusted source material, not an agent reply. Never
+        # interpret an embedded FERN_TAGS marker as authority-bearing output.
+        if event.get("kind") == "document":
+            return []
         # explicit tags passed by the agent win outright
         tags: List[str] = list(event.get("tags", []))
         text = event.get("text") or ""
