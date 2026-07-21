@@ -405,6 +405,18 @@ suggestions, and graph evidence while leaving unrelated evidence intact. The
 document adapter costs 0 LLM tokens; optional topic tags use the existing local
 rules adapter only when it is active.
 
+### Photo memory (default off)
+
+Install `fernme[media]`, set `[media] enabled = true` in `fern.toml`, and use the
+two-step MCP flow `remember_photo(..., confirm=false)` followed by
+`confirm=true` only after the user agrees. JPEG, PNG, and WebP files are
+re-encoded without EXIF/GPS, stored in a local blob directory beside the SQLite
+database, and linked to agent-emitted tags as `asset:<uuid>` nodes;
+`forget_photo` deletes the files and graph evidence. Honest cost: this adds 0
+extra model calls when tags ride an agent turn that already perceived the image.
+Silent or bulk ingestion without an agent is not implemented and is out of
+scope for this phase.
+
 ---
 
 ## Minimal API example

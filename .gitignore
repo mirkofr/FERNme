@@ -16,6 +16,7 @@ layer3_synthetic_*/
 *.db-*
 *.sqlite
 *.sqlite3
+*.assets/
 .fern/
 mirko_memory_map.html
 glossary.json

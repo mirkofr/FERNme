@@ -37,7 +37,7 @@ _NS_TO_CAT = {
     "milestone": "milestones", "event": "milestones", "decision": "milestones",
     "habit": "habits", "activity": "habits", "trait": "habits", "style": "habits",
     "comm": "habits", "phrase": "habits", "tool": "habits",
-    "media": "media", "brand": "media", "food": "media", "tea": "media",
+    "media": "media", "asset": "media", "brand": "media", "food": "media", "tea": "media",
     "music": "media", "movie": "media", "book": "media", "pet": "media", "entity": "media",
 }
 

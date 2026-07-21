@@ -26,6 +26,7 @@ from . import enrichment as _enrichment
 from . import glossary as _glossary
 from .capture import obsidian as _obsidian
 from .capture import fernmark_documents as _fernmark_documents
+from . import media as _media
 from .capture.config import load_config as _load_capture_config
 from .capture.local_tagger import LocalTaggerAdapter
 from .capture.pipeline import CapturePipeline
@@ -41,6 +42,11 @@ import math
 import os
 import re
 import uuid
+
+
+_MEDIA_AUTHORITY_NAMESPACES = {
+    "admin", "auth", "permission", "permissions", "policy", "role", "system",
+}
 
 
 def _clamp01(x: float) -> float:
@@ -93,7 +99,7 @@ class ConsentError(RuntimeError):
 class FernService:
     def __init__(self, db_path: str = None, cfg: Config = DEFAULT, store=None,
                  memory_mode: str = "pure", tagger=None, enricher=None, catalog=None,
-                 vocabulary=None):
+                 vocabulary=None, media_root: str = None):
         # memory_mode: "pure" (default, key-less) | "gated" | "offline".
         # All hot writes and recalls are deterministic. Legacy tagger/enricher
         # objects are only used by explicit propose-only enrichment wrappers.
@@ -112,9 +118,12 @@ class FernService:
         self._ask_count = {}                  # ask-budget rate limit per (site,user)
         self.llm_calls = 0                    # transparency: count LLM invocations
         self._last_enrich_ts = {}             # in-service watermark for batch fallback
+        self.media_root = _media.blob_root_for_store(self.store, media_root)
 
     # ---------- consent / governance ----------
     def consent(self, site: str, user: str, granted: bool, ts: float = 0.0) -> Dict:
+        if not granted:
+            self._purge_user_asset_files(site, user)
         self.store.set_consent(site, user, granted, ts)
         self._audit(site, user, "consent", {"granted": bool(granted)}, ts)
         if not granted:                       # withdrawing consent purges the profile
@@ -208,6 +217,162 @@ class FernService:
             out["questions"] = questions
             out["superseded"] = superseded
         return out
+
+    # ---------- image memory (default off, zero model calls) ----------
+    def _require_media(self):
+        if not self.cfg.media_enabled:
+            raise _media.MediaDisabledError("media memory is disabled")
+        required = ("insert_asset", "get_asset", "list_assets",
+                    "delete_asset_artifacts")
+        if not all(hasattr(self.store, name) for name in required):
+            raise _media.MediaError("the configured store does not support media assets")
+
+    def _media_tags(self, tags) -> List[str]:
+        clean = []
+        for tag in sanitize_tags(tags):
+            namespace = tag.lstrip("!").split(":", 1)[0]
+            if namespace in _MEDIA_AUTHORITY_NAMESPACES:
+                continue
+            if self.vocabulary is not None:
+                tag, _alias = self.vocabulary.resolve(tag)
+                if not tag:
+                    continue
+            if tag not in clean:
+                clean.append(tag)
+        return clean
+
+    @staticmethod
+    def _asset_token(asset_id: str) -> str:
+        return "asset:" + _valid_uuid(asset_id)
+
+    def _asset_event_tags(self, site: str, user: str, asset_id: str) -> List[str]:
+        token = self._asset_token(asset_id)
+        tags = []
+        for event in self.store.recall(site, user, type="asset", limit=100000):
+            if event.get("payload", {}).get("asset_id") != asset_id:
+                continue
+            for attr, _magnitude in event.get("attrs", []):
+                if attr != token and attr not in tags:
+                    tags.append(attr)
+        return tags
+
+    def _asset_metadata(self, row: Dict, tags=None) -> Dict:
+        return {
+            "id": row["id"],
+            "type": row["type"],
+            "mime": row["mime"],
+            "uri": row["uri"],
+            "sha256": row["sha256"],
+            "bytes": int(row["bytes"]),
+            "created_ts": float(row["created_ts"]),
+            "source": row["source"],
+            "thumbnail_uri": row["thumbnail_uri"],
+            "exif_stripped": bool(row["exif_stripped"]),
+            "sensitive": bool(row["sensitive"]),
+            "consent": bool(row["consent"]),
+            "status": row["status"],
+            "tags": list(tags if tags is not None else self._asset_event_tags(
+                row["site"], row["user"], row["id"])),
+            "content_redacted": True,
+        }
+
+    def observe_asset(self, site: str, user: str, source_path_or_bytes,
+                      tags, meta=None, sensitive: bool = False,
+                      source: str = "chat", dry_run: bool = False,
+                      max_bytes: int = None, now: float = 0.0) -> Dict:
+        """Validate or store one image and link it through one normal observe call."""
+        self._require_media()
+        if not dry_run:
+            self._require_consent(site, user)
+        metadata = dict(meta or {})
+        description = sanitize_display_text(metadata.get("description", ""), 180)
+        source_kind = str(metadata.get("source", source)).lower()
+        if source_kind not in ("chat", "upload", "bulk"):
+            source_kind = "chat"
+        safe_tags = self._media_tags(tags)
+        limit = self.cfg.media_max_bytes if max_bytes is None else int(max_bytes)
+        prepared = _media.prepare_image(
+            source_path_or_bytes,
+            max_bytes=limit,
+            thumbnail_max_px=self.cfg.media_thumbnail_max_px,
+        )
+        existing = self.store.get_asset(site, user, prepared.source_sha256)
+        report = {
+            "dry_run": bool(dry_run),
+            "duplicate": existing is not None,
+            "id": existing["id"] if existing else None,
+            "sha256": prepared.source_sha256,
+            "sha256_prefix": prepared.source_sha256[:12],
+            "mime": prepared.mime,
+            "bytes": prepared.source_bytes,
+            "width": prepared.width,
+            "height": prepared.height,
+            "tags": safe_tags,
+            "thumbnail_uri": existing["thumbnail_uri"] if existing else None,
+            "sensitive": bool(sensitive or (existing and existing["sensitive"])),
+            "content_redacted": True,
+            "llm_calls": 0,
+        }
+        if dry_run:
+            return report
+        if self.media_root is None:
+            raise _media.MediaError(
+                "media memory needs a file-backed database or explicit media_root")
+
+        created = existing is None
+        row = existing
+        if created:
+            asset_id = str(uuid.uuid4())
+            uri, thumbnail_uri = _media.persist_image(
+                self.media_root, site, user, asset_id, prepared)
+            media_object = _media.MediaObject(
+                id=asset_id, site=site, user=user, type="image", mime=prepared.mime,
+                uri=uri, sha256=prepared.source_sha256,
+                bytes=prepared.source_bytes, created_ts=float(now), source=source_kind,
+                thumbnail_uri=thumbnail_uri, exif_stripped=True,
+                sensitive=bool(sensitive), consent=True, status="active",
+            )
+            try:
+                row = self.store.insert_asset(media_object.row())
+            except Exception:
+                _media.delete_media_files(self.media_root, uri, thumbnail_uri)
+                raise
+        elif sensitive and not row["sensitive"]:
+            row = self.store.set_asset_sensitive(site, user, row["id"], True)
+
+        payload = {
+            "tags": safe_tags + [self._asset_token(row["id"])],
+            "source": "inferred",
+            "asset_id": row["id"],
+            "source_sha256": row["sha256"],
+            "mime": row["mime"],
+            "asset_source": source_kind,
+            "sensitive": bool(row["sensitive"]),
+        }
+        if description:
+            payload["text"] = description
+        try:
+            observed = self.observe(site, user, "asset", payload, ts=now)
+        except Exception:
+            if created:
+                _media.delete_media_files(
+                    self.media_root, row["uri"], row["thumbnail_uri"])
+                self.store.delete_asset_row(site, user, row["id"])
+            raise
+        report.update({
+            "id": row["id"],
+            "thumbnail_uri": row["thumbnail_uri"],
+            "sensitive": bool(row["sensitive"]),
+            "tags": [attr for attr in observed["stored_attrs"]
+                     if not attr.startswith("asset:")],
+            "stored": created,
+            "linked": True,
+        })
+        self._audit(site, user, "observe_asset", {
+            "asset_id": row["id"], "duplicate": not created,
+            "sensitive": bool(row["sensitive"]), "content_redacted": True,
+        }, now)
+        return report
 
     def _curate(self, site, user, ug, mapped, new_source, existing, ts):
         """Apply the editing policy to the just-written attrs: supersede a losing
@@ -345,7 +510,99 @@ class FernService:
                contains: Optional[str] = None, limit: int = 20) -> List[Dict]:
         """Open the Cabinet: structured query over raw events (specific facts)."""
         self._require_consent(site, user)
-        return self.store.recall(site, user, type, contains, limit)
+        events = self.store.recall(site, user, type, contains, limit)
+        if not self.cfg.media_enabled or not hasattr(self.store, "get_asset"):
+            return events
+        for event in events:
+            asset_id = event.get("payload", {}).get("asset_id")
+            if event.get("type") != "asset" or not asset_id:
+                continue
+            row = self.store.get_asset(site, user, asset_id)
+            if row is not None:
+                event["asset"] = self._asset_metadata(
+                    row, tags=[attr for attr, _magnitude in event.get("attrs", [])
+                               if not attr.startswith("asset:")])
+        return events
+
+    def get_asset(self, site: str, user: str, asset_id_or_sha256: str) -> Dict:
+        self._require_media()
+        self._require_consent(site, user)
+        row = self.store.get_asset(site, user, str(asset_id_or_sha256))
+        if row is None:
+            raise ValueError("active asset not found")
+        return self._asset_metadata(row)
+
+    def recall_assets(self, site: str, user: str, context=None,
+                      limit: int = 20) -> List[Dict]:
+        """Return redacted active asset pointers, never inline image bytes."""
+        self._require_media()
+        self._require_consent(site, user)
+        seeds = set(self._media_tags(context or []))
+        rows = self.store.list_assets(site, user, status="active", limit=max(1, int(limit)))
+        assets = [self._asset_metadata(row) for row in rows]
+        if seeds:
+            assets.sort(key=lambda item: (
+                -len(seeds.intersection(item["tags"])),
+                -float(item["created_ts"]), item["id"],
+            ))
+        return assets[:max(0, int(limit))]
+
+    def set_asset_sensitive(self, site: str, user: str, asset_id: str,
+                            sensitive: bool) -> Dict:
+        self._require_media()
+        self._require_consent(site, user)
+        asset_id = _valid_uuid(asset_id)
+        row = self.store.set_asset_sensitive(site, user, asset_id, bool(sensitive))
+        if row is None:
+            raise ValueError("active asset not found")
+        return self._asset_metadata(row)
+
+    def forget_asset(self, site: str, user: str, asset_id_or_sha256: str,
+                     ts: float = 0.0) -> Dict:
+        self._require_media()
+        self._require_consent(site, user)
+        row = self.store.get_asset(site, user, str(asset_id_or_sha256))
+        if row is None:
+            raise ValueError("active asset not found")
+        files_deleted = _media.delete_media_files(
+            self.media_root, row["uri"], row["thumbnail_uri"])
+        removed = self.store.delete_asset_artifacts(
+            site, user, row["id"], row["sha256"])
+        affected = {
+            str(item[0])
+            for event in removed["events"]
+            for item in event.get("attrs", [])
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        }
+        rebuilt = self._rebuild_attrs_from_events(site, user, affected)
+        self._audit(site, user, "forget_asset", {
+            "asset_id": row["id"], "events_deleted": len(removed["events"]),
+            "suggestions_deleted": removed["suggestions_deleted"],
+            "attrs_rebuilt": rebuilt,
+        }, ts)
+        return {
+            "forgotten": True,
+            "asset_id": row["id"],
+            "sha256": row["sha256"],
+            "events_deleted": len(removed["events"]),
+            "suggestions_deleted": removed["suggestions_deleted"],
+            "attrs_rebuilt": rebuilt,
+            "files_deleted": files_deleted,
+        }
+
+    def _purge_user_asset_files(self, site: str, user: str) -> int:
+        if not hasattr(self.store, "list_assets"):
+            return 0
+        rows = self.store.list_assets(site, user, status="active", limit=100000)
+        if not rows:
+            return 0
+        if self.media_root is None:
+            raise _media.MediaError("media blob directory is unavailable for deletion")
+        deleted = 0
+        for row in rows:
+            deleted += _media.delete_media_files(
+                self.media_root, row["uri"], row["thumbnail_uri"])
+        return deleted
 
     def import_obsidian(self, site: str, user: str, path: str, dry_run: bool = False,
                         include=None, exclude=None, max_notes: int = None,
@@ -617,9 +874,17 @@ class FernService:
 
     def export(self, site: str, user: str) -> Dict:
         self._require_consent(site, user)
-        return self.store.export_user(site, user)
+        exported = self.store.export_user(site, user)
+        if self.cfg.media_enabled and hasattr(self.store, "list_assets"):
+            exported["assets"] = [
+                self._asset_metadata(row)
+                for row in self.store.list_assets(
+                    site, user, status="active", limit=100000)
+            ]
+        return exported
 
     def delete(self, site: str, user: str) -> Dict:
+        self._purge_user_asset_files(site, user)
         self.store.delete_user(site, user)
         return {"deleted": True, "site": site, "user": user}
 
@@ -1284,7 +1549,17 @@ class FernService:
     def build_supernode(self, person: str) -> Supernode:
         sn = Supernode(person)
         for site, local_user in self.store.list_identities(person):
-            sn.add_from_site(site, self.store.load_user(site, local_user))
+            excluded = set()
+            if hasattr(self.store, "list_assets"):
+                excluded = {
+                    self._asset_token(row["id"])
+                    for row in self.store.list_assets(
+                        site, local_user, status="active", limit=100000)
+                    if row["sensitive"]
+                }
+            sn.add_from_site(
+                site, self.store.load_user(site, local_user),
+                exclude_attrs=excluded)
         return sn
 
     def memory_graph(self, person: str) -> Dict:
@@ -1477,6 +1752,7 @@ class FernService:
         wipe the profile, then UNLEARN the user's contribution from the population
         prior (cascading). The audit chain (no PII) remains as proof it happened."""
         self._audit(site, user, "forget", {})
+        self._purge_user_asset_files(site, user)
         self.store.delete_user(site, user)
         refreshed = self.prior_refresh(site)          # recompute prior without them
         return {"forgotten": True, "site": site, "user": user, "prior": refreshed}

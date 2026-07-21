@@ -4,9 +4,11 @@ import sys, os, tempfile, shutil
 import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pytest
+from dataclasses import replace
 
 pgserver = pytest.importorskip("pgserver")
 from fernme.service import FernService
+from fernme.config import DEFAULT
 from fernme.store.postgres_store import PostgresStore
 
 
@@ -62,6 +64,28 @@ def test_delete_on_postgres(pg):
     svc.observe("shop", "z", "purchase", {"tags": ["organic"]})
     svc.delete("shop", "z")
     assert svc.store.load_user("shop", "z").n_edges() == 0
+
+
+def test_media_metadata_lifecycle_on_postgres(pg, tmp_path):
+    Image = pytest.importorskip("PIL.Image")
+    from io import BytesIO
+
+    output = BytesIO()
+    Image.new("RGB", (8, 8), "orange").save(output, format="PNG")
+    svc = FernService(
+        store=PostgresStore(pg),
+        cfg=replace(DEFAULT, media_enabled=True),
+        media_root=str(tmp_path / "postgres-assets"),
+    )
+    svc.consent("media-demo", "elena", True)
+
+    stored = svc.observe_asset(
+        "media-demo", "elena", output.getvalue(), ["topic:orange"], now=1.0)
+
+    assert svc.get_asset("media-demo", "elena", stored["id"])["mime"] == "image/png"
+    assert len(svc.store.list_assets("media-demo", "elena")) == 1
+    assert svc.forget_asset("media-demo", "elena", stored["id"])["forgotten"] is True
+    assert svc.store.list_assets("media-demo", "elena") == []
 
 
 def test_canonicalization_suggestions_on_postgres(pg):

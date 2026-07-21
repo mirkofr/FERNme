@@ -1,7 +1,9 @@
 # FERNme-M — Multimodal memory: design map (pre-build)
 
-*Status: design only. Nothing here is implemented. Goal: decide whether/how to add
-files (images, video, PDFs, audio) as first-class memory before writing any code.*
+*Status: Phase 1 is implemented for images only in `fernme/media.py`, the asset
+store methods, `FernService.observe_asset()`, and the MCP photo tools. Video,
+audio, server-side vision inspection, and silent bulk ingestion remain design
+work. The implementation is default-off and remains in version `0.4.0b2`.*
 
 ---
 

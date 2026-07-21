@@ -12,6 +12,7 @@ def test_namespace_mapping():
     assert category_of("rel:jonas") == "people"
     assert category_of("name:elena") == "facts"
     assert category_of("tea:earl-grey") == "media"
+    assert category_of("asset:00000000-0000-0000-0000-000000000000") == "media"
     assert category_of("activity:yoga") == "habits"
     assert category_of("!pref:dairy") == "emotional"        # dislikes are emotional
     assert category_of("weird:unknown") == "facts"          # default fallback

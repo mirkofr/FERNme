@@ -85,6 +85,8 @@ The MCP server currently exposes:
 - `import_obsidian`
 - `import_document`
 - `forget_document`
+- `remember_photo`
+- `forget_photo`
 - `edit_memory`
 - `forget_me`
 - `list_canonicalization_suggestions`
@@ -110,6 +112,38 @@ the user agrees. A confirmed report includes each full SHA-256 so the user can
 later call `forget_document(site, user, source_sha256)` to remove that
 document's evidence. If the optional extra is absent or the path is invalid,
 the tool returns a clean error rather than crashing the MCP server.
+
+## Photo Memory Tools
+
+Photo memory is image-only, default-off, and requires `pip install
+"fernme[media]"`. Enable it in the MCP server's working-directory `fern.toml`:
+
+```toml
+[media]
+enabled = true
+max_bytes = 26214400
+thumbnail_max_px = 512
+```
+
+Call `remember_photo(path, tags, site, user, confirm=false, description,
+sensitive)` first with a local image path explicitly named by the user. The
+preview validates the actual image header and reports only a SHA-256 prefix,
+sanitized tags, dimensions, and redacted metadata; it changes neither consent,
+the graph, the asset table, nor the filesystem. After showing the preview, call
+again with `confirm=true` only when the user agrees and site consent already
+exists. Tags must come from perception the calling agent already performed for
+the user's request. FERNme does not call a model, inspect pixels semantically, or
+silently bulk-ingest images.
+
+Confirmed JPEG, PNG, and WebP images are re-encoded without EXIF/GPS, stored by
+pointer beside the SQLite database, and linked as `asset:<uuid>` graph nodes.
+The tool returns an asset id, SHA-256 prefix, tags, and thumbnail pointer, never
+inline bytes or the description. Set `sensitive=true` for private media so the
+asset node stays outside cross-surface supernode output. `forget_photo(site,
+user, asset_id_or_sha256)` needs no second confirmation and deletes both files,
+the asset's Cabinet events and suggestions, and its graph evidence. Disabled
+media, missing Pillow, and invalid paths return clean errors without stopping
+other MCP tools.
 
 ## Obsidian Vault Import
 

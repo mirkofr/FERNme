@@ -8,9 +8,13 @@ Requires: pip install fernme
 from __future__ import annotations
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
+from ..capture.config import load_config as load_capture_config
 from ..capture.fernmark_documents import FernmarkDocumentError
+from ..config import DEFAULT
+from ..media import MediaError
 from ..service import ConsentError, FernService
 from ..runtime_config import default_db_path, default_site, default_user, ensure_default_db_path
 
@@ -40,7 +44,7 @@ def _resolve_document_path(path: str) -> str:
     try:
         resolved = Path(path).expanduser().resolve(strict=True)
         is_regular_source = resolved.is_file() or resolved.is_dir()
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise ValueError(
             "path must name an existing regular file or directory"
         ) from exc
@@ -121,6 +125,61 @@ def _forget_document(site: str, user: str, source_sha256: str) -> dict:
         return _service().forget_document(site, user, source_sha256)
     except (ConsentError, ValueError) as exc:
         return _document_tool_error(str(exc))
+
+
+def _redacted_photo_report(report: dict) -> dict:
+    """Whitelist metadata returned by remember_photo."""
+    return {
+        "ok": True,
+        "dry_run": bool(report.get("dry_run")),
+        "duplicate": bool(report.get("duplicate")),
+        "id": report.get("id"),
+        "sha256_prefix": str(report.get("sha256_prefix", ""))[:12],
+        "mime": report.get("mime"),
+        "bytes": report.get("bytes"),
+        "width": report.get("width"),
+        "height": report.get("height"),
+        "tags": [_safe_tag(tag) for tag in report.get("tags", [])],
+        "thumbnail_uri": report.get("thumbnail_uri"),
+        "sensitive": bool(report.get("sensitive")),
+        "content_redacted": True,
+        "llm_calls": 0,
+    }
+
+
+def _remember_photo(path: str, site: str, user: str, tags,
+                    description: str = "", sensitive: bool = False,
+                    confirm: bool = False) -> dict:
+    try:
+        report = _service().observe_asset(
+            site, user, path, tags,
+            meta={"description": description, "source": "chat"},
+            sensitive=sensitive, dry_run=not confirm)
+    except (ConsentError, MediaError, OSError, TypeError, ValueError) as exc:
+        return _document_tool_error(str(exc))
+    return _redacted_photo_report(report)
+
+
+def _forget_photo(site: str, user: str, asset_id_or_sha256: str) -> dict:
+    try:
+        return _service().forget_asset(site, user, asset_id_or_sha256)
+    except (ConsentError, MediaError, ValueError) as exc:
+        return _document_tool_error(str(exc))
+
+
+def _configured_service(db_path: str) -> FernService:
+    """Build the MCP service with default-off media settings from fern.toml."""
+    settings = load_capture_config().get("media", {})
+    enabled = settings.get("enabled", False)
+    enabled = enabled is True or str(enabled).lower() == "true"
+    cfg = replace(
+        DEFAULT,
+        media_enabled=enabled,
+        media_max_bytes=int(settings.get("max_bytes", DEFAULT.media_max_bytes)),
+        media_thumbnail_max_px=int(settings.get(
+            "thumbnail_max_px", DEFAULT.media_thumbnail_max_px)),
+    )
+    return FernService(db_path=db_path, cfg=cfg)
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -213,6 +272,27 @@ if FastMCP is not None:
         return _forget_document(site, user, source_sha256)
 
     @mcp.tool()
+    def remember_photo(path: str, tags: list[str], site: str = default_site(),
+                       user: str = default_user(), description: str = "",
+                       sensitive: bool = False, confirm: bool = False) -> dict:
+        """Preview or remember an explicit user-named local image file.
+
+        First call with confirm=false and show the redacted preview. Call again
+        with confirm=true only after the user agrees and site consent exists.
+        The path must be a local file explicitly named by the user. Tags must
+        come from what the agent already observed while serving this request;
+        this tool never calls a model or interprets pixels itself.
+        """
+        return _remember_photo(
+            path, site, user, tags, description, sensitive, confirm)
+
+    @mcp.tool()
+    def forget_photo(asset_id_or_sha256: str, site: str = default_site(),
+                     user: str = default_user()) -> dict:
+        """Forget one photo and delete its local blob and thumbnail files."""
+        return _forget_photo(site, user, asset_id_or_sha256)
+
+    @mcp.tool()
     def edit_memory(attr: str, weight: float, site: str = default_site(),
                     user: str = default_user()) -> dict:
         """Glass-box override of a single preference (locked, never decays)."""
@@ -286,7 +366,7 @@ def main(argv=None, run_server: bool = True):
         raise SystemExit("Install the 'mcp' package: pip install mcp")
     resolved = ensure_default_db_path()
     global svc
-    svc = FernService(db_path=resolved)
+    svc = _configured_service(resolved)
     print(f"FERNme DB: {resolved}", file=sys.stderr)
     if run_server:
         mcp.run()

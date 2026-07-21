@@ -86,6 +86,13 @@ CREATE TABLE IF NOT EXISTS canonicalization_suggestions(
   kind TEXT NOT NULL, payload TEXT NOT NULL, score DOUBLE PRECISION NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_ts DOUBLE PRECISION NOT NULL, decided_ts DOUBLE PRECISION);
+CREATE TABLE IF NOT EXISTS assets(
+  id TEXT PRIMARY KEY, site TEXT NOT NULL, "user" TEXT NOT NULL,
+  type TEXT NOT NULL, mime TEXT NOT NULL, uri TEXT NOT NULL,
+  sha256 TEXT NOT NULL, bytes BIGINT NOT NULL, created_ts DOUBLE PRECISION NOT NULL,
+  source TEXT NOT NULL, thumbnail_uri TEXT NOT NULL,
+  exif_stripped INT NOT NULL, sensitive INT NOT NULL,
+  consent INT NOT NULL, status TEXT NOT NULL DEFAULT 'active');
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, "user", ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, "user", attr);
 CREATE INDEX IF NOT EXISTS idx_assoc_edge_users_edge
@@ -94,6 +101,10 @@ CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
   ON relation_facts(site, "user", subject_id, relation, object_id, ts);
 CREATE INDEX IF NOT EXISTS idx_canonicalization_suggestions_user
   ON canonicalization_suggestions(site, "user", status, created_ts);
+CREATE INDEX IF NOT EXISTS idx_assets_owner_status
+  ON assets(site, "user", status, created_ts);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_owner_sha_active
+  ON assets(site, "user", sha256) WHERE status='active';
 """
 
 
@@ -245,6 +256,7 @@ class PostgresStore:
                 self._q(f'DELETE FROM {t} WHERE site=%s AND "user"=%s', (site, user))
             self._q('DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s',
                     (site, user))
+            self._q('DELETE FROM assets WHERE site=%s AND "user"=%s', (site, user))
 
     def export_user(self, site, user) -> Dict:
         ug = self.load_user(site, user)
@@ -362,6 +374,102 @@ class PostgresStore:
                         "DELETE FROM canonicalization_suggestions WHERE suggestion_id=%s",
                         [(suggestion_id,) for suggestion_id in suggestion_ids],
                     )
+        return {"events": removed, "suggestions_deleted": len(suggestion_ids)}
+
+    # ---- local media asset metadata (bytes remain in the blob store) ----
+    @staticmethod
+    def _asset_row(row):
+        if row is None:
+            return None
+        out = dict(row)
+        for key in ("exif_stripped", "sensitive", "consent"):
+            out[key] = bool(out[key])
+        return out
+
+    def insert_asset(self, row):
+        with self._lock:
+            self._q(
+                'INSERT INTO assets(id,site,"user",type,mime,uri,sha256,bytes,'
+                'created_ts,source,thumbnail_uri,exif_stripped,sensitive,consent,status) '
+                'VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                (row["id"], row["site"], row["user"], row["type"], row["mime"],
+                 row["uri"], row["sha256"], int(row["bytes"]), row["created_ts"],
+                 row["source"], row["thumbnail_uri"], int(row["exif_stripped"]),
+                 int(row["sensitive"]), int(row["consent"]), row["status"]),
+            )
+        return self.get_asset(row["site"], row["user"], row["id"])
+
+    def get_asset(self, site, user, asset_id_or_sha256, status="active"):
+        row = self._q(
+            'SELECT * FROM assets WHERE site=%s AND "user"=%s AND status=%s '
+            'AND (id=%s OR sha256=%s) ORDER BY created_ts DESC LIMIT 1',
+            (site, user, status, asset_id_or_sha256, asset_id_or_sha256),
+        ).fetchone()
+        return self._asset_row(row)
+
+    def list_assets(self, site, user, status="active", limit=100):
+        rows = self._q(
+            'SELECT * FROM assets WHERE site=%s AND "user"=%s AND status=%s '
+            'ORDER BY created_ts DESC,id ASC LIMIT %s',
+            (site, user, status, int(limit)),
+        ).fetchall()
+        return [self._asset_row(row) for row in rows]
+
+    def set_asset_sensitive(self, site, user, asset_id, sensitive):
+        with self._lock:
+            self._q(
+                'UPDATE assets SET sensitive=%s WHERE site=%s AND "user"=%s '
+                "AND id=%s AND status='active'",
+                (int(sensitive), site, user, asset_id),
+            )
+        return self.get_asset(site, user, asset_id)
+
+    def delete_asset_row(self, site, user, asset_id):
+        with self._lock:
+            self._q(
+                'DELETE FROM assets WHERE site=%s AND "user"=%s AND id=%s',
+                (site, user, asset_id),
+            )
+
+    def delete_asset_artifacts(self, site, user, asset_id, source_sha256):
+        with self._lock:
+            event_rows = self._q(
+                'SELECT id,ts,type,payload,attrs FROM events '
+                'WHERE site=%s AND "user"=%s AND type=%s ORDER BY id ASC',
+                (site, user, "asset"),
+            ).fetchall()
+            removed = []
+            for row in event_rows:
+                payload = json.loads(row["payload"])
+                if payload.get("asset_id") != asset_id:
+                    continue
+                removed.append({
+                    "id": row["id"], "ts": row["ts"], "type": row["type"],
+                    "payload": payload, "attrs": json.loads(row["attrs"]),
+                })
+            suggestion_rows = self._q(
+                'SELECT suggestion_id,payload FROM canonicalization_suggestions '
+                'WHERE site=%s AND "user"=%s', (site, user)).fetchall()
+            suggestion_ids = []
+            for row in suggestion_rows:
+                payload = json.loads(row["payload"])
+                if (payload.get("asset_id") == asset_id or
+                        payload.get("source_sha256") == source_sha256):
+                    suggestion_ids.append(row["suggestion_id"])
+            with self._conn.cursor() as cursor:
+                if removed:
+                    cursor.executemany(
+                        "DELETE FROM events WHERE id=%s",
+                        [(row["id"],) for row in removed])
+                if suggestion_ids:
+                    cursor.executemany(
+                        "DELETE FROM canonicalization_suggestions WHERE suggestion_id=%s",
+                        [(suggestion_id,) for suggestion_id in suggestion_ids])
+                cursor.execute(
+                    "UPDATE assets SET status='tombstoned',uri='',thumbnail_uri='' "
+                    'WHERE site=%s AND "user"=%s AND id=%s',
+                    (site, user, asset_id),
+                )
         return {"events": removed, "suggestions_deleted": len(suggestion_ids)}
 
     # ---- prior ----

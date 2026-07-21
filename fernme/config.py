@@ -109,6 +109,11 @@ class Config:
     canonicalization_min_score: float = 0.55
     canonicalization_low_confidence: float = 0.40
 
+    # --- local image memory (media.py); OFF by default ---
+    media_enabled: bool = False
+    media_max_bytes: int = 25 * 1024 * 1024
+    media_thumbnail_max_px: int = 512
+
     # --- Differential / population-prior encoding (prior/population.py) ---
     theta: float = 2.0        # store a user edge only if |w_user - w_prior| > theta
 

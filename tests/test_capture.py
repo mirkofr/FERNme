@@ -52,3 +52,6 @@ def test_config_round_trip(tmp_path):
     cfg = load_config(p)
     assert cfg["active"] == ["signal", "local"]
     assert cfg["local"]["mode"] == "rules"
+    assert cfg["media"] == {
+        "enabled": False, "max_bytes": 25 * 1024 * 1024,
+        "thumbnail_max_px": 512}

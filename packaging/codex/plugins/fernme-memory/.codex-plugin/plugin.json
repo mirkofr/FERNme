@@ -9,13 +9,14 @@
   "interface": {
     "displayName": "FERNme Memory",
     "shortDescription": "Use local, consent-gated FERNme memory from Codex.",
-    "longDescription": "Adds a local MCP server for consent-gated FERNme memory plus a standing skill for safe recall, remembering, document previews, and human-reviewed suggestions.",
+    "longDescription": "Adds a local MCP server for consent-gated FERNme memory plus safe recall, document and photo previews, and human-reviewed suggestions.",
     "developerName": "Acquilab Inc.",
     "category": "Productivity",
     "capabilities": [
       "MCP",
       "Memory",
-      "Document Import"
+      "Document Import",
+      "Photo Memory"
     ],
     "defaultPrompt": "Use FERNme memory for this project. Recall before acting and only remember consented facts."
   },

@@ -139,6 +139,7 @@ def test_invalid_envelope_error_redacts_body_and_local_path(
     "missing/document.fernmark.json",
     "missing/../still-missing.fernmark.json",
     r"\\.\NUL",
+    "bad\x00name.fernmark.json",
 ])
 def test_hostile_or_nonexistent_paths_return_clean_errors(
         hostile_path, monkeypatch):

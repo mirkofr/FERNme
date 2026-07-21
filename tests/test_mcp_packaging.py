@@ -58,6 +58,8 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
         "fastapi>=0.110", "uvicorn[standard]>=0.27"]
     assert pyproject["project"]["optional-dependencies"]["fernmark"] == [
         "fernmark==0.4.0a9"]
+    assert pyproject["project"]["optional-dependencies"]["media"] == [
+        "Pillow>=10"]
 
     codex_plugin = _read_json(
         "packaging/codex/plugins/fernme-memory/.codex-plugin/plugin.json")
@@ -71,6 +73,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
     assert "Document Import" in codex_plugin["interface"]["capabilities"]
+    assert "Photo Memory" in codex_plugin["interface"]["capabilities"]
     _assert_uvx_git_mcp(codex_mcp)
     assert codex_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
     assert codex_marketplace["plugins"][0]["source"]["path"] == "./plugins/fernme-memory"
@@ -102,6 +105,9 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert "import_document" in skill_text
     assert "forget_document" in skill_text
     assert "confirm=false" in skill_text
+    assert "remember_photo" in skill_text
+    assert "forget_photo" in skill_text
+    assert "fernme[media]" in skill_text
 
 
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp extra not installed")
@@ -130,6 +136,8 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
                     assert "remember" in tool_names
                     assert "import_document" in tool_names
                     assert "forget_document" in tool_names
+                    assert "remember_photo" in tool_names
+                    assert "forget_photo" in tool_names
                     await session.call_tool(
                         "grant_consent",
                         {"site": "demo.local", "user": "elena", "granted": True},

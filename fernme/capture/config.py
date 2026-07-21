@@ -13,6 +13,11 @@ Dependency-free: a tiny targeted TOML reader/writer for our small, known schema
 
     [capture.agent]
     marker = "FERN_TAGS:"
+
+    [media]
+    enabled = false
+    max_bytes = 26214400
+    thumbnail_max_px = 512
 """
 from __future__ import annotations
 import os
@@ -29,12 +34,15 @@ def default_config(active: List[str] = None) -> Dict:
         "local": {"mode": "rules", "model": "hermes3",
                   "endpoint": "http://localhost:11434"},
         "agent": {"marker": "FERN_TAGS:"},
+        "media": {"enabled": False, "max_bytes": 25 * 1024 * 1024,
+                  "thumbnail_max_px": 512},
     }
 
 
 _ACTIVE = re.compile(r'^\s*active\s*=\s*\[(.*?)\]', re.MULTILINE)
-_SECTION = re.compile(r'^\s*\[capture\.(\w+)\]\s*$')
+_SECTION = re.compile(r'^\s*\[(?:capture\.(\w+)|(media))\]\s*$')
 _KV = re.compile(r'^\s*(\w+)\s*=\s*"(.*?)"\s*$')
+_SCALAR_KV = re.compile(r'^\s*(\w+)\s*=\s*(true|false|-?\d+)\s*$', re.I)
 
 
 def load_config(path: str = DEFAULT_PATH) -> Dict:
@@ -52,13 +60,19 @@ def load_config(path: str = DEFAULT_PATH) -> Dict:
     for line in text.splitlines():
         sm = _SECTION.match(line)
         if sm:
-            section = sm.group(1)
+            section = sm.group(1) or sm.group(2)
             cfg.setdefault(section, {})
             continue
         if section:
             kv = _KV.match(line)
             if kv:
                 cfg[section][kv.group(1)] = kv.group(2)
+                continue
+            scalar = _SCALAR_KV.match(line)
+            if scalar:
+                value = scalar.group(2).lower()
+                cfg[section][scalar.group(1)] = (
+                    value == "true" if value in ("true", "false") else int(value))
     return cfg
 
 
@@ -75,6 +89,14 @@ def write_config(cfg: Dict, path: str = DEFAULT_PATH) -> str:
         for k, v in opts.items():
             lines.append('%s = "%s"' % (k, v))
         lines.append("")
+    media = cfg.get("media", {})
+    lines.extend([
+        "[media]",
+        "enabled = %s" % ("true" if media.get("enabled") else "false"),
+        "max_bytes = %d" % int(media.get("max_bytes", 25 * 1024 * 1024)),
+        "thumbnail_max_px = %d" % int(media.get("thumbnail_max_px", 512)),
+        "",
+    ])
     out = "\n".join(lines)
     with open(path, "w", encoding="utf-8") as f:
         f.write(out)

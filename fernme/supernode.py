@@ -40,8 +40,11 @@ class Supernode:
         self.attrs: Dict[str, Dict] = {}
         self.numeric: Dict[str, Dict] = {}   # key -> {"value": v, "sources": [site]}
 
-    def add_from_site(self, site: str, ug: UserGraph):
+    def add_from_site(self, site: str, ug: UserGraph, exclude_attrs=None):
+        excluded = set(exclude_attrs or ())
         for attr, e in ug.edges.items():
+            if attr in excluded:
+                continue
             slot = self.attrs.setdefault(attr, {"weight": 0.0, "confidence": 0.0,
                                                 "sources": {}, "sensitive": is_sensitive(attr)})
             slot["sources"][site] = e.wire_weight()

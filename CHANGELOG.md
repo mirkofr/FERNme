@@ -13,6 +13,12 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 - Added `import_document` and `forget_document` MCP tools with a mandatory
   no-write preview before user-confirmed import, redacted metadata-only output,
   explicit local-path validation, and clean optional-extra errors.
+- Added default-off image memory with local pointer storage, verified EXIF/GPS
+  removal, bounded thumbnails, owner-scoped deduplication, `asset:<uuid>` graph
+  links, sensitive-media supernode exclusion, and cascading file deletion.
+- Added two-step `remember_photo` and user-favoring `forget_photo` MCP tools.
+  Photo tags ride perception the calling agent already performed, so FERNme
+  makes 0 extra model calls on write. The optional `media` extra provides Pillow.
 - Persisted edge provenance (`stated`/`inferred`) in SQLite and Postgres stores,
   including migration defaults and consolidation snapshot/undo preservation.
 - Added deterministic structured-field extraction at capture ingest for email,
