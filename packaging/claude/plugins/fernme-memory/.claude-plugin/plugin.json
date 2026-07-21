@@ -2,7 +2,7 @@
   "name": "fernme-memory",
   "displayName": "FERNme Memory",
   "version": "0.4.0b2",
-  "description": "Local FERNme memory MCP server with safe document and photo previews.",
+  "description": "Local FERNme memory MCP server with managed document evidence and safe photo previews.",
   "author": {
     "name": "Acquilab Inc."
   },
@@ -14,6 +14,7 @@
     "mcp",
     "personalization",
     "document-import",
+    "document-catalog",
     "photo-memory"
   ],
   "skills": "./skills/"

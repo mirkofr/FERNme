@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph from "force-graph";
 import {
   BarChart3,
@@ -315,6 +315,17 @@ export default function GraphView() {
   const [kindCollapsed, setKindCollapsed] = useState(saved.kindCollapsed ?? true);
   const [viewMode, setViewMode] = useState<"2d" | "spatial">("2d");
 
+  const selectNode = useCallback((node: GraphNode | null) => {
+    setSelected(node);
+    if (fern.documentEvidence) {
+      void fern.refreshGraph({
+        selectedNode: node?.id || "",
+        query: search,
+        documentEvidence: true
+      });
+    }
+  }, [fern.documentEvidence, fern.refreshGraph, search]);
+
   const categories = useMemo(() => {
     const nodes = fern.graph?.nodes || [];
     return Array.from(new Set(nodes.map(categoryOf))).sort();
@@ -597,8 +608,8 @@ export default function GraphView() {
         if (edge.entity_relation) return "rgba(255,155,85,.92)";
         return "rgba(176,204,232,.82)";
       })
-      .onNodeClick((node: GraphNode) => setSelected(node))
-      .onBackgroundClick(() => setSelected(null))
+      .onNodeClick((node: GraphNode) => selectNode(node))
+      .onBackgroundClick(() => selectNode(null))
       .onLinkHover((edge: GraphEdge | null) => {
         hoveredLinkRef.current = edge;
         graphRef.current?.refresh?.();
@@ -651,7 +662,7 @@ export default function GraphView() {
     });
     resize.observe(hostRef.current);
     return () => resize.disconnect();
-  }, [filtered, focus, selected, viewMode]);
+  }, [filtered, focus, selectNode, selected, viewMode]);
 
   useEffect(() => {
     return () => {
@@ -666,7 +677,7 @@ export default function GraphView() {
     if (!term || !graphRef.current) return;
     const node = filtered.nodes.find((item) => labelFor(item).toLowerCase().includes(term) || item.id.toLowerCase().includes(term));
     if (!node) return;
-    setSelected(node);
+    selectNode(node);
     graphRef.current.centerAt((node as any).x || 0, (node as any).y || 0, 600);
     graphRef.current.zoom(3, 600);
   };
@@ -681,10 +692,10 @@ export default function GraphView() {
       return id === rawTerm || id.endsWith(`:${bareTerm}`) || label === bareTerm || label.includes(bareTerm);
     });
     if (!match || selected?.id === match.id) return;
-    setSelected(match);
+    selectNode(match);
     graphRef.current?.centerAt?.((match as any).x || 0, (match as any).y || 0, 650);
     graphRef.current?.zoom?.(2.6, 650);
-  }, [fern.contextText, filtered.nodes, selected?.id]);
+  }, [fern.contextText, filtered.nodes, selectNode, selected?.id]);
 
   return (
     <section className="workspace graph-route">
@@ -798,6 +809,39 @@ export default function GraphView() {
             <span className="switch" aria-hidden="true" />
             Known only
           </button>
+          <button
+            type="button"
+            className="switch-control"
+            role="switch"
+            aria-checked={fern.documentEvidence}
+            onClick={() => {
+              const next = !fern.documentEvidence;
+              fern.setDocumentEvidence(next);
+              void fern.refreshGraph({
+                selectedNode: selected?.id || "",
+                query: search,
+                documentEvidence: next
+              });
+            }}
+          >
+            <span className="switch" aria-hidden="true" />
+            Document evidence
+          </button>
+          {fern.documentEvidence && fern.graph?.document_overlay?.truncated ? (
+            <button
+              type="button"
+              className="button"
+              onClick={() => fern.loadMoreDocuments(selected?.id || "", search)}
+            >
+              Load more documents
+            </button>
+          ) : null}
+          {fern.documentEvidence && fern.graph?.document_overlay &&
+            fern.graph.document_overlay.document_count === 0 ? (
+            <span className="graph-toolbar__hint">
+              No document evidence yet -- import one with import_document.
+            </span>
+          ) : null}
           <div className="segmented-control" aria-label="Graph view mode">
             <button type="button" className={viewMode === "2d" ? "is-active" : ""} onClick={() => setViewMode("2d")}>2D</button>
             <button type="button" className={viewMode === "spatial" ? "is-active" : ""} onClick={() => setViewMode("spatial")}>Spatial</button>
@@ -814,7 +858,7 @@ export default function GraphView() {
                 colorFor={colorFor}
                 labelFor={labelFor}
                 relationLabel={relationLabel}
-                onSelect={setSelected}
+                onSelect={selectNode}
               />
             </Suspense>
           ) : (
@@ -838,7 +882,7 @@ export default function GraphView() {
         totalEdges={fern.graph?.edges?.length || 0}
         suggestions={fern.suggestions.length}
         selected={selected}
-        onCloseSelection={() => setSelected(null)}
+        onCloseSelection={() => selectNode(null)}
         onEdit={fern.editAttr}
       />
     </section>
@@ -1019,7 +1063,7 @@ function SelectedNodeCard({
   useEffect(() => {
     setWhy(null);
     setConfidence(null);
-    if (!node || node.kind === "user") return;
+    if (!node || node.kind === "user" || node.kind === "document") return;
     const attr = String(node.label || node.id);
     Promise.allSettled([
       postJson("/why", { site: fern.site, user: fern.user, attr }),
@@ -1046,6 +1090,7 @@ function SelectedNodeCard({
   }
 
   const attr = String(node.label || node.id);
+  const isDocument = node.kind === "document";
   const aliases = node.entity_aliases || node.collapsed_aliases || [];
   const kind = entityKindOf(node) || node.kind || "attribute";
   const degree = edges.reduce((total, edge) => {
@@ -1089,7 +1134,14 @@ function SelectedNodeCard({
             {aliases.slice(0, 3).map((alias) => <span key={alias}>{stripNamespace(alias)}</span>)}
           </div>
         ) : null}
-        {node.kind !== "user" ? (
+        {isDocument ? (
+          <div className="selected-card__document">
+            <span><FileText className="icon" aria-hidden="true" /> Managed Markdown</span>
+            <code>{String(node.markdown_path || "")}</code>
+            <small>{String(node.mime_type || "document")} | {String(node.status || "active")}</small>
+          </div>
+        ) : null}
+        {node.kind !== "user" && !isDocument ? (
           <label className="selected-card__edit">
             <span>Set weight</span>
             <input
@@ -1101,14 +1153,18 @@ function SelectedNodeCard({
             />
           </label>
         ) : null}
-        <details className="selected-card__details">
-          <summary>Why this appears</summary>
-          <pre>{JSON.stringify(why || {}, null, 2)}</pre>
-        </details>
-        <details className="selected-card__details">
-          <summary>Confidence</summary>
-          <pre>{JSON.stringify(confidence || {}, null, 2)}</pre>
-        </details>
+        {!isDocument ? (
+          <>
+            <details className="selected-card__details">
+              <summary>Why this appears</summary>
+              <pre>{JSON.stringify(why || {}, null, 2)}</pre>
+            </details>
+            <details className="selected-card__details">
+              <summary>Confidence</summary>
+              <pre>{JSON.stringify(confidence || {}, null, 2)}</pre>
+            </details>
+          </>
+        ) : null}
       </section>
     </div>
   );

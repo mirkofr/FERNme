@@ -2,6 +2,12 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { getJson, GraphData, postJson, PromptCard, RecallReplay, Suggestion } from "./api";
 
 type RuntimeDefaults = { site: string; user: string };
+type GraphRefreshOptions = {
+  selectedNode?: string;
+  query?: string;
+  documentEvidence?: boolean;
+  documentLimit?: number;
+};
 
 const CONTEXT_KEY = "fernme.ui.context.v1";
 
@@ -11,6 +17,8 @@ type FernState = {
   contextText: string;
   assocFloor: number;
   knownOnly: boolean;
+  documentEvidence: boolean;
+  documentLimit: number;
   graph: GraphData | null;
   card: PromptCard | null;
   suggestions: Suggestion[];
@@ -25,8 +33,10 @@ type FernState = {
   setContextText: (value: string) => void;
   setAssocFloor: (value: number) => void;
   setKnownOnly: (value: boolean) => void;
+  setDocumentEvidence: (value: boolean) => void;
   refreshAll: () => Promise<void>;
-  refreshGraph: () => Promise<void>;
+  refreshGraph: (options?: GraphRefreshOptions) => Promise<void>;
+  loadMoreDocuments: (selectedNode?: string, query?: string) => Promise<void>;
   refreshSuggestions: () => Promise<void>;
   acceptSuggestion: (suggestion: Suggestion) => Promise<void>;
   rejectSuggestion: (suggestion: Suggestion) => Promise<void>;
@@ -66,6 +76,8 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
   const [contextText, setContextText] = useState("");
   const [assocFloor, setAssocFloor] = useState(1);
   const [knownOnly, setKnownOnly] = useState(true);
+  const [documentEvidence, setDocumentEvidence] = useState(false);
+  const [documentLimit, setDocumentLimit] = useState(12);
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [card, setCard] = useState<PromptCard | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -104,14 +116,30 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(CONTEXT_KEY, JSON.stringify({ site, user }));
   }, [site, user]);
 
-  const refreshGraph = useCallback(async () => {
+  const refreshGraph = useCallback(async (options: GraphRefreshOptions = {}) => {
+    const includeDocuments = options.documentEvidence ?? documentEvidence;
     const data = await postJson<GraphData>("/graph-data", {
       ...payload,
       hierarchy: true,
-      assoc_floor: assocFloor
+      assoc_floor: assocFloor,
+      document_evidence: includeDocuments,
+      document_query: options.query || "",
+      selected_node: options.selectedNode || "",
+      document_limit: options.documentLimit ?? documentLimit
     });
     setGraph(data);
-  }, [assocFloor, payload]);
+  }, [assocFloor, documentEvidence, documentLimit, payload]);
+
+  const loadMoreDocuments = useCallback(async (selectedNode = "", query = "") => {
+    const nextLimit = Math.min(50, documentLimit + 12);
+    setDocumentLimit(nextLimit);
+    await refreshGraph({
+      selectedNode,
+      query,
+      documentEvidence: true,
+      documentLimit: nextLimit
+    });
+  }, [documentLimit, refreshGraph]);
 
   const refreshSuggestions = useCallback(async () => {
     const data = await postJson<Suggestion[]>("/suggestions/list", {
@@ -126,7 +154,14 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const [graphData, cardData, suggestionData, recallData, auditData, replayData, healthData] = await Promise.all([
-        postJson<GraphData>("/graph-data", { ...payload, hierarchy: true, assoc_floor: assocFloor }),
+        postJson<GraphData>("/graph-data", {
+          ...payload,
+          hierarchy: true,
+          assoc_floor: assocFloor,
+          document_evidence: documentEvidence,
+          document_query: contextText,
+          document_limit: documentLimit
+        }),
         postJson<PromptCard>("/card", { ...payload, context }),
         postJson<Suggestion[]>("/suggestions/list", { ...payload, refresh: true }),
         postJson<unknown[]>("/recall", { ...payload, limit: 40 }),
@@ -146,7 +181,7 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [assocFloor, context, payload]);
+  }, [assocFloor, context, contextText, documentEvidence, documentLimit, payload]);
 
   useEffect(() => {
     refreshAll();
@@ -183,6 +218,8 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     contextText,
     assocFloor,
     knownOnly,
+    documentEvidence,
+    documentLimit,
     graph,
     card,
     suggestions,
@@ -197,8 +234,10 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     setContextText,
     setAssocFloor,
     setKnownOnly,
+    setDocumentEvidence,
     refreshAll,
     refreshGraph,
+    loadMoreDocuments,
     refreshSuggestions,
     acceptSuggestion,
     rejectSuggestion,

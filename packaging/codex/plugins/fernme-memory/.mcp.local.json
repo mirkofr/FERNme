@@ -3,7 +3,9 @@
     "fernme": {
       "command": "fernme-mcp",
       "args": [],
-      "env": {}
+      "env": {
+        "FERNME_MANAGED_DOCUMENTS": "true"
+      }
     }
   }
 }

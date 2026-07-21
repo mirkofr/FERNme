@@ -49,6 +49,15 @@ export type GraphData = {
   entities?: Record<string, unknown>[];
   entity_aliases?: Record<string, string>;
   entity_relations?: Record<string, unknown>[];
+  document_overlay?: {
+    enabled: boolean;
+    truncated: boolean;
+    next_cursor?: string | null;
+    document_count: number;
+    link_count: number;
+    limit: number;
+    content_redacted: boolean;
+  };
 };
 
 export type PromptCard = {

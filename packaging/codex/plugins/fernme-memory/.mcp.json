@@ -3,12 +3,15 @@
     "fernme": {
       "command": "uvx",
       "args": [
+        "--with",
+        "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae",
         "--from",
         "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2",
         "fernme-mcp"
       ],
       "env": {
-        "FERNME_DB": ""
+        "FERNME_DB": "",
+        "FERNME_MANAGED_DOCUMENTS": "true"
       }
     }
   }

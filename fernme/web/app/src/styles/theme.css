@@ -682,6 +682,12 @@ textarea:focus-visible,
   margin-right: 2px;
 }
 
+.graph-toolbar__hint {
+  color: var(--fern-text-muted);
+  font-size: var(--fern-font-size-12);
+  white-space: nowrap;
+}
+
 .graph-stage {
   position: relative;
   min-width: 0;
@@ -1126,6 +1132,27 @@ textarea:focus-visible,
   font-size: var(--fern-font-size-10);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.selected-card__document {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--fern-border-subtle);
+  border-radius: var(--fern-radius-8);
+  background: var(--fern-surface-2);
+}
+
+.selected-card__document span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.selected-card__document code {
+  overflow-wrap: anywhere;
+  color: var(--fern-text-secondary);
 }
 
 .selected-card__edit {
