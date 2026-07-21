@@ -114,6 +114,11 @@ class Config:
     media_max_bytes: int = 25 * 1024 * 1024
     media_thumbnail_max_px: int = 512
 
+    # --- managed durable documents; OFF by default ---
+    managed_documents_enabled: bool = False
+    document_overlay_limit: int = 20
+    document_read_max_chars: int = 20000
+
     # --- Differential / population-prior encoding (prior/population.py) ---
     theta: float = 2.0        # store a user edge only if |w_user - w_prior| > theta
 

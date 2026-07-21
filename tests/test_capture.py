@@ -55,3 +55,4 @@ def test_config_round_trip(tmp_path):
     assert cfg["media"] == {
         "enabled": False, "max_bytes": 25 * 1024 * 1024,
         "thumbnail_max_px": 512}
+    assert cfg["documents"] == {"enabled": False, "overlay_limit": 20}

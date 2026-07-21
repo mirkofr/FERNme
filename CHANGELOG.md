@@ -5,6 +5,50 @@ All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 ## [0.4.0b2] - entity layer, local UI, and document import
 
 ### Added
+- Added a default-off managed FERNmark document workflow for raw supported files
+  and existing envelopes. A redacted preview performs no writes; confirmation
+  atomically stores UTF-8 Markdown plus a canonical envelope under a safe,
+  owner-scoped vault path and records a durable document catalog row.
+- Added additive SQLite/PostgreSQL `documents` and `document_tags` tables with
+  owner isolation, approved-tag provenance, archive/supersede/pin/authority
+  lifecycle state, selective forgetting, and idempotent schema setup.
+- Added bounded `recall_documents` metadata retrieval with continuation and an
+  explicit graph document-evidence overlay. The overlay is off by default,
+  contains typed provenance links, and does not change `recall_card` or lower
+  `assoc_floor`.
+- Added human-reviewed document tag proposals linked to stable document IDs.
+  The bundled skills treat generated Markdown as untrusted data, infer at most
+  eight tags only as a byproduct of the current agent turn, and never auto-accept.
+- Pinned the FERNmark optional dependency and bundled MCP plugin configuration
+  to immutable commit `23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae` while keeping
+  the FERNme package version at `0.4.0b2`.
+- Fixed (Phase 18): the managed `import_document` path wrote events with
+  `attrs=[]` and always reported `tags_written=0`, so native document tags
+  never reached the graph. Confirmed imports now flow through the same
+  `CapturePipeline` + document adapter + `service.observe()` path as
+  `import_fernmark`, so there is one import write path, not a parallel one.
+  Extended the Level-1 native tag set (still zero-LLM, still sanitized through
+  the existing tag path) with source origin (raw vs. envelope), managed-vault
+  and catalog-status identity, a safe title when FERNmark classifies one, and
+  explicit task/use tags from the calling workflow.
+- Fixed a managed-vault path-traversal guard that could silently swallow a
+  hostile relative pointer (and skip deletion without raising) whenever the
+  pointer's intermediate directories did not happen to exist on disk; the
+  containment check is now purely lexical and always enforced first.
+- Added `remember_document_use` to record that a document was used for
+  something as a byproduct of work already done in the turn (never a reason
+  for a separate model call); it writes one normal event linking a
+  `task:<purpose-slug>` tag to the document's own `doc:` tag.
+- Added `read_document` for bounded, paged, audit-logged access to a
+  consented document's stored canonical Markdown by document reference only
+  (never a filesystem path), with a server-enforced `max_chars` cap.
+- Added `backfill_documents` (service method, `python -m
+  fernme.backfill_documents` CLI, and MCP tool) to create catalog rows for
+  document evidence imported before the managed catalog existed, without
+  duplicating events or rewriting graph edges. Dry-run by default, idempotent,
+  consent-respecting, and audit-logged.
+- `recall_documents` now returns a `hint` field naming `import_document` when
+  the catalog has nothing to show.
 - Added an optional FERNmark `0.4.0a9` document adapter and consent-action CLI.
   Schema-v1 envelopes are validated only by FERNmark, then mapped into the
   existing zero-LLM capture and `observe()` path with per-document SHA-256

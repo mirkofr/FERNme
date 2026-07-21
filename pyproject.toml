@@ -31,7 +31,7 @@ mcp = ["mcp>=1.0"]
 ui = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]
 postgres = ["psycopg[binary]>=3.1"]
 viz = ["matplotlib>=3.7"]
-fernmark = ["fernmark==0.4.0a9"]
+fernmark = ["fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae"]
 media = ["Pillow>=10"]
 dev = ["pytest>=7.4", "httpx>=0.27", "tomli>=2.0; python_version < '3.11'"]
 # Postgres-backed tests only; pgserver has no Windows wheel, so it's gated by platform
@@ -49,6 +49,8 @@ Documentation = "https://fernme.dev"
 
 [tool.setuptools.packages.find]
 include = ["fernme*"]
+exclude = ["fernme.web.app*"]
+namespaces = false
 
 [tool.setuptools.package-data]
 fernme = [

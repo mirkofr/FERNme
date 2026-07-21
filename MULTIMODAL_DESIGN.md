@@ -1,9 +1,11 @@
 # FERNme-M — Multimodal memory: design map (pre-build)
 
-*Status: Phase 1 is implemented for images only in `fernme/media.py`, the asset
-store methods, `FernService.observe_asset()`, and the MCP photo tools. Video,
-audio, server-side vision inspection, and silent bulk ingestion remain design
-work. The implementation is default-off and remains in version `0.4.0b2`.*
+*Status: Phase 1 is implemented for images in `fernme/media.py`, the asset store
+methods, `FernService.observe_asset()`, and the MCP photo tools. Managed document
+evidence is also implemented as a separate durable catalog plus bounded,
+on-demand graph overlay. Video, audio, server-side vision inspection, and silent
+bulk ingestion remain design work. Both optional paths are default-off in the
+engine and remain in version `0.4.0b2`.*
 
 ---
 
@@ -91,9 +93,11 @@ Linking to memory (reuses existing tables, **no schema churn**):
   co-occurs with those tags in the assoc graph.
 - Retrieval returns `asset:<id>` nodes; the service resolves them to `MediaObject` rows.
 
-PDFs/documents are special: their **text extracts deterministically** (pdfminer/pypdf,
-no model), so they flow straight through the *existing text pipeline* — the cheapest,
-highest-value modality.
+Documents are special: FERNmark converts supported sources deterministically,
+with no model call, into Markdown and a validated canonical envelope. FERNme
+stores those artifacts in a managed vault and keeps their durable catalog
+separate from the decaying hot graph. Human-approved tags provide provenance
+links in a bounded, explicitly requested document overlay.
 
 ---
 

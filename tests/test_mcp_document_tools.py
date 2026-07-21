@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from dataclasses import replace
+from pathlib import Path
 import sys
 
 import pytest
 
 from fernme.api import mcp_server
+from fernme.config import DEFAULT
 from fernme.service import FernService
 from fernme.store.sqlite_store import SQLiteStore
 
@@ -20,6 +23,16 @@ requires_fernmark = pytest.mark.skipif(
 
 def _service(monkeypatch):
     service = FernService(store=SQLiteStore(":memory:"))
+    monkeypatch.setattr(mcp_server, "svc", service)
+    return service
+
+
+def _managed_service(tmp_path, monkeypatch):
+    service = FernService(
+        store=SQLiteStore(str(tmp_path / "managed-mcp.db")),
+        cfg=replace(DEFAULT, managed_documents_enabled=True),
+        vault_root=str(tmp_path / "vault"),
+    )
     monkeypatch.setattr(mcp_server, "svc", service)
     return service
 
@@ -37,6 +50,19 @@ def _make_envelope(tmp_path):
     envelope = tmp_path / "fictional-borealis.fernmark.json"
     fernmark.dump_document(document, envelope)
     return body, document, envelope
+
+
+def test_mcp_environment_enables_managed_documents_and_vault(
+        tmp_path, monkeypatch):
+    vault = tmp_path / "configured-vault"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FERNME_MANAGED_DOCUMENTS", "true")
+    monkeypatch.setenv("FERNME_VAULT", str(vault))
+
+    service = mcp_server._configured_service(str(tmp_path / "configured.db"))
+
+    assert service.cfg.managed_documents_enabled is True
+    assert service.vault_root == vault.resolve()
 
 
 @requires_fernmark
@@ -151,3 +177,79 @@ def test_hostile_or_nonexistent_paths_return_clean_errors(
     assert report["ok"] is False
     assert "existing regular file or directory" in report["error"]
     assert "Traceback" not in json.dumps(report)
+
+
+@requires_fernmark
+def test_managed_raw_document_mcp_preview_confirm_recall_and_forget(
+        tmp_path, monkeypatch):
+    body = "# Fictional MCP raw source\n\nSynthetic document evidence.\n"
+    source = tmp_path / "fictional-source.txt"
+    source.write_text(body, encoding="utf-8")
+    service = _managed_service(tmp_path, monkeypatch)
+
+    preview = mcp_server.import_document(
+        str(source), "demo.com", "elena", confirm=False)
+
+    preview_item = preview["documents"][0]
+    assert preview["ok"] is True and preview["dry_run"] is True
+    assert len(preview_item["source_sha256_prefix"]) == 12
+    assert "source_sha256" not in preview_item
+    assert preview_item["planned_markdown_path"].startswith("documents/")
+    assert service.store.has_consent("demo.com", "elena") is False
+    assert not (tmp_path / "vault").exists()
+    assert body not in json.dumps(preview)
+
+    confirmed = mcp_server.import_document(
+        str(source), "demo.com", "elena", confirm=True)
+    item = confirmed["documents"][0]
+    assert item["document_id"]
+    assert len(item["source_sha256"]) == 64
+    assert item["markdown_path"].startswith("documents/")
+    assert str(tmp_path) not in json.dumps(confirmed)
+
+    proposal = service.propose_tags(
+        "demo.com", "elena", ["topic:synthetic"],
+        document_id=item["document_id"], ts=2.0)
+    service.accept_suggestion(
+        "demo.com", "elena", proposal["suggestion"]["suggestion_id"], ts=3.0)
+    recalled = mcp_server.recall_documents(
+        ["topic:synthetic"], 5, False, None, "demo.com", "elena")
+    assert recalled["documents"][0]["document_id"] == item["document_id"]
+    assert body not in json.dumps(recalled)
+
+    page = mcp_server.read_document(item["document_id"], 0, 10, "demo.com", "elena")
+    assert page["returned_chars"] == 10
+    assert page["has_more"] is True
+    assert body not in json.dumps(page)  # only the requested 10-char slice
+
+    use = mcp_server.remember_document_use(
+        item["document_id"], "drafted a summary", ["topic:synthetic"],
+        None, None, "demo.com", "elena", 4.0)
+    assert use["document_id"] == item["document_id"]
+    assert "doc:" + item["source_sha256"][:12] in use["stored_attrs"]
+
+    forgotten = mcp_server.forget_document(
+        item["document_id"], "demo.com", "elena", True)
+    assert forgotten["files_deleted"] == 2
+    assert Path(source).exists()
+
+
+@requires_fernmark
+def test_backfill_documents_mcp_tool_previews_then_confirms(tmp_path, monkeypatch):
+    _, document, envelope = _make_envelope(tmp_path)
+    service = _managed_service(tmp_path, monkeypatch)
+    legacy_report = service.import_fernmark(
+        "demo.com", "elena", str(envelope), dry_run=False, now=1.0)
+    assert legacy_report["tags_written"] == 3
+    assert service.store.list_documents("demo.com", "elena") == []
+
+    preview = mcp_server.backfill_documents(False, "demo.com", "elena")
+    assert preview == {
+        "dry_run": True, "site": "demo.com", "user": "elena",
+        "candidates_found": 1, "documents_created": 0,
+    }
+
+    confirmed = mcp_server.backfill_documents(True, "demo.com", "elena")
+    assert confirmed["documents_created"] == 1
+    rows = service.store.list_documents("demo.com", "elena")
+    assert rows[0]["source_sha256"] == document.source_sha256

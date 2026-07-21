@@ -77,7 +77,7 @@ def test_graph_includes_hierarchy_without_removing_flat_view():
     assert g["hierarchy"]["assignments"]["connection:helped-connect-orbitlabs"] in anchors
 
 
-def test_graph_assoc_floor_can_show_single_observation_tag_links():
+def test_graph_assoc_floor_can_show_two_observation_tag_links():
     s = FernService(store=SQLiteStore(":memory:"))
     s.store.set_consent("demo.com", "ana", True)
     tags = ["person:dana-reyes", "org:northwind-labs", "topic:pilot-design"]
@@ -230,6 +230,9 @@ def test_spa_graph_source_is_local_force_directed_shell():
     assert "SpatialGraphView" in graph_view
     assert "View mode" not in graph_view
     assert "Spatial" in graph_view
+    assert "Document evidence" in graph_view
+    assert "Load more documents" in graph_view
+    assert "markdown_path" in graph_view
     assert "isOwnerNode(selected)" in graph_view
     assert "ctx.globalAlpha = focused ? 1 : 0.18" in graph_view
     assert "segmented-control" in styles

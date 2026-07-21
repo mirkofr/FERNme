@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TEST_RELEASE_TAG = "v0.4.0b2"
 PACKAGE_VERSION = "0.4.0b2"
 UVX_FROM = f"fernme[mcp] @ git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}"
+FERNMARK_VCS = (
+    "fernmark @ git+https://github.com/mirkofr/FERNmark.git@"
+    "23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae")
 PLUGIN_VERSION = "0.4.0b2"
 
 
@@ -27,10 +30,12 @@ def _read_json(path):
 def _assert_uvx_git_mcp(mcp):
     server = mcp["mcpServers"]["fernme"]
     assert server["command"] == "uvx"
-    assert server["args"] == ["--from", UVX_FROM, "fernme-mcp"]
-    assert "[mcp]" in server["args"][1]
-    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][1]
+    assert server["args"] == [
+        "--with", FERNMARK_VCS, "--from", UVX_FROM, "fernme-mcp"]
+    assert "[mcp]" in server["args"][3]
+    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][3]
     assert server["env"]["FERNME_DB"] == ""
+    assert server["env"]["FERNME_MANAGED_DOCUMENTS"] == "true"
 
 
 def test_packaging_json_files_are_valid():
@@ -57,7 +62,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert pyproject["project"]["optional-dependencies"]["ui"] == [
         "fastapi>=0.110", "uvicorn[standard]>=0.27"]
     assert pyproject["project"]["optional-dependencies"]["fernmark"] == [
-        "fernmark==0.4.0a9"]
+        FERNMARK_VCS]
     assert pyproject["project"]["optional-dependencies"]["media"] == [
         "Pillow>=10"]
 
@@ -73,9 +78,12 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
     assert "Document Import" in codex_plugin["interface"]["capabilities"]
+    assert "Managed Document Evidence" in codex_plugin["interface"]["capabilities"]
     assert "Photo Memory" in codex_plugin["interface"]["capabilities"]
     _assert_uvx_git_mcp(codex_mcp)
     assert codex_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
+    assert codex_local_mcp["mcpServers"]["fernme"]["env"][
+        "FERNME_MANAGED_DOCUMENTS"] == "true"
     assert codex_marketplace["plugins"][0]["source"]["path"] == "./plugins/fernme-memory"
 
     claude_plugin = _read_json(
@@ -91,6 +99,8 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert claude_plugin["skills"] == "./skills/"
     _assert_uvx_git_mcp(claude_mcp)
     assert claude_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
+    assert claude_local_mcp["mcpServers"]["fernme"]["env"][
+        "FERNME_MANAGED_DOCUMENTS"] == "true"
     assert claude_marketplace["plugins"][0]["source"] == "./plugins/fernme-memory"
     assert root_claude_marketplace["interface"]["displayName"] == "FERNme Local"
     root_source = root_claude_marketplace["plugins"][0]["source"]
@@ -104,6 +114,9 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     ).read_text(encoding="utf-8")
     assert "import_document" in skill_text
     assert "forget_document" in skill_text
+    assert "recall_documents" in skill_text
+    assert "document_id" in skill_text
+    assert "review is pending" in skill_text
     assert "confirm=false" in skill_text
     assert "remember_photo" in skill_text
     assert "forget_photo" in skill_text
@@ -136,6 +149,9 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
                     assert "remember" in tool_names
                     assert "import_document" in tool_names
                     assert "forget_document" in tool_names
+                    assert "recall_documents" in tool_names
+                    assert "archive_document" in tool_names
+                    assert "supersede_document" in tool_names
                     assert "remember_photo" in tool_names
                     assert "forget_photo" in tool_names
                     await session.call_tool(

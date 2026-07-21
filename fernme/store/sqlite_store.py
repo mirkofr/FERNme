@@ -81,6 +81,21 @@ CREATE TABLE IF NOT EXISTS canonicalization_suggestions(
   kind TEXT NOT NULL, payload TEXT NOT NULL, score REAL NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending',
   created_ts REAL NOT NULL, decided_ts REAL);
+CREATE TABLE IF NOT EXISTS documents(
+  document_id TEXT PRIMARY KEY, site TEXT NOT NULL, user TEXT NOT NULL,
+  source_sha256 TEXT NOT NULL, source_name TEXT NOT NULL,
+  markdown_path TEXT NOT NULL, envelope_path TEXT NOT NULL,
+  mime_type TEXT NOT NULL, extraction_quality TEXT NOT NULL,
+  warning_count INTEGER NOT NULL, block_count INTEGER NOT NULL,
+  created_ts REAL NOT NULL, imported_ts REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active', pinned INTEGER NOT NULL DEFAULT 0,
+  authoritative INTEGER NOT NULL DEFAULT 0, superseded_by TEXT NOT NULL DEFAULT '',
+  UNIQUE(site, user, source_sha256));
+CREATE TABLE IF NOT EXISTS document_tags(
+  document_id TEXT NOT NULL, site TEXT NOT NULL, user TEXT NOT NULL,
+  tag TEXT NOT NULL, provenance TEXT NOT NULL DEFAULT 'human_approved',
+  suggestion_id TEXT NOT NULL DEFAULT '', approved_ts REAL NOT NULL,
+  PRIMARY KEY(document_id, tag));
 CREATE TABLE IF NOT EXISTS assets(
   id TEXT PRIMARY KEY, site TEXT NOT NULL, user TEXT NOT NULL,
   type TEXT NOT NULL, mime TEXT NOT NULL, uri TEXT NOT NULL,
@@ -99,6 +114,10 @@ CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
   ON relation_facts(site, user, subject_id, relation, object_id, ts);
 CREATE INDEX IF NOT EXISTS idx_canonicalization_suggestions_user
   ON canonicalization_suggestions(site, user, status, created_ts);
+CREATE INDEX IF NOT EXISTS idx_documents_owner_status
+  ON documents(site, user, status, pinned, imported_ts);
+CREATE INDEX IF NOT EXISTS idx_document_tags_owner_tag
+  ON document_tags(site, user, tag, document_id);
 CREATE INDEX IF NOT EXISTS idx_assets_owner_status
   ON assets(site, user, status, created_ts);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_owner_sha_active
@@ -292,6 +311,10 @@ class SQLiteStore:
                 "DELETE FROM canonicalization_suggestions WHERE site=? AND user=?",
                 (site, user))
             self._conn.execute(
+                "DELETE FROM document_tags WHERE site=? AND user=?", (site, user))
+            self._conn.execute(
+                "DELETE FROM documents WHERE site=? AND user=?", (site, user))
+            self._conn.execute(
                 "DELETE FROM assets WHERE site=? AND user=?", (site, user))
             self._conn.commit()
 
@@ -343,11 +366,12 @@ class SQLiteStore:
     # ---- cabinet (events) ----
     def append_event(self, ev: Event):
         with self._lock:
-            self._conn.execute(
+            cursor = self._conn.execute(
                 "INSERT INTO events(site,user,ts,type,payload,attrs) VALUES(?,?,?,?,?,?)",
                 (ev.site, ev.user, ev.ts, ev.type, json.dumps(ev.payload),
                  json.dumps(ev.attrs)))
             self._conn.commit()
+            return int(cursor.lastrowid)
 
     def recall(self, site: str, user: str, type: Optional[str] = None,
                contains: Optional[str] = None, limit: int = 20) -> List[Dict]:
@@ -382,19 +406,58 @@ class SQLiteStore:
             for row in rows
         ]
 
+    def events_site_chronological(self, site: str) -> List[Dict]:
+        """Return all site events in stable write order for assoc rebuilding."""
+        rows = self._conn.execute(
+            "SELECT id,user,attrs FROM events WHERE site=? ORDER BY id ASC",
+            (site,),
+        )
+        return [
+            {"id": row["id"], "user": row["user"],
+             "attrs": json.loads(row["attrs"])}
+            for row in rows
+        ]
+
+    def replace_assoc_site(self, ag: AssocGraph, contributor_hits: Dict):
+        """Replace one site's derived assoc state after evidence deletion."""
+        rows = [
+            (ag.site, user, a, b, int(hits))
+            for (user, a, b), hits in contributor_hits.items()
+            if int(hits) > 0
+        ]
+        users_by_pair = {}
+        for _site, user, a, b, _hits in rows:
+            users_by_pair.setdefault((a, b), set()).add(user)
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM assoc_edge_users WHERE site=?", (ag.site,))
+            self._conn.execute("DELETE FROM assoc_edges WHERE site=?", (ag.site,))
+            self._conn.executemany(
+                "INSERT INTO assoc_edges(site,a,b,weight,users) VALUES(?,?,?,?,?)",
+                [(ag.site, a, b, weight, len(users_by_pair.get((a, b), set())))
+                 for (a, b), weight in ag.edges.items()],
+            )
+            self._conn.executemany(
+                "INSERT INTO assoc_edge_users(site,user,a,b,hits) VALUES(?,?,?,?,?)",
+                rows,
+            )
+            self._conn.commit()
+
     def delete_document_artifacts(self, site: str, user: str,
-                                  source_sha256: str) -> Dict:
+                                  source_sha256: str,
+                                  document_id: str = None) -> Dict:
         """Delete exact document events and queue rows, returning removed events."""
         with self._lock:
             event_rows = self._conn.execute(
                 "SELECT id,ts,type,payload,attrs FROM events "
-                "WHERE site=? AND user=? AND type='document' ORDER BY id ASC",
+                "WHERE site=? AND user=? ORDER BY id ASC",
                 (site, user),
             ).fetchall()
             removed = []
             for row in event_rows:
                 payload = json.loads(row["payload"])
-                if payload.get("source_sha256") != source_sha256:
+                if not (payload.get("source_sha256") == source_sha256 or (
+                        document_id and payload.get("document_id") == document_id)):
                     continue
                 removed.append({
                     "id": row["id"],
@@ -412,7 +475,8 @@ class SQLiteStore:
             suggestion_ids = [
                 row["suggestion_id"]
                 for row in suggestion_rows
-                if json.loads(row["payload"]).get("source_sha256") == source_sha256
+                if (json.loads(row["payload"]).get("source_sha256") == source_sha256 or
+                    (document_id and json.loads(row["payload"]).get("document_id") == document_id))
             ]
             if removed:
                 self._conn.executemany(
@@ -426,6 +490,115 @@ class SQLiteStore:
                 )
             self._conn.commit()
         return {"events": removed, "suggestions_deleted": len(suggestion_ids)}
+
+    # ---- durable document catalog and approved tag provenance ----
+    @staticmethod
+    def _document_row(row):
+        if row is None:
+            return None
+        out = dict(row)
+        out["pinned"] = bool(out["pinned"])
+        out["authoritative"] = bool(out["authoritative"])
+        return out
+
+    def insert_document(self, row: Dict):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO documents(document_id,site,user,source_sha256,source_name,"
+                "markdown_path,envelope_path,mime_type,extraction_quality,warning_count,"
+                "block_count,created_ts,imported_ts,status,pinned,authoritative,superseded_by) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (row["document_id"], row["site"], row["user"], row["source_sha256"],
+                 row["source_name"], row["markdown_path"], row["envelope_path"],
+                 row["mime_type"], row["extraction_quality"], int(row["warning_count"]),
+                 int(row["block_count"]), float(row["created_ts"]),
+                 float(row["imported_ts"]), row["status"], int(row.get("pinned", False)),
+                 int(row.get("authoritative", False)), row.get("superseded_by", "")),
+            )
+            self._conn.commit()
+        return self.get_document(row["site"], row["user"], row["document_id"])
+
+    def get_document(self, site: str, user: str, document_id_or_sha256: str):
+        row = self._conn.execute(
+            "SELECT * FROM documents WHERE site=? AND user=? "
+            "AND (document_id=? OR source_sha256=?) LIMIT 1",
+            (site, user, document_id_or_sha256, document_id_or_sha256),
+        ).fetchone()
+        return self._document_row(row)
+
+    def list_documents(self, site: str, user: str, statuses=None,
+                       limit: int = 100, offset: int = 0) -> List[Dict]:
+        statuses = list(statuses or ["active"])
+        if not statuses:
+            return []
+        marks = ",".join("?" for _ in statuses)
+        rows = self._conn.execute(
+            "SELECT * FROM documents WHERE site=? AND user=? AND status IN (" +
+            marks + ") ORDER BY pinned DESC,imported_ts DESC,document_id ASC LIMIT ? OFFSET ?",
+            (site, user, *statuses, int(limit), int(offset)),
+        ).fetchall()
+        return [self._document_row(row) for row in rows]
+
+    def update_document(self, site: str, user: str, document_id: str, **changes):
+        allowed = {"status", "pinned", "authoritative", "superseded_by"}
+        items = [(key, value) for key, value in changes.items() if key in allowed]
+        if not items:
+            return self.get_document(site, user, document_id)
+        sets = ",".join(key + "=?" for key, _value in items)
+        values = [int(value) if key in ("pinned", "authoritative") else value
+                  for key, value in items]
+        with self._lock:
+            self._conn.execute(
+                "UPDATE documents SET " + sets +
+                " WHERE site=? AND user=? AND document_id=?",
+                (*values, site, user, document_id),
+            )
+            self._conn.commit()
+        return self.get_document(site, user, document_id)
+
+    def add_document_tags(self, site: str, user: str, document_id: str,
+                          tags, suggestion_id: str, approved_ts: float):
+        rows = [(document_id, site, user, tag, "human_approved",
+                 suggestion_id or "", float(approved_ts)) for tag in tags]
+        with self._lock:
+            self._conn.executemany(
+                "INSERT INTO document_tags(document_id,site,user,tag,provenance,"
+                "suggestion_id,approved_ts) VALUES(?,?,?,?,?,?,?) "
+                "ON CONFLICT(document_id,tag) DO UPDATE SET "
+                "provenance=excluded.provenance,suggestion_id=excluded.suggestion_id,"
+                "approved_ts=excluded.approved_ts",
+                rows,
+            )
+            self._conn.commit()
+        return self.list_document_tags(site, user, document_id)
+
+    def list_document_tags(self, site: str, user: str,
+                           document_id: str = None) -> List[Dict]:
+        query = "SELECT * FROM document_tags WHERE site=? AND user=?"
+        args = [site, user]
+        if document_id:
+            query += " AND document_id=?"
+            args.append(document_id)
+        query += " ORDER BY tag,document_id"
+        return [dict(row) for row in self._conn.execute(query, args)]
+
+    def delete_document_catalog(self, site: str, user: str, document_id: str):
+        with self._lock:
+            tags = self._conn.execute(
+                "SELECT tag FROM document_tags WHERE site=? AND user=? AND document_id=?",
+                (site, user, document_id),
+            ).fetchall()
+            self._conn.execute(
+                "DELETE FROM document_tags WHERE site=? AND user=? AND document_id=?",
+                (site, user, document_id),
+            )
+            cursor = self._conn.execute(
+                "DELETE FROM documents WHERE site=? AND user=? AND document_id=?",
+                (site, user, document_id),
+            )
+            self._conn.commit()
+        return {"documents_deleted": int(cursor.rowcount),
+                "tag_mappings_deleted": len(tags)}
 
     # ---- local media asset metadata (bytes remain in the blob store) ----
     @staticmethod

@@ -1,0 +1,17 @@
+# Keep sdist/wheel source discovery fast and free of build tooling.
+# Without this, setuptools' file-list scan (used for editable installs and
+# for computing SOURCES.txt before a wheel build) walks the SPA's
+# node_modules tree, which is thousands of files that never ship in the
+# package (only the pre-built fernme/web/static/app/assets/* bundle does).
+prune fernme/web/app/node_modules
+prune fernme/web/app/.pnpm-store
+prune fernme/web/app/dist
+prune .git
+prune .pytest_cache
+prune .venv
+prune venv
+prune build
+prune dist
+prune *.egg-info
+global-exclude __pycache__
+global-exclude *.py[cod]

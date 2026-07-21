@@ -88,6 +88,43 @@ def test_media_metadata_lifecycle_on_postgres(pg, tmp_path):
     assert svc.store.list_assets("media-demo", "elena") == []
 
 
+def test_document_catalog_lifecycle_on_postgres(pg):
+    store = PostgresStore(pg)
+    document_id = str(uuid.uuid4())
+    row = store.insert_document({
+        "document_id": document_id,
+        "site": "document-demo",
+        "user": "elena",
+        "source_sha256": "a" * 64,
+        "source_name": "fictional.txt",
+        "markdown_path": "documents/owner/fictional.md",
+        "envelope_path": "documents/owner/fictional.fernmark.json",
+        "mime_type": "text/plain",
+        "extraction_quality": "good",
+        "warning_count": 0,
+        "block_count": 1,
+        "created_ts": 1.0,
+        "imported_ts": 1.0,
+        "status": "active",
+        "pinned": False,
+        "authoritative": False,
+        "superseded_by": "",
+    })
+    store.add_document_tags(
+        "document-demo", "elena", document_id,
+        ["topic:fictional"], "suggestion-1", 2.0)
+
+    assert row["source_sha256"] == "a" * 64
+    assert store.list_document_tags(
+        "document-demo", "elena", document_id)[0]["tag"] == "topic:fictional"
+    assert store.update_document(
+        "document-demo", "elena", document_id,
+        status="archived")["status"] == "archived"
+    deleted = store.delete_document_catalog(
+        "document-demo", "elena", document_id)
+    assert deleted == {"documents_deleted": 1, "tag_mappings_deleted": 1}
+
+
 def test_canonicalization_suggestions_on_postgres(pg):
     svc = FernService(store=PostgresStore(pg))
     svc.consent("demo", "alex", True)

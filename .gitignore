@@ -10,6 +10,10 @@ dist/
 venv/
 node_modules/
 fernme/web/app/node_modules/
+fernme/web/app/dist/
+# Vite leaves these behind if a build is interrupted; they embed the
+# machine-local absolute path to node_modules, so never commit them.
+fernme/web/app/vite.config.*.timestamp-*.mjs
 layer3_synthetic_*/
 # local data + run artifacts (never commit personal data or DBs)
 *.db

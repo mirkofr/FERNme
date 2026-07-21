@@ -9,10 +9,10 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from ..runtime_config import default_site, default_user
+from ..runtime_config import configured_features, default_site, default_user
 from ..service import FernService, ConsentError
 
-svc = FernService()  # default: $FERNME_DB or ~/.fernme/fernme.db
+svc = FernService(cfg=configured_features())
 app = FastAPI(title="FERN Memory API", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 _APP_INDEX = os.path.join(os.path.dirname(__file__), "..", "web", "static", "app", "index.html")
@@ -54,6 +54,8 @@ def root():
 
 class GraphIn(BaseModel):
     site: str; user: Optional[str] = None; hierarchy: bool = True; assoc_floor: float = 1.0
+    document_evidence: bool = False; document_query: str = ""; selected_node: str = ""
+    include_archived_documents: bool = False; document_limit: int = 20
 
 class WhyIn(BaseModel):
     site: str; user: str; attr: str; now: float = 0.0
@@ -88,7 +90,12 @@ def runtime_defaults():
 
 @app.post("/graph-data")
 def graph_data(b: GraphIn):
-    return _guard(svc.graph, b.site, b.user, assoc_floor=b.assoc_floor, hierarchy=b.hierarchy)
+    return _guard(
+        svc.graph, b.site, b.user, assoc_floor=b.assoc_floor,
+        hierarchy=b.hierarchy, document_evidence=b.document_evidence,
+        document_query=b.document_query, selected_node=b.selected_node,
+        include_archived_documents=b.include_archived_documents,
+        document_limit=b.document_limit)
 
 @app.post("/memory-graph")
 def memory_graph(b: MemoryGraphIn):

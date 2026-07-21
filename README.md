@@ -350,13 +350,15 @@ mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
 The shipped MCP configs run:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
+uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
 ```
 
-With `fernme[fernmark]` installed, the MCP plugin can preview an explicitly
-named local envelope using `import_document(..., confirm=false)` and returns
-only redacted metadata. It imports only after the user agrees to a second call
-with `confirm=true`; `forget_document` removes one confirmed SHA-256 later.
+The bundled plugin enables managed documents. It can preview an explicitly
+named raw FERNmark-supported file or existing envelope using
+`import_document(..., confirm=false)` and returns only redacted metadata. After
+the user agrees, `confirm=true` writes UTF-8 Markdown plus a canonical envelope
+below `FERNME_VAULT`, stores a durable catalog row, and returns only relative
+pointers. Semantic tags remain proposals until a human accepts them.
 
 No PyPI publish is required for the plugin route. The plugin is pinned to the
 reproducible release ref `v0.4.0b2`, so external testers get the same server
@@ -381,29 +383,38 @@ wikilink or alias candidates for human review. It never auto-applies entity
 truth. Through MCP, agents call `import_obsidian(site, user, path, ...)`; the
 path is on the MCP server machine and the returned summary is counts-only.
 
-### Document import (FERNmark)
+### Managed document evidence (FERNmark)
 
-FERNme can ingest FERNmark's validated schema-v1 envelope without adding an LLM
-call. Build the FERNmark wheel in its own repository, then install it before the
-FERNme document extra. Use a placeholder path in shared instructions, never a
-machine-specific path:
+FERNme can convert raw supported files locally or ingest FERNmark's validated
+schema-v1 envelope without adding an LLM call. The optional dependency is
+pinned to an immutable public Git commit. Use a placeholder path in shared
+instructions, never a machine-specific path:
 
 ```bash
-pip install <path-to>/fernmark-0.4.0a9-py3-none-any.whl
 pip install "fernme[fernmark]"
-python -m fernme.import_fernmark ./document.fernmark.json --site demo.com --user elena --dry-run
-python -m fernme.import_fernmark ./document.fernmark.json --site demo.com --user elena
-python -m fernme.import_fernmark --site demo.com --user elena --forget <source-sha256>
+set FERNME_MANAGED_DOCUMENTS=true
+set FERNME_VAULT=<vault-root>
 ```
 
-The real import command is the consent action for that document and site/user;
-`--dry-run` does not change consent or memory. FERNmark performs envelope
-validation, FERNme stores only sanitized deterministic tags through the normal
-capture path, and reports never print document text by default. Re-importing the
-same SHA-256 is idempotent. `--forget` removes that document's events, review
-suggestions, and graph evidence while leaving unrelated evidence intact. The
-document adapter costs 0 LLM tokens; optional topic tags use the existing local
-rules adapter only when it is active.
+The engine flag is default-off; the bundled plugin enables it. Preview performs
+conversion and validation in memory with zero persistent writes. Confirmation
+stores full Markdown as Cabinet evidence and catalog metadata separately from
+the normal hot graph, and writes through the same single `CapturePipeline` ->
+`service.observe()` path as every other import, so native identity tags
+(`doc:`, `mime:`, `quality:`, plus origin/vault/status/title facts) always
+reach the graph. `recall_documents` returns a bounded metadata overlay with
+relative pointers and continuation (with a `hint` naming `import_document` on
+an empty catalog), while normal `recall_card` and its `assoc_floor` remain
+unchanged. Archive, supersede, pin, authority, and selective forget operations
+are explicit. `read_document` gives bounded, audit-logged, paged access to a
+document's stored Markdown by reference only. `remember_document_use` records
+that a document was used for something, as a byproduct of work already done
+in the turn -- never a reason for a separate model call. `backfill_documents`
+(also `python -m fernme.backfill_documents`) catalogs pre-Phase-18 document
+imports without duplicating events or graph edges. The agent may infer at most
+eight topical tags while already reading selected Markdown, but must link them
+to the document via `propose_tags`; FERNme never auto-accepts semantic tags.
+See `docs/fernmark-document-adapter.md` for the vault and lifecycle contract.
 
 ### Photo memory (default off)
 

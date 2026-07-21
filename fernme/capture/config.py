@@ -18,6 +18,10 @@ Dependency-free: a tiny targeted TOML reader/writer for our small, known schema
     enabled = false
     max_bytes = 26214400
     thumbnail_max_px = 512
+
+    [documents]
+    enabled = false
+    overlay_limit = 20
 """
 from __future__ import annotations
 import os
@@ -36,11 +40,12 @@ def default_config(active: List[str] = None) -> Dict:
         "agent": {"marker": "FERN_TAGS:"},
         "media": {"enabled": False, "max_bytes": 25 * 1024 * 1024,
                   "thumbnail_max_px": 512},
+        "documents": {"enabled": False, "overlay_limit": 20},
     }
 
 
 _ACTIVE = re.compile(r'^\s*active\s*=\s*\[(.*?)\]', re.MULTILINE)
-_SECTION = re.compile(r'^\s*\[(?:capture\.(\w+)|(media))\]\s*$')
+_SECTION = re.compile(r'^\s*\[(?:capture\.(\w+)|(media|documents))\]\s*$')
 _KV = re.compile(r'^\s*(\w+)\s*=\s*"(.*?)"\s*$')
 _SCALAR_KV = re.compile(r'^\s*(\w+)\s*=\s*(true|false|-?\d+)\s*$', re.I)
 
@@ -95,6 +100,13 @@ def write_config(cfg: Dict, path: str = DEFAULT_PATH) -> str:
         "enabled = %s" % ("true" if media.get("enabled") else "false"),
         "max_bytes = %d" % int(media.get("max_bytes", 25 * 1024 * 1024)),
         "thumbnail_max_px = %d" % int(media.get("thumbnail_max_px", 512)),
+        "",
+    ])
+    documents = cfg.get("documents", {})
+    lines.extend([
+        "[documents]",
+        "enabled = %s" % ("true" if documents.get("enabled") else "false"),
+        "overlay_limit = %d" % int(documents.get("overlay_limit", 20)),
         "",
     ])
     out = "\n".join(lines)
