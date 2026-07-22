@@ -14,13 +14,16 @@ else:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEST_RELEASE_TAG = "v0.4.0b2"
-PACKAGE_VERSION = "0.4.0b2"
+EXPECTED_PACKAGE_VERSION = "0.4.0b4"
+PACKAGE_VERSION = tomllib.loads(
+    (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+)["project"]["version"]
+TEST_RELEASE_TAG = f"v{PACKAGE_VERSION}"
 UVX_FROM = f"fernme[mcp] @ git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}"
 FERNMARK_VCS = (
     "fernmark @ git+https://github.com/mirkofr/FERNmark.git@"
     "23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae")
-PLUGIN_VERSION = "0.4.0b2"
+PLUGIN_VERSION = PACKAGE_VERSION
 
 
 def _read_json(path):
@@ -47,7 +50,10 @@ def test_packaging_json_files_are_valid():
 
 def test_console_script_and_plugin_manifests_reference_mcp_server():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert PACKAGE_VERSION == EXPECTED_PACKAGE_VERSION
     assert pyproject["project"]["version"] == PACKAGE_VERSION
+    init_text = (ROOT / "fernme/__init__.py").read_text(encoding="utf-8")
+    assert f'__version__ = "{PACKAGE_VERSION}"' in init_text
     assert pyproject["project"]["scripts"]["fernme-mcp"] == "fernme.api.mcp_server:main"
     assert pyproject["project"]["scripts"]["fernme-ui"] == "fernme.api.serve:main"
     assert "mcp>=1.0" in pyproject["project"]["dependencies"]
@@ -121,6 +127,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert "remember_photo" in skill_text
     assert "forget_photo" in skill_text
     assert "fernme[media]" in skill_text
+    assert "new Codex task" in skill_text
 
 
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp extra not installed")

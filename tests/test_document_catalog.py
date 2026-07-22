@@ -605,6 +605,25 @@ def test_recall_documents_on_empty_catalog_returns_hint(tmp_path):
     assert "hint" not in populated
 
 
+def test_recall_documents_distinguishes_no_match_from_empty_catalog(tmp_path):
+    service = _service(tmp_path)
+    service.consent("demo.com", "elena", True)
+    empty = service.recall_documents(
+        "demo.com", "elena", ["topic:missing"], limit=5)
+    assert "import_document" in empty["hint"]
+
+    _confirm(service, _source(tmp_path))
+    unmatched = service.recall_documents(
+        "demo.com", "elena", ["topic:missing"], limit=5)
+
+    assert unmatched["documents"] == []
+    assert unmatched["catalog_count"] == 1
+    assert "No documents match this query" in unmatched["hint"]
+    assert "1 document in the catalog" in unmatched["hint"]
+    assert "unapproved tag proposals may be pending" in unmatched["hint"]
+    assert "import_document" not in unmatched["hint"]
+
+
 def test_backfill_does_not_recatalog_already_managed_imports(tmp_path):
     service = _service(tmp_path)
     _confirm(service, _source(tmp_path))

@@ -5,7 +5,7 @@ methods, `FernService.observe_asset()`, and the MCP photo tools. Managed documen
 evidence is also implemented as a separate durable catalog plus bounded,
 on-demand graph overlay. Video, audio, server-side vision inspection, and silent
 bulk ingestion remain design work. Both optional paths are default-off in the
-engine and remain in version `0.4.0b2`.*
+engine and remain in version `0.4.0b4`.*
 
 ---
 

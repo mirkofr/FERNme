@@ -34,18 +34,35 @@ For GitHub marketplace installs before or alongside PyPI, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
+uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
 ```
 
-The shipped plugin is pinned to the reproducible release ref `v0.4.0b2`, so
-testers fetch the same server build. The git tag `v0.4.0b2` maps to the package
-version `0.4.0b2` in PEP 440 form. The owner pushes this tag; Codex does not tag
+The shipped plugin is pinned to the reproducible release ref `v0.4.0b4`, so
+testers fetch the same server build. The git tag `v0.4.0b4` maps to the package
+version `0.4.0b4` in PEP 440 form. The owner pushes this tag; Codex does not tag
 or publish.
 
 This path works only after the owner has pushed `main` and created plus pushed
-the `v0.4.0b2` tag to GitHub, and the repo is reachable from the target machine,
+the `v0.4.0b4` tag to GitHub, and the repo is reachable from the target machine,
 either publicly or with git credentials. No PyPI publish is required for this
 path.
+
+### Repairing early epoch-zero document timestamps
+
+Early managed-document MCP builds could store omitted timestamps as `0.0`.
+Existing rows are not changed automatically because FERNme cannot infer their
+true historical time. Preview the document-linked rows first, choose an explicit
+Unix timestamp, then apply only with a fresh backup path:
+
+```bash
+python -m fernme.repair_document_timestamps --db memory.db --timestamp 1725000000
+python -m fernme.repair_document_timestamps --db memory.db --timestamp 1725000000 --apply --backup memory.before-timestamp-repair.db
+```
+
+The helper is idempotent and SQLite-only. It repairs zero-valued catalog,
+document event, document-linked suggestion, approved-tag, and graph reinforcement
+timestamps. It does not rewrite audit rows because their timestamps are part of
+the audit hash chain.
 
 Optional graph UI install:
 
@@ -288,7 +305,7 @@ is documented as unrun. The schema and layout were checked against current Claud
 Code plugin documentation.
 
 The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path,
-pinned to `v0.4.0b2`, plus the immutable FERNmark commit. Actual Cowork UI installation requires the pushed,
+pinned to `v0.4.0b4`, plus the immutable FERNmark commit. Actual Cowork UI installation requires the pushed,
 reachable repo and the pushed tag, and is not exercised in CI.
 
 ## Smoke Test

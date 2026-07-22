@@ -350,7 +350,7 @@ mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
 The shipped MCP configs run:
 
 ```bash
-uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b2" fernme-mcp
+uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
 ```
 
 The bundled plugin enables managed documents. It can preview an explicitly
@@ -361,8 +361,8 @@ below `FERNME_VAULT`, stores a durable catalog row, and returns only relative
 pointers. Semantic tags remain proposals until a human accepts them.
 
 No PyPI publish is required for the plugin route. The plugin is pinned to the
-reproducible release ref `v0.4.0b2`, so external testers get the same server
-build. The owner must push `main` and create plus push the `v0.4.0b2` tag on a
+reproducible release ref `v0.4.0b4`, so external testers get the same server
+build. The owner must push `main` and create plus push the `v0.4.0b4` tag on a
 public or otherwise reachable repo before testers can fetch it. PyPI publish is
 an owner action triggered by that `v*` tag after trusted publishing is configured.
 See `docs/mcp.md` for local development alternatives.

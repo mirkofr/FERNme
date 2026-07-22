@@ -539,6 +539,18 @@ class SQLiteStore:
         ).fetchall()
         return [self._document_row(row) for row in rows]
 
+    def count_documents(self, site: str, user: str, statuses=None) -> int:
+        statuses = list(statuses or ["active"])
+        if not statuses:
+            return 0
+        marks = ",".join("?" for _ in statuses)
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM documents WHERE site=? AND user=? "
+            "AND status IN (" + marks + ")",
+            (site, user, *statuses),
+        ).fetchone()
+        return int(row["n"])
+
     def update_document(self, site: str, user: str, document_id: str, **changes):
         allowed = {"status", "pinned", "authoritative", "superseded_by"}
         items = [(key, value) for key, value in changes.items() if key in allowed]

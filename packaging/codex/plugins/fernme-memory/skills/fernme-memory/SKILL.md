@@ -34,6 +34,7 @@ Use this skill when a user wants persistent, inspectable FERNme memory through t
 - Keep `site` and `user` explicit in every tool call. If the host has no configured values, ask the user which site/user to use before writing.
 - Never store secrets, credentials, private keys, or personal data the user has not explicitly agreed to remember.
 - Do not claim FERNme guarantees correctness. It provides deterministic, consent-gated memory tools that the user can inspect, edit, and delete.
+- After installing, upgrading, or reinstalling the plugin, start a new Codex task. Existing tasks do not attach newly installed MCP tools retroactively; restart Codex if a new task still does not list the FERNme tools.
 
 ## Typical Flow
 

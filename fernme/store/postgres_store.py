@@ -489,6 +489,17 @@ class PostgresStore:
         ).fetchall()
         return [self._document_row(row) for row in rows]
 
+    def count_documents(self, site, user, statuses=None):
+        statuses = list(statuses or ["active"])
+        if not statuses:
+            return 0
+        row = self._q(
+            'SELECT COUNT(*) AS n FROM documents WHERE site=%s AND "user"=%s '
+            'AND status = ANY(%s)',
+            (site, user, statuses),
+        ).fetchone()
+        return int(row["n"])
+
     def update_document(self, site, user, document_id, **changes):
         allowed = {"status", "pinned", "authoritative", "superseded_by"}
         items = [(key, value) for key, value in changes.items() if key in allowed]

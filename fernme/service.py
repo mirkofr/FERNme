@@ -42,6 +42,7 @@ from .triggers import due_reorders, fading_favorites
 import math
 import os
 import re
+import time as _time
 import uuid
 
 
@@ -52,6 +53,11 @@ _MEDIA_AUTHORITY_NAMESPACES = {
 
 def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
+
+
+def _timestamp(value: Optional[float]) -> float:
+    """Use wall-clock time only when a caller omitted an explicit timestamp."""
+    return float(_time.time() if value is None else value)
 
 
 _FIELD_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
@@ -283,8 +289,9 @@ class FernService:
     def observe_asset(self, site: str, user: str, source_path_or_bytes,
                       tags, meta=None, sensitive: bool = False,
                       source: str = "chat", dry_run: bool = False,
-                      max_bytes: int = None, now: float = 0.0) -> Dict:
+                      max_bytes: int = None, now: float = None) -> Dict:
         """Validate or store one image and link it through one normal observe call."""
+        now = _timestamp(now)
         self._require_media()
         if not dry_run:
             self._require_consent(site, user)
@@ -562,7 +569,8 @@ class FernService:
         return self._asset_metadata(row)
 
     def forget_asset(self, site: str, user: str, asset_id_or_sha256: str,
-                     ts: float = 0.0) -> Dict:
+                     ts: float = None) -> Dict:
+        ts = _timestamp(ts)
         self._require_media()
         self._require_consent(site, user)
         row = self.store.get_asset(site, user, str(asset_id_or_sha256))
@@ -695,7 +703,7 @@ class FernService:
 
     def import_document(self, site: str, user: str, source,
                         dry_run: bool = False, max_bytes: int = None,
-                        config_path: str = "fern.toml", now: float = 0.0,
+                        config_path: str = "fern.toml", now: float = None,
                         task_tags: List[str] = None) -> Dict:
         """Preview or persist raw/enveloped documents in the managed vault.
 
@@ -706,6 +714,7 @@ class FernService:
         (Phase 15) -- there is no separate write path here, only additional
         vault storage and catalog bookkeeping layered on top of one write.
         """
+        now = _timestamp(now)
         self._require_managed_documents()
         limit = (_fernmark_documents.DEFAULT_MAX_BYTES if max_bytes is None
                  else int(max_bytes))
@@ -909,6 +918,10 @@ class FernService:
             statuses.extend(["archived", "superseded"])
         rows = self.store.list_documents(
             site, user, statuses=statuses, limit=200, offset=catalog_offset)
+        catalog_count = (
+            self.store.count_documents(site, user, statuses=statuses)
+            if hasattr(self.store, "count_documents") else len(rows)
+        )
         terms = self._document_context_terms(context)
         ranked = []
         for row in rows:
@@ -945,27 +958,40 @@ class FernService:
             "next_cursor": next_cursor,
             "truncated": next_cursor is not None,
             "limit": limit,
+            "catalog_count": catalog_count,
             "content_redacted": True,
         }
         if not documents and ranked_offset == 0 and catalog_offset == 0:
-            result["hint"] = (
-                "No documents found. Import one with the import_document "
-                "tool (preview with confirm=false, then confirm=true).")
+            if catalog_count:
+                noun = "document" if catalog_count == 1 else "documents"
+                result["hint"] = (
+                    "No documents match this query. "
+                    f"{catalog_count} {noun} in the catalog; unapproved tag "
+                    "proposals may be pending."
+                )
+            else:
+                result["hint"] = (
+                    "No documents found. Import one with the import_document "
+                    "tool (preview with confirm=false, then confirm=true).")
         return result
 
     def archive_document(self, site: str, user: str,
-                         document_id_or_sha256: str) -> Dict:
+                         document_id_or_sha256: str,
+                         ts: float = None) -> Dict:
+        ts = _timestamp(ts)
         row = self._active_document_or_raise(site, user, document_id_or_sha256)
         updated = self.store.update_document(
             site, user, row["document_id"], status="archived")
         self._audit(site, user, "archive_document", {
-            "document_id": row["document_id"]}, 0.0)
+            "document_id": row["document_id"]}, ts)
         return self._document_metadata(
             updated, self.store.list_document_tags(site, user, row["document_id"]))
 
     def supersede_document(self, site: str, user: str,
                            document_id_or_sha256: str,
-                           replacement_document_id: str) -> Dict:
+                           replacement_document_id: str,
+                           ts: float = None) -> Dict:
+        ts = _timestamp(ts)
         old = self._active_document_or_raise(site, user, document_id_or_sha256)
         replacement = self._active_document_or_raise(
             site, user, replacement_document_id)
@@ -977,13 +1003,15 @@ class FernService:
         self._audit(site, user, "supersede_document", {
             "document_id": old["document_id"],
             "replacement_document_id": replacement["document_id"],
-        }, 0.0)
+        }, ts)
         return self._document_metadata(
             updated, self.store.list_document_tags(site, user, old["document_id"]))
 
     def set_document_flags(self, site: str, user: str,
                            document_id_or_sha256: str, pinned: bool = None,
-                           authoritative: bool = None) -> Dict:
+                           authoritative: bool = None,
+                           ts: float = None) -> Dict:
+        ts = _timestamp(ts)
         self._require_managed_documents()
         self._require_consent(site, user)
         row = self.store.get_document(site, user, str(document_id_or_sha256))
@@ -1000,7 +1028,7 @@ class FernService:
             "document_id": row["document_id"],
             "pinned": updated["pinned"],
             "authoritative": updated["authoritative"],
-        }, 0.0)
+        }, ts)
         return self._document_metadata(
             updated, self.store.list_document_tags(site, user, row["document_id"]))
 
@@ -1017,7 +1045,7 @@ class FernService:
                               document_id_or_sha256: str, purpose: str,
                               task_tags: List[str] = None,
                               artifact_pointer: str = None,
-                              use_summary: str = None, ts: float = 0.0) -> Dict:
+                              use_summary: str = None, ts: float = None) -> Dict:
         """Record that a document was used for something, as a byproduct of
         work the agent already did this turn.
 
@@ -1027,6 +1055,7 @@ class FernService:
         ``task:<purpose-slug>`` plus the document's own ``doc:`` tag, so the
         use co-occurs with the document in the graph like any other evidence.
         """
+        ts = _timestamp(ts)
         self._require_managed_documents()
         self._require_consent(site, user)
         row = self.store.get_document(site, user, str(document_id_or_sha256))
@@ -1095,7 +1124,7 @@ class FernService:
 
     def read_document(self, site: str, user: str,
                       document_id_or_sha256: str, offset: int = 0,
-                      max_chars: int = None) -> Dict:
+                      max_chars: int = None, now: float = None) -> Dict:
         """Bounded read of one already-imported, consented document's
         canonical Markdown, by document reference only.
 
@@ -1105,6 +1134,7 @@ class FernService:
         Every call is audit-logged. Archived/superseded documents remain
         readable but report their status so a caller can explain it.
         """
+        now = _timestamp(now)
         self._require_managed_documents()
         self._require_consent(site, user)
         row = self.store.get_document(site, user, str(document_id_or_sha256))
@@ -1125,7 +1155,7 @@ class FernService:
             "offset": offset,
             "returned_chars": len(slice_text),
             "content_redacted": True,
-        }, 0.0)
+        }, now)
         return {
             "document_id": row["document_id"],
             "source_sha256": row["source_sha256"],
@@ -1140,7 +1170,7 @@ class FernService:
         }
 
     def backfill_documents(self, site: str, user: str, dry_run: bool = True,
-                           now: float = 0.0) -> Dict:
+                           now: float = None) -> Dict:
         """Create catalog rows for pre-catalog (Phase 15) document events.
 
         Finds ``document`` Cabinet events identified by a ``source_sha256``
@@ -1154,6 +1184,7 @@ class FernService:
         original Cabinet event's stored Markdown for them. Dry-run first,
         idempotent, consent-respecting, and audit-logged. Reports counts only.
         """
+        now = _timestamp(now)
         self._require_document_catalog_store()
         self._require_consent(site, user)
         candidates = []
@@ -1283,13 +1314,14 @@ class FernService:
 
     def import_fernmark(self, site: str, user: str, source, dry_run: bool = False,
                         config_path: str = "fern.toml", max_bytes: int = None,
-                        now: float = 0.0) -> Dict:
+                        now: float = None) -> Dict:
         """Import validated FERNmark envelopes through the capture pipeline.
 
         Calling this explicit import API is the consent action for new document
         evidence. Dry runs validate and propose tags without changing consent or
         any stored state. Repeated hashes are idempotent per site and user.
         """
+        now = _timestamp(now)
         paths = _fernmark_documents.envelope_paths(source)
         limit = (_fernmark_documents.DEFAULT_MAX_BYTES if max_bytes is None
                  else max_bytes)
@@ -1453,9 +1485,10 @@ class FernService:
         return len(assoc.edges)
 
     def forget_document(self, site: str, user: str, source_sha256: str,
-                        ts: float = 0.0,
+                        ts: float = None,
                         delete_managed_files: bool = False) -> Dict:
         """Forget one document and optionally remove only its managed files."""
+        ts = _timestamp(ts)
         self._require_consent(site, user)
         reference = str(source_sha256)
         row = (self.store.get_document(site, user, reference)
@@ -1852,7 +1885,7 @@ class FernService:
 
     def propose_tags(self, site: str, user: str, tags: List[str],
                      text: str = "", source_note: str = "",
-                     source_event_id: int = None, ts: float = 0.0,
+                     source_event_id: int = None, ts: float = None,
                      document_id: str = None,
                      source_sha256: str = None) -> Dict:
         """Queue agent-suggested tags for human review.
@@ -1862,6 +1895,7 @@ class FernService:
         observe(), so normal graph, audit, consent, curation, and deletion rules
         still apply.
         """
+        ts = _timestamp(ts)
         self._require_consent(site, user)
         vocab = self.vocabulary or Vocabulary(default_namespace="topic")
         canonical = []

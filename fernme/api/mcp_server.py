@@ -331,7 +331,7 @@ if FastMCP is not None:
                               use_summary: str = None,
                               site: str = default_site(),
                               user: str = default_user(),
-                              ts: float = 0.0) -> dict:
+                              ts: float = None) -> dict:
         """Record that a document was used for something, as a byproduct of
         work already done this turn.
 
@@ -442,7 +442,7 @@ if FastMCP is not None:
                      source_event_id: int = None,
                      document_id: str = None, source_sha256: str = None,
                      site: str = default_site(), user: str = default_user(),
-                     ts: float = 0.0) -> dict:
+                     ts: float = None) -> dict:
         """Propose tags inferred from text for human review. Never auto-applies.
 
         Use after recalling/importing Cabinet text when an agent has read prose and

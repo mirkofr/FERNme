@@ -235,6 +235,36 @@ def test_managed_raw_document_mcp_preview_confirm_recall_and_forget(
 
 
 @requires_fernmark
+def test_mcp_document_writes_default_to_current_time(tmp_path, monkeypatch):
+    current = 1_725_000_000.0
+    monkeypatch.setattr("fernme.service._time.time", lambda: current)
+    source = tmp_path / "fictional-current-time.txt"
+    source.write_text(
+        "# Fictional current-time document\n\nSynthetic evidence only.\n",
+        encoding="utf-8",
+    )
+    service = _managed_service(tmp_path, monkeypatch)
+
+    confirmed = mcp_server.import_document(
+        str(source), "demo.com", "elena", confirm=True)
+    item = confirmed["documents"][0]
+    row = service.store.get_document(
+        "demo.com", "elena", item["document_id"])
+    event = service.store.recall(
+        "demo.com", "elena", type="document", limit=1)[0]
+
+    assert row["created_ts"] == current
+    assert row["imported_ts"] == current
+    assert event["ts"] == current
+
+    proposal = mcp_server.propose_tags(
+        ["topic:synthetic"], document_id=item["document_id"],
+        source_sha256=item["source_sha256"], site="demo.com", user="elena")
+
+    assert proposal["suggestion"]["created_ts"] == current
+
+
+@requires_fernmark
 def test_backfill_documents_mcp_tool_previews_then_confirms(tmp_path, monkeypatch):
     _, document, envelope = _make_envelope(tmp_path)
     service = _managed_service(tmp_path, monkeypatch)
