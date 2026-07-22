@@ -1,30 +1,55 @@
 import sqlite3
 
-from dataclasses import replace
-
-from fernme.config import DEFAULT
+from fernme.core.graph import Event
 from fernme.repair_document_timestamps import repair_zero_document_timestamps
-from fernme.service import FernService
 from fernme.store.sqlite_store import SQLiteStore
 
 
 def test_document_timestamp_repair_is_backup_first_and_idempotent(tmp_path):
     db = tmp_path / "fictional-repair.db"
-    vault = tmp_path / "vault"
-    source = tmp_path / "fictional-repair.txt"
-    source.write_text("# Fictional repair\n\nSynthetic evidence.\n", encoding="utf-8")
-    service = FernService(
-        store=SQLiteStore(str(db)),
-        cfg=replace(DEFAULT, managed_documents_enabled=True),
-        vault_root=str(vault),
-    )
-    imported = service.import_document(
-        "demo.com", "elena", str(source), dry_run=False, now=0.0)
-    item = imported["documents"][0]
-    proposal = service.propose_tags(
-        "demo.com", "elena", ["topic:synthetic"],
-        document_id=item["document_id"], ts=0.0)
-    service.store._conn.close()
+    store = SQLiteStore(str(db))
+    document_id = "doc-fictional-repair"
+    source_sha256 = "a" * 64
+    suggestion_id = "suggestion-fictional-repair"
+    store.insert_document({
+        "document_id": document_id,
+        "site": "demo.com",
+        "user": "elena",
+        "source_sha256": source_sha256,
+        "source_name": "fictional-repair.txt",
+        "markdown_path": "vault/fictional-repair.md",
+        "envelope_path": "vault/fictional-repair.fernmark.json",
+        "mime_type": "text/plain",
+        "extraction_quality": "good",
+        "warning_count": 0,
+        "block_count": 1,
+        "created_ts": 0.0,
+        "imported_ts": 0.0,
+        "status": "active",
+    })
+    store.append_event(Event(
+        "demo.com",
+        "elena",
+        0.0,
+        "document",
+        {"document_id": document_id, "source_sha256": source_sha256},
+        [("topic:synthetic", 1.0)],
+    ))
+    store.upsert_suggestion({
+        "suggestion_id": suggestion_id,
+        "site": "demo.com",
+        "user": "elena",
+        "kind": "tag_proposal",
+        "payload": {
+            "document_id": document_id,
+            "source_sha256": source_sha256,
+            "tags": ["topic:synthetic"],
+        },
+        "score": 1.0,
+        "status": "pending",
+        "created_ts": 0.0,
+    })
+    store._conn.close()
 
     preview = repair_zero_document_timestamps(db, 1_725_000_000.0)
     assert preview["mode"] == "dry-run"
@@ -42,7 +67,7 @@ def test_document_timestamp_repair_is_backup_first_and_idempotent(tmp_path):
     try:
         assert conn.execute(
             "SELECT created_ts FROM documents WHERE document_id=?",
-            (item["document_id"],),
+            (document_id,),
         ).fetchone()[0] == 1_725_000_000.0
         assert conn.execute(
             "SELECT ts FROM events WHERE type='document'"
@@ -50,7 +75,7 @@ def test_document_timestamp_repair_is_backup_first_and_idempotent(tmp_path):
         assert conn.execute(
             "SELECT created_ts FROM canonicalization_suggestions "
             "WHERE suggestion_id=?",
-            (proposal["suggestion"]["suggestion_id"],),
+            (suggestion_id,),
         ).fetchone()[0] == 1_725_000_000.0
     finally:
         conn.close()
