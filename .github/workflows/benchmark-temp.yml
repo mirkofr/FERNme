@@ -1,0 +1,42 @@
+name: Temporary FERNme benchmark
+on:
+  push:
+    branches:
+      - bench/fernme-20260922
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install FERNme
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run 20-seed benchmark
+        run: |
+          mkdir -p reports
+          python -m fernme.eval.harness --seeds 20 --json reports/eval_harness_20.json
+      - name: Print machine-readable summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("reports/eval_harness_20.json")
+          r = json.loads(p.read_text())
+          print("BENCHMARK_JSON_BEGIN")
+          print(json.dumps({
+              "mode": r["mode"],
+              "seeds": r["seeds"],
+              "k": r["k"],
+              "methods": r["methods"],
+              "regimes": r["regimes"],
+              "summary": r["summary"],
+          }, sort_keys=True))
+          print("BENCHMARK_JSON_END")
+          PY
