@@ -7,22 +7,39 @@ on:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install FERNme
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      - name: Run 20-seed benchmark
+          pip install "datasets>=3.0"
+      - name: Run 20-seed FERNme benchmark
         run: |
           mkdir -p reports
           python -m fernme.eval.harness --seeds 20 --json reports/eval_harness_20.json
-      - name: Print machine-readable summary
+      - name: Inspect PersonaMem-v3 released dataset
+        run: |
+          python - <<'PY'
+          from datasets import get_dataset_config_names, load_dataset
+          repo = "bowen-upenn/PersonaMem-v3"
+          print("PERSONAMEM_INSPECT_BEGIN")
+          configs = get_dataset_config_names(repo)
+          print("CONFIGS", configs)
+          for cfg in configs:
+              print("CONFIG", cfg)
+              ds = load_dataset(repo, cfg, split="full", streaming=True)
+              print("FEATURES", ds.features)
+              for i, row in enumerate(ds.take(1)):
+                  print("SAMPLE", i, {k: (str(v)[:800] if v is not None else None) for k, v in row.items()})
+          print("PERSONAMEM_INSPECT_END")
+          PY
+      - name: Print machine-readable FERNme summary
         run: |
           python - <<'PY'
           import json
