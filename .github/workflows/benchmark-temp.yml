@@ -18,38 +18,87 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-      - name: Fast-lane ablation
+      - name: Association-spread ablation
         run: |
           python - <<'PY'
+          import math
           from dataclasses import replace
           from fernme.config import DEFAULT
           from fernme.eval.harness import run
+          import fernme.retrieve.activation as activation
+          import fernme.retrieve.card as card
+          import fernme.retrieve.entity_card as entity_card
 
-          variants = []
-          for beta_fast in (0.5, 1.0, 2.0, 4.0):
-              for bl_decay in (0.5, 0.75, 1.0):
-                  variants.append((beta_fast, bl_decay))
+          original_spread = activation.spread
 
-          print("ABLATION_BEGIN")
-          for beta_fast, bl_decay in variants:
-              cfg = replace(DEFAULT, beta_fast=beta_fast, bl_decay=bl_decay)
+          def make_spread(mode):
+              def spread(ug, assoc, seeds, now, cfg=DEFAULT):
+                  act = {}
+                  for attr in ug.edges:
+                      act[attr] = activation.base_level(ug, attr, now, cfg)
+                  for s in seeds:
+                      act[s] = act.get(s, 0.0) + 1.0
+
+                  if mode == "seed_only":
+                      frontier = list(dict.fromkeys(seeds))
+                  elif mode == "seed_recent3":
+                      recent = [a for a,e in sorted(
+                          ug.edges.items(), key=lambda kv:(-kv[1].fast, -kv[1].last_reinforced, kv[0])
+                      )[:3]]
+                      frontier = list(dict.fromkeys(list(seeds) + recent))
+                  else:
+                      frontier = list(act.keys())
+
+                  for _ in range(cfg.hops):
+                      delta = {}
+                      for j in frontier:
+                          nbrs = assoc.neighbors(j)
+                          tot = sum(w for _, w in nbrs)
+                          if tot <= 0:
+                              continue
+                          aj = act.get(j, 0.0)
+                          for nb, w in nbrs:
+                              delta[nb] = delta.get(nb, 0.0) + aj * (w / tot)
+                      for k,v in delta.items():
+                          act[k] = act.get(k, 0.0) + 0.5*v
+                      frontier = list(delta.keys())
+
+                  clusters = {}
+                  for attr in act:
+                      if ":" in attr:
+                          clusters.setdefault(attr.split(":",1)[0], []).append(attr)
+                  for members in clusters.values():
+                      if len(members) < 2: continue
+                      winner=max(members,key=lambda a:act[a])
+                      for a in members:
+                          if a != winner:
+                              act[a] *= 0.3
+                  return act
+              return spread
+
+          cfg = replace(DEFAULT, beta_fast=2.0, bl_decay=0.75)
+          print("SPREAD_ABLATION_BEGIN")
+          for mode in ("current", "seed_only", "seed_recent3"):
+              sp = original_spread if mode == "current" else make_spread(mode)
+              activation.spread = sp
+              card.spread = sp
+              if hasattr(entity_card, "spread"):
+                  entity_card.spread = sp
               report = run(seeds=20, cfg=cfg, k=5)
-              s = report["summary"]
+              s=report["summary"]
               def m(regime, metric="precision_at_k"):
                   return s[regime]["fern_pure"][metric]["mean"]
-              vals = {
-                  "beta_fast": beta_fast,
-                  "bl_decay": bl_decay,
-                  "static_p": m("static"),
-                  "abrupt_p": m("abrupt_drift"),
-                  "abrupt_stale": m("abrupt_drift", "stale_recall_rate"),
-                  "gradual_p": m("gradual_drift"),
-                  "gradual_stale": m("gradual_drift", "stale_recall_rate"),
-                  "staleness_p": m("staleness"),
-                  "context_p": m("contextual"),
-                  "outcome": m("outcome", "action_quality"),
-                  "tokens_context": s["contextual"]["fern_pure"]["token_estimate"]["mean"],
-              }
-              print(vals)
-          print("ABLATION_END")
+              print({
+                  "mode":mode,
+                  "static":m("static"),
+                  "abrupt":m("abrupt_drift"),
+                  "abrupt_stale":m("abrupt_drift","stale_recall_rate"),
+                  "gradual":m("gradual_drift"),
+                  "gradual_stale":m("gradual_drift","stale_recall_rate"),
+                  "staleness":m("staleness"),
+                  "context":m("contextual"),
+                  "outcome":m("outcome","action_quality"),
+                  "tokens_context":s["contextual"]["fern_pure"]["token_estimate"]["mean"],
+              })
+          print("SPREAD_ABLATION_END")
           PY
