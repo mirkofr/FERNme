@@ -14,46 +14,42 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
+      - name: Install
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install "datasets>=3.0"
-      - name: Run 20-seed FERNme benchmark
-        run: |
-          mkdir -p reports
-          python -m fernme.eval.harness --seeds 20 --json reports/eval_harness_20.json
-      - name: Inspect PersonaMem-v3 released dataset
+      - name: Fast-lane ablation
         run: |
           python - <<'PY'
-          from datasets import get_dataset_config_names, load_dataset
-          repo = "bowen-upenn/PersonaMem-v3"
-          print("PERSONAMEM_INSPECT_BEGIN")
-          configs = get_dataset_config_names(repo)
-          print("CONFIGS", configs)
-          for cfg in configs:
-              print("CONFIG", cfg)
-              ds = load_dataset(repo, cfg, split="full", streaming=True)
-              print("FEATURES", ds.features)
-              for i, row in enumerate(ds.take(1)):
-                  print("SAMPLE", i, {k: (str(v)[:800] if v is not None else None) for k, v in row.items()})
-          print("PERSONAMEM_INSPECT_END")
-          PY
-      - name: Print machine-readable FERNme summary
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          p = Path("reports/eval_harness_20.json")
-          r = json.loads(p.read_text())
-          print("BENCHMARK_JSON_BEGIN")
-          print(json.dumps({
-              "mode": r["mode"],
-              "seeds": r["seeds"],
-              "k": r["k"],
-              "methods": r["methods"],
-              "regimes": r["regimes"],
-              "summary": r["summary"],
-          }, sort_keys=True))
-          print("BENCHMARK_JSON_END")
+          from dataclasses import replace
+          from fernme.config import DEFAULT
+          from fernme.eval.harness import run
+
+          variants = []
+          for beta_fast in (0.5, 1.0, 2.0, 4.0):
+              for bl_decay in (0.5, 0.75, 1.0):
+                  variants.append((beta_fast, bl_decay))
+
+          print("ABLATION_BEGIN")
+          for beta_fast, bl_decay in variants:
+              cfg = replace(DEFAULT, beta_fast=beta_fast, bl_decay=bl_decay)
+              report = run(seeds=20, cfg=cfg, k=5)
+              s = report["summary"]
+              def m(regime, metric="precision_at_k"):
+                  return s[regime]["fern_pure"][metric]["mean"]
+              vals = {
+                  "beta_fast": beta_fast,
+                  "bl_decay": bl_decay,
+                  "static_p": m("static"),
+                  "abrupt_p": m("abrupt_drift"),
+                  "abrupt_stale": m("abrupt_drift", "stale_recall_rate"),
+                  "gradual_p": m("gradual_drift"),
+                  "gradual_stale": m("gradual_drift", "stale_recall_rate"),
+                  "staleness_p": m("staleness"),
+                  "context_p": m("contextual"),
+                  "outcome": m("outcome", "action_quality"),
+                  "tokens_context": s["contextual"]["fern_pure"]["token_estimate"]["mean"],
+              }
+              print(vals)
+          print("ABLATION_END")
           PY
