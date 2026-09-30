@@ -13,8 +13,36 @@ def base_level(ug: UserGraph, attr: str, now: float, cfg: Config = DEFAULT) -> f
     if not ts:
         e = ug.edges.get(attr)
         return (e.weight / cfg.w_max) if e else 0.0
-    s = sum((max(now - t, 0.0) + 1.0) ** (-cfg.bl_decay) for t in ts)
+    d = cfg.bl_decay
+    s = sum((max(now - t, 0.0) + 1.0) ** (-d) for t in ts)
+    s += _omitted_hits_term(ug, attr, ts, now, cfg)
     return math.log(s) if s > 0 else 0.0
+
+
+def _omitted_hits_term(ug: UserGraph, attr: str, ts, now: float, cfg: Config) -> float:
+    """Closed-form contribution of hits dropped by ``history_cap``.
+
+    A capped history keeps the first timestamp and the most recent ones. The
+    ``hits - len(ts)`` dropped hits are assumed spread evenly between the first
+    and the oldest kept recent timestamp, and their decayed sum is integrated
+    instead of stored (Petrov 2006, "Computationally efficient approximation of
+    the base-level learning equation in ACT-R")."""
+    cap = int(getattr(cfg, "history_cap", 0) or 0)
+    e = ug.edges.get(attr)
+    if cap < 2 or e is None or len(ts) < cap or e.hits <= len(ts):
+        return 0.0
+    ordered = sorted(ts)
+    a, b = ordered[0], ordered[1]
+    m = e.hits - len(ts)
+    if b <= a:
+        return m * ((max(now - a, 0.0) + 1.0) ** (-cfg.bl_decay))
+    d = cfg.bl_decay
+    ua, ub = max(now - a, 0.0) + 1.0, max(now - b, 0.0) + 1.0
+    if abs(1.0 - d) < 1e-9:
+        integral = math.log(ua / ub)
+    else:
+        integral = (ua ** (1.0 - d) - ub ** (1.0 - d)) / (1.0 - d)
+    return m * integral / (b - a)
 
 
 def spread(ug: UserGraph, assoc: AssocGraph, seeds: List[str], now: float,

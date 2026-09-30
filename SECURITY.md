@@ -6,13 +6,16 @@ signals via the supernode). Treat it accordingly.
 ## Threat model status (honest)
 | Concern | v1 status |
 |---|---|
-| Transport auth | Optional API key (`FERNME_API_KEY` -> `X-API-Key` header). **Off by default.** |
+| Transport auth | Optional API key (`FERNME_API_KEY` -> `X-API-Key` header, compared in constant time). Without a key the REST server answers only requests addressed to `localhost`/`127.0.0.1`/`[::1]` (DNS-rebinding guard; widen with `FERNME_ALLOWED_HOSTS`). |
+| Browser access (CORS) | Only local origins by default; list others in `FERNME_CORS_ORIGINS`. The bundled UI is same-origin and needs none. |
+| Audit chain key | Per-install secret: `FERNME_SECRET_KEY`, else a `<db>.key` file next to a SQLite DB (0600; keep it with the DB and out of backups you share), else one secret stored per Postgres database. Older DBs keep verifying with the legacy key and report `legacy_key: True`. |
+| Population prior | Newcomer cold start uses only the private release: attributes held by fewer than `prior_k_anon` (5) users are never seeded, sensitive attributes are never seeded, means carry Laplace noise keyed by the install secret. Deleting a user, withdrawing consent, or `forget_everywhere` recomputes the prior. |
 | Tenant isolation | Enforced by `(site, user)` on every query; covered by tests. |
 | Consent | Required for all reads/writes; withdrawal purges the profile. |
 | Right to delete / export | Implemented (`/delete`, `/export`). |
 | Cross-site sharing | Default-deny; sensitive categories opt-in only. |
 | DB at rest | SQLite, **unencrypted**. Use disk encryption; keep off cloud-synced folders. |
-| Prompt injection | **Not handled.** Treat any text that reaches an agent as untrusted; FERNme does not yet sanitize event payloads used downstream. |
+| Prompt injection | Tags, edited memory names, and glosses are sanitized (instruction-like text dropped, including `_`/`-` spellings). Free event `text` is stored as Cabinet data and returned verbatim by recall tools: treat it as untrusted. |
 | Rate limiting / abuse | Not implemented. |
 | PII in logs | Avoid logging payloads in production. |
 

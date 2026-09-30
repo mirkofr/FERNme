@@ -1,4 +1,4 @@
-"""Multi-seed variance on the headline cost claim. Run: python -m fern.eval.cost_variance"""
+"""Multi-seed variance on the headline cost claim. Run: python -m fernme.eval.cost_variance"""
 from __future__ import annotations
 import statistics
 from .experiment import run

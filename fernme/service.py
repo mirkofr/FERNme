@@ -2,6 +2,8 @@
 Ties the engine (write/retrieve/prior) to the SQLite store. This is what the
 REST and MCP layers call."""
 from __future__ import annotations
+import contextlib as _contextlib
+import functools as _functools
 from typing import List, Dict, Optional
 from .core.graph import UserGraph, AssocGraph, Event, Edge
 from .write import Catalog, map_event, observe, decay
@@ -14,11 +16,14 @@ from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
 from .runtime_config import default_db_path, ensure_default_db_path
 from .supernode import Supernode
-from .safety import sanitize_tags, cap_numeric, sanitize_display_text
+from .safety import sanitize_tags, cap_numeric, sanitize_display_text, sanitize_glosses
 from .tagging import DeterministicTagger
 from . import style as _style
 from .dp import PrivatePrior
 from . import audit as _audit_mod
+from . import install_key as _install_key
+import hmac as _hmac
+import hashlib as _hashlib
 from . import confidence as _confidence
 from . import curation as _curation
 from . import curation_queue as _curation_queue
@@ -103,6 +108,21 @@ class ConsentError(RuntimeError):
     pass
 
 
+def _atomic(fn):
+    """Run a load-modify-save service method as one store transaction.
+
+    Stores that expose ``transaction()`` (SQLite, Postgres) serialize the whole
+    read-modify-write so concurrent writers cannot overwrite each other or leave
+    a graph update without its Cabinet event. Other stores run unchanged."""
+    @_functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        tx = getattr(self.store, "transaction", None)
+        site = args[0] if args and isinstance(args[0], str) else kwargs.get("site")
+        with (tx(lock_key=site) if callable(tx) else _contextlib.nullcontext()):
+            return fn(self, *args, **kwargs)
+    return wrapper
+
+
 class FernService:
     def __init__(self, db_path: str = None, cfg: Config = DEFAULT, store=None,
                  memory_mode: str = "pure", tagger=None, enricher=None, catalog=None,
@@ -122,7 +142,11 @@ class FernService:
         self.catalog = catalog if isinstance(catalog, Catalog) else Catalog(catalog)
         # controlled vocabulary: normalize every tag to one canonical namespaced form.
         self.vocabulary = vocabulary
-        self.audit_key = b"fernme-default-audit-key"  # per-user key in production
+        # Per-install secret (see fernme/install_key.py). Existing SQLite chains
+        # signed with the old public constant keep verifying with it.
+        self._secret, self.audit_key_legacy = _install_key.resolve(self.store)
+        self.audit_key = (_install_key.LEGACY_AUDIT_KEY if self.audit_key_legacy
+                          else _install_key.derive(self._secret, "audit"))
         self._ask_count = {}                  # ask-budget rate limit per (site,user)
         self.llm_calls = 0                    # transparency: count LLM invocations
         self._last_enrich_ts = {}             # in-service watermark for batch fallback
@@ -130,6 +154,7 @@ class FernService:
         self.vault_root = _documents.vault_root_for_store(self.store, vault_root)
 
     # ---------- consent / governance ----------
+    @_atomic
     def consent(self, site: str, user: str, granted: bool, ts: float = 0.0) -> Dict:
         if not granted:
             self._purge_user_asset_files(site, user)
@@ -138,6 +163,7 @@ class FernService:
         self._audit(site, user, "consent", {"granted": bool(granted)}, ts)
         if not granted:                       # withdrawing consent purges the profile
             self.store.delete_user(site, user)
+            self._unlearn_from_prior(site)
         return {"site": site, "user": user, "consent": granted}
 
     def _require_consent(self, site: str, user: str):
@@ -169,16 +195,18 @@ class FernService:
                 salience[attr] = max(salience.get(attr, 0.0), self.cfg.salience_identity)
         return salience
 
+    @_atomic
     def observe(self, site: str, user: str, type: str, payload: Dict,
                 ts: float = 0.0) -> Dict:
         """Record one interaction. payload may carry 'tags' (and/or 'item_id');
         mapping is deterministic, no LLM. Updates graph + Cabinet."""
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
-        ag = self.store.load_assoc(site)
         payload = dict(payload)
         if "tags" in payload:
             payload["tags"] = sanitize_tags(payload["tags"])
+        if "glosses" in payload:
+            payload["glosses"] = sanitize_glosses(payload["glosses"])
         ev = Event(site, user, ts, type, payload)
         mapped = map_event(ev, self.catalog)
         ev.attrs = mapped
@@ -206,6 +234,9 @@ class FernService:
         existing_snapshot = ({a: _replace(e) for a, e in ug.edges.items()}
                              if self.cfg.curation else {})
         new_source = payload.get("source", "known")
+        load_pairs = getattr(self.store, "load_assoc_pairs", None)
+        ag = (load_pairs(site, _assoc_pairs(mapped)) if callable(load_pairs)
+              else self.store.load_assoc(site))
         observe(ug, ag, ev, mapped, self.cfg,
                 salience=self._salience_of(payload, mapped, st),
                 provenance=new_source)
@@ -416,6 +447,7 @@ class FernService:
             return 0.8
         return 0.5
 
+    @_atomic
     def set_numeric(self, site: str, user: str, key: str, value) -> Dict:
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
@@ -431,13 +463,43 @@ class FernService:
         ag = self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
         prior = self.store.load_prior(site)
         if cold_start and ug.n_edges() == 0 and prior.n_users > 0:
-            prior.cold_start(ug, self.cfg)     # turn-one usefulness from the population
+            # turn-one usefulness from the population, released privately only
+            self._released_prior(prior).cold_start(ug, self.cfg)
         if self.cfg.entities or self.cfg.entity_aggregation:
             return compile_entity_card(
                 ug, ag, context or [], now, prior, self.cfg,
                 self._entity_card_context(site, user, ug),
             )
         return compile_card(ug, ag, context or [], now, prior, self.cfg)
+
+    def _released_prior(self, prior) -> PrivatePrior:
+        """The population prior as it may be shown to *other* users.
+
+        k-anonymous (rare traits never leave the population), noisy (bounded-mean
+        Laplace), and without sensitive attributes. The noise seed is derived from
+        the install secret and the prior's contents, so repeated reads of the same
+        prior return the same release (no averaging attack) and the noise cannot
+        be recomputed without the secret."""
+        from .supernode import is_sensitive
+
+        class _Filtered:
+            pass
+        base = _Filtered()
+        base.site, base.n_users = prior.site, prior.n_users
+        keep = [a for a in prior._n
+                if not (self.cfg.prior_exclude_sensitive and is_sensitive(a))]
+        base._n = {a: prior._n[a] for a in keep}
+        base._sum = {a: prior._sum[a] for a in keep}
+        return PrivatePrior(base, epsilon=self.cfg.prior_epsilon, k=self.cfg.prior_k_anon,
+                            w_max=self.cfg.w_max, max_contrib=max(1, self.cfg.top_n),
+                            seed=self._prior_noise_seed(prior, keep))
+
+    def _prior_noise_seed(self, prior, attrs) -> int:
+        fingerprint = repr((prior.site, prior.n_users,
+                            sorted((a, prior._n[a], round(prior._sum[a], 6)) for a in attrs)))
+        digest = _hmac.new(_install_key.derive(self._secret, "prior-noise"),
+                           fingerprint.encode("utf-8"), _hashlib.sha256).digest()
+        return int.from_bytes(digest[:8], "big")
 
     def recall_replay(self, site: str, user: str, context: Optional[List[str]] = None,
                       now: float = 0.0) -> Dict:
@@ -1404,6 +1466,7 @@ class FernService:
         }, now)
         return report
 
+    @_atomic
     def _rebuild_attrs_from_events(self, site: str, user: str,
                                    attrs: set[str]) -> int:
         """Rebuild selected non-override edges after evidence deletion."""
@@ -1564,15 +1627,23 @@ class FernService:
         return {"bias_toward": known, "numeric": card["numeric"]}
 
     # ---------- glass-box ----------
+    @_atomic
     def edit(self, site: str, user: str, attr: str, weight: float) -> Dict:
         """User override: locked, never decays."""
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
+        if attr not in ug.edges:
+            # a new name follows the same rules as observed tags, so an edit cannot
+            # plant free text on the card; existing memories stay editable as-is
+            clean = sanitize_tags([attr]) if isinstance(attr, str) else []
+            if not clean or clean[0] != attr.strip().lower():
+                raise ValueError("invalid memory name: use a short namespace:value tag")
+            attr = clean[0]
         ug.edges[attr] = Edge(weight=float(weight), confidence=1.0,
                               source="override", last_reinforced=now_or_zero(ug, attr),
                               provenance="stated")
         self.store.save_user(ug)
-        self._audit(site, user, "edit", {"attr": attr, "weight": weight})
+        self._audit(site, user, "edit", {"attr_ref": self._audit_ref(attr), "weight": weight})
         return {"attr": attr, "weight": weight, "source": "override"}
 
     def export(self, site: str, user: str) -> Dict:
@@ -1601,9 +1672,18 @@ class FernService:
         self._purge_user_asset_files(site, user)
         self._purge_user_document_files(site, user)
         self.store.delete_user(site, user)
+        self._unlearn_from_prior(site)
         return {"deleted": True, "site": site, "user": user}
 
+    def _unlearn_from_prior(self, site: str):
+        """Recompute the site prior after a user is removed, if one exists, so a
+        deleted user's contribution does not outlive them."""
+        if self.store.load_prior(site).n_users > 0:
+            return self.prior_refresh(site)
+        return None
+
     # ---------- batch jobs ----------
+    @_atomic
     def decay(self, site: str, user: str, now: float) -> Dict:
         ug = self.store.load_user(site, user)
         conflict_map = self._decay_conflicts(ug) if self.cfg.resolution else {}
@@ -2191,6 +2271,7 @@ class FernService:
                     fact["ts"])
         return {"forgotten": fact["fact_id"], "deleted": bool(deleted)}
 
+    @_atomic
     def entity_forget(self, site: str, user: str, entity_id: str) -> Dict:
         self._require_consent(site, user)
         entity = self._entity_or_raise(site, user, entity_id)
@@ -2401,6 +2482,7 @@ class FernService:
         return {"mood": mood, "mood_trend": trend, "style": tags,
                 "guidance": _style.guidance(mood, trend, tags)}
 
+    @_atomic
     def record_outcome(self, site: str, user: str, success: bool,
                        attrs=None, now: float = 0.0, weight: float = 1.0) -> Dict:
         """Domain-agnostic OUTCOME signal. `success` = did acting on memory achieve
@@ -2482,13 +2564,23 @@ class FernService:
         if hasattr(self.store, "append_audit"):
             return self.store.append_audit(site, user, ts, action, detail, self.audit_key)
 
+    def _audit_ref(self, value: str) -> str:
+        """Keyed reference to a memory name for the audit chain. The owner (who
+        holds the key) can check whether an entry concerns a given memory, but the
+        name itself does not outlive a deletion inside the chain."""
+        return _hmac.new(_install_key.derive(self._secret, "audit-ref"),
+                         value.encode("utf-8"), _hashlib.sha256).hexdigest()[:24]
+
     def audit_log(self, site: str, user: str):
         return self.store.read_audit(site, user) if hasattr(self.store, "read_audit") else []
 
     def verify_audit(self, site: str, user: str) -> Dict:
         """Replay the tamper-evident chain. ok=False means it was altered."""
         ok, broken = _audit_mod.verify(self.audit_log(site, user), self.audit_key)
-        return {"ok": ok, "broken_at_seq": broken}
+        out = {"ok": ok, "broken_at_seq": broken}
+        if self.audit_key_legacy:
+            out["legacy_key"] = True
+        return out
 
     def forget_everywhere(self, site: str, user: str) -> Dict:
         """Right to be forgotten, provably: record the deletion in the audit chain,
@@ -2511,6 +2603,7 @@ class FernService:
         self.catalog = Catalog(items)
         return {"items": len(items)}
 
+    @_atomic
     def prune_to_prior(self, site: str, user: str, theta: float = None) -> Dict:
         """Differential storage (#spec): drop user edges that are within `theta` of
         the population prior -- they're redundant (read-through from the prior gives
@@ -2893,11 +2986,17 @@ class FernService:
     def record_ask(self, site: str, user: str):
         self._ask_count[(site, user)] = self._ask_count.get((site, user), 0) + 1
 
-    def private_prior(self, site: str, epsilon: float = 1.0, k: int = 5, seed: int = 0):
+    def private_prior(self, site: str, epsilon: float = 1.0, k: int = 5, seed: int = None):
         """A differentially-private, rare-group-suppressed view of the population
-        prior (#1). Safe to use for cross-user cold-start: no individual leaks."""
-        return PrivatePrior(self.store.load_prior(site), epsilon=epsilon, k=k,
-                            w_max=self.cfg.w_max, seed=seed)
+        prior (#1). Safe to use for cross-user cold-start: no individual leaks.
+
+        ``seed=None`` (default) derives the noise from the install secret and the
+        prior's contents; pass an explicit seed only for reproducible experiments
+        (a public seed lets anyone recompute and remove the noise)."""
+        prior = self.store.load_prior(site)
+        if seed is None:
+            seed = self._prior_noise_seed(prior, list(prior._n))
+        return PrivatePrior(prior, epsilon=epsilon, k=k, w_max=self.cfg.w_max, seed=seed)
 
     def autotune_decay(self, drift: bool = True) -> Dict:
         """Self-tuning forgetting (#6): search decay rates, set the best on this
@@ -2911,8 +3010,7 @@ class FernService:
         """Fold every consented user's graph into the population prior."""
         prior = self.store.load_prior(site)
         prior._sum.clear(); prior._n.clear(); prior.n_users = 0
-        users = [r["user"] for r in self.store._conn.execute(
-            "SELECT DISTINCT user FROM user_edges WHERE site=?", (site,))]
+        users = [u for u in self.store.list_users(site) if self.store.has_consent(site, u)]
         for u in users:
             prior.update_from_user(self.store.load_user(site, u))
         self.store.save_prior(prior)

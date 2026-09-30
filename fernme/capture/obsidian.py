@@ -242,8 +242,21 @@ def _selected_markdown_files(
 ) -> Tuple[List[Path], Dict[str, int]]:
     include_patterns = _patterns(include)
     exclude_patterns = _patterns(exclude)
+    root = vault.resolve()
+
+    def _inside_vault(p: Path) -> bool:
+        # symlinked notes or folders can point anywhere on the machine; only
+        # files that really live under the vault are imported
+        if p.is_symlink():
+            return False
+        try:
+            p.resolve().relative_to(root)
+        except (OSError, ValueError):
+            return False
+        return True
+
     files = sorted(
-        (p for p in vault.rglob("*.md") if p.is_file()),
+        (p for p in vault.rglob("*.md") if p.is_file() and _inside_vault(p)),
         key=lambda p: p.relative_to(vault).as_posix().lower(),
     )
     selected: List[Path] = []

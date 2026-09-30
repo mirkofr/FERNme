@@ -15,6 +15,12 @@ fernme/web/app/dist/
 # machine-local absolute path to node_modules, so never commit them.
 fernme/web/app/vite.config.*.timestamp-*.mjs
 layer3_synthetic_*/
+# agent instruction and handoff files (local working docs, never publish)
+*_PROMPT.md
+*_prompt.md
+HANDOFF_*.md
+CODEX_RULES_LOCAL*.md
+
 # local data + run artifacts (never commit personal data or DBs)
 *.db
 *.db-*
@@ -54,3 +60,6 @@ option_b_spec.md
 hierarchy_map_spec.md
 tmp_pytest/
 demo/elena/brain_regions.html
+
+# per-install secret written next to a SQLite database (fernme/install_key.py)
+*.db.key

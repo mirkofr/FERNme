@@ -34,7 +34,7 @@ For GitHub marketplace installs before or alongside PyPI, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
+uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --with "mcp>=1.0,<2" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
 ```
 
 The shipped plugin is pinned to the reproducible release ref `v0.4.0b4`, so

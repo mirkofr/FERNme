@@ -66,8 +66,8 @@ def test_delete_removes_everything():
 
 def test_cold_start_from_prior():
     svc, _ = _svc()
-    # build a prior from several organic-leaning users
-    for i in range(4):
+    # build a prior from several organic-leaning users (at least prior_k_anon)
+    for i in range(5):
         svc.consent("s", f"u{i}", True)
         for _ in range(4):
             svc.observe("s", f"u{i}", "purchase", {"tags": ["organic"]})

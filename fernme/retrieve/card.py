@@ -11,7 +11,12 @@ from ..config import Config, DEFAULT
 from .. import resolution as _resolution
 from .. import curation as _curation
 from .activation import spread
+from ..write.hebbian import effective_edge
+from dataclasses import replace as _replace_edge
 
+
+# Timestamps above this (~1973 in Unix seconds) are treated as wall-clock time.
+_WALL_CLOCK_EPOCH = 1e8
 
 CARD_EXCLUDE_NS = {"style", "mood", "mood_ema", "mood_prev"}
 
@@ -54,21 +59,46 @@ def compile_card(ug: UserGraph, assoc: AssocGraph, seeds: List[str], now: float,
     exclude_ns = card_exclude_namespaces(cfg)
     # score = activation * idf (rare attrs earn slots); only stored attrs eligible
     scored = []
+    read_decay = getattr(cfg, "card_read_decay", False)
+    shown = {}
+    # Decay runs on the user's own activity clock (their latest reinforcement),
+    # not wall-clock time: a memory fades when newer evidence keeps arriving
+    # without it, but a user who is simply away for months keeps their card.
+    timed = [e.last_reinforced for e in ug.edges.values()
+             if e.source not in ("guessed", "override")]
+    activity_now = max(timed, default=0.0)
+    if now > 0:
+        activity_now = min(activity_now, now)
+    # A card requested without a time (now=0, the MCP default) is not decayed.
+    # When some memories carry wall-clock seconds and others were written with
+    # ts=0 (the MCP default), the ts=0 ones have no known age and stay fresh.
+    wall_clock = activity_now > _WALL_CLOCK_EPOCH
+    read_decay = read_decay and now > 0
     for attr, e in ug.edges.items():
         if e.source == "superseded" or _namespace(attr) in exclude_ns:
             continue
+        fast = e.fast
+        fresh = 1
+        if (read_decay and e.source != "guessed"
+                and not (wall_clock and e.last_reinforced <= 0)):
+            w_eff, fast = effective_edge(attr, e, activity_now, cfg)
+            # faded memories move behind every fresh one: they only keep a slot
+            # when there are not enough current memories to fill the card
+            fresh = 0 if w_eff < cfg.floor else 1
+            shown[attr] = _replace_edge(e, weight=w_eff, fast=fast)
         idf = prior.idf(attr) if prior else 1.0
         a = act.get(attr, 0.0)
         real = 0 if e.source == "guessed" else 1
-        fast_boost = cfg.beta_fast * (e.fast / cfg.w_max)   # recent context lifts ranking
+        fast_boost = cfg.beta_fast * (fast / cfg.w_max)   # recent context lifts ranking
         salience_boost = cfg.salience_card_boost * e.salience
-        scored.append((attr, (real, a * (idf + 1.0) + fast_boost + salience_boost), e))
+        scored.append((attr, (real, fresh, a * (idf + 1.0) + fast_boost + salience_boost), e))
     scored.sort(key=lambda x: x[1], reverse=True)
     top = scored[: cfg.top_n]
 
     parts = []
     links = []
     for attr, score, e in top:
+        e = shown.get(attr, e)
         mark = "*" if e.confidence >= cfg.conf_known else "?"  # known vs guessed
         verify = (
             _resolution.needs_verify(attr, e, now, cfg,

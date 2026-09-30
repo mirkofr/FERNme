@@ -10,8 +10,17 @@ MAX_TAG_LEN = 64
 MAX_TAGS = 32
 _ALLOWED = re.compile(r"[^a-z0-9_:!\-]")          # attributes are simple tokens
 _INJECTION = re.compile(
-    r"(ignore (the )?(previous|above)|system:|assistant:|<\|.*?\|>|\{\{|\}\}|"
-    r"prompt|disregard|override|http[s]?://)", re.I)
+    r"(ignore (all )?(the )?(previous|above|prior)|system:|assistant:|<\|.*?\|>|\{\{|\}\}|"
+    r"prompt|disregard|override|http[s]?://|new instructions|you are now|"
+    r"exfiltrat|</?\s*(memory|system|instructions?)\b)", re.I)
+
+
+def looks_like_injection(text: str) -> bool:
+    """True if ``text`` reads like an instruction aimed at the agent. Word
+    separators common in tags (``_``, ``-``, ``.``) count as spaces, so
+    ``ignore_all_previous_instructions`` is caught like the spaced version."""
+    return bool(_INJECTION.search(text) or
+                _INJECTION.search(re.sub(r"[_\-.]+", " ", text)))
 
 
 def sanitize_tags(tags) -> List[str]:
@@ -24,7 +33,7 @@ def sanitize_tags(tags) -> List[str]:
         raw = t.strip()
         if not raw or len(raw) > MAX_TAG_LEN:
             continue
-        if _INJECTION.search(raw):                # drop instruction-like content
+        if looks_like_injection(raw):             # drop instruction-like content
             continue
         clean = _ALLOWED.sub("", raw.lower())     # keep only token chars
         if clean and clean not in seen:
@@ -43,6 +52,22 @@ def sanitize_display_text(value, limit: int = 180) -> str:
     """
     text = re.sub(r"[\x00-\x1f\x7f]", " ", str(value)).strip()
     return " ".join(text.split())[:max(0, int(limit))]
+
+
+def sanitize_glosses(glosses, limit: int = 160) -> dict:
+    """Agent-supplied ``{tag: meaning}`` notes: keys must be valid tags, values
+    are bounded display text, and instruction-like values are dropped."""
+    if not isinstance(glosses, dict):
+        return {}
+    out = {}
+    for tag, meaning in list(glosses.items())[:MAX_TAGS]:
+        clean = sanitize_tags([tag]) if isinstance(tag, str) else []
+        if not clean or not isinstance(meaning, str):
+            continue
+        text = sanitize_display_text(meaning, limit)
+        if text and not looks_like_injection(text):
+            out[clean[0]] = text
+    return out
 
 
 def cap_numeric(value, lo: float = -1e6, hi: float = 1e6):

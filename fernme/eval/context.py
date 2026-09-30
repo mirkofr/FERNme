@@ -1,7 +1,7 @@
 """CONTEXT — the same user wants different things in different contexts (e.g.
 weekday vs weekend). FERN seeds spreading activation with the current context and
 recovers the context-relevant slice; a context-blind frequency counter returns the
-global top and can't condition on 'now'. Run: python -m fern.eval.context"""
+global top and can't condition on 'now'. Run: python -m fernme.eval.context"""
 from __future__ import annotations
 import statistics, random
 from ..core.graph import UserGraph, AssocGraph, Event

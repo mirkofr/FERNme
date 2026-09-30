@@ -14,7 +14,7 @@ Design (kept deliberately un-circular):
 HONEST CAVEAT: the simulator defines the ground truth FERN learns, so this proves
 the mechanism works and beats non-personalized recs UNDER THESE ASSUMPTIONS. It is
 NOT evidence about real humans. A real pilot is still required for that.
-Run: python -m fern.eval.pilot
+Run: python -m fernme.eval.pilot
 """
 from __future__ import annotations
 import random, statistics

@@ -1,7 +1,8 @@
 """FastAPI REST interface for FERN v1. Run:
-  uvicorn fern.api.rest:app --port 8077
+  uvicorn fernme.api.rest:app --port 8077
 Every endpoint is consent-gated by the service layer."""
 from __future__ import annotations
+import hmac
 import os
 from typing import List, Optional, Any, Dict
 from fastapi import FastAPI, HTTPException
@@ -14,16 +15,28 @@ from ..service import FernService, ConsentError
 
 svc = FernService(cfg=configured_features())
 app = FastAPI(title="FERN Memory API", version="1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# Browsers may call this API only from origins you list in FERNME_CORS_ORIGINS
+# (comma-separated); by default only local pages (localhost / 127.0.0.1 / [::1]).
+# The bundled UI is served from this same server, so it needs no CORS at all.
+_CORS = [o.strip() for o in os.environ.get("FERNME_CORS_ORIGINS", "").split(",") if o.strip()]
+_LOCAL_ORIGIN = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
+app.add_middleware(CORSMiddleware, allow_origins=_CORS,
+                   allow_origin_regex=None if _CORS else _LOCAL_ORIGIN,
+                   allow_methods=["*"], allow_headers=["*"])
 _APP_INDEX = os.path.join(os.path.dirname(__file__), "..", "web", "static", "app", "index.html")
 _STATIC = os.path.join(os.path.dirname(__file__), "..", "web", "static")
 _API_KEY = os.environ.get("FERNME_API_KEY")  # if set, all data routes require X-API-Key
+# Without an API key the server is a local tool: requests must be addressed to a
+# local host name, which blocks DNS-rebinding pages from reaching it. Set
+# FERNME_ALLOWED_HOSTS (comma-separated) to serve other host names keyless.
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]", "testserver"}
+_ALLOWED_HOSTS = {h.strip().lower() for h in
+                  os.environ.get("FERNME_ALLOWED_HOSTS", "").split(",") if h.strip()}
 _OPEN = {
     "/",
     "/health",
     "/ui",
     "/graph",
-    "/runtime-defaults",
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -32,10 +45,24 @@ _OPEN = {
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
 
+def _host_name(host_header: str) -> str:
+    host = (host_header or "").strip().lower()
+    if host.startswith("["):
+        return host.split("]")[0] + "]"
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+
+
 @app.middleware("http")
 async def _auth(request, call_next):
-    if _API_KEY and request.url.path not in _OPEN and not request.url.path.startswith("/static/"):
-        if request.headers.get("x-api-key") != _API_KEY:
+    if not _API_KEY:
+        host = _host_name(request.headers.get("host", ""))
+        if host not in _LOCAL_HOSTS and host not in _ALLOWED_HOSTS:
+            return JSONResponse(
+                {"detail": "keyless FERNme only answers local requests; set "
+                           "FERNME_API_KEY or FERNME_ALLOWED_HOSTS"}, status_code=403)
+    elif request.url.path not in _OPEN and not request.url.path.startswith("/static/"):
+        supplied = request.headers.get("x-api-key") or ""
+        if not hmac.compare_digest(supplied.encode("utf-8"), _API_KEY.encode("utf-8")):
             return JSONResponse({"detail": "invalid or missing X-API-Key"}, status_code=401)
     return await call_next(request)
 
@@ -138,6 +165,8 @@ def _guard(fn, *a, **k):
         return fn(*a, **k)
     except ConsentError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/health")

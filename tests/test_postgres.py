@@ -129,7 +129,7 @@ def test_canonicalization_suggestions_on_postgres(pg):
     svc = FernService(store=PostgresStore(pg))
     svc.consent("demo", "alex", True)
     svc.observe("demo", "alex", "note", {"tags": ["person:dana-reyes"]})
-    svc.observe("demo", "alex", "note", {"tags": ["person:danareyes"]})
+    svc.observe("demo", "alex", "note", {"tags": ["person:dana_reyes"]})
 
     rows = svc.list_suggestions("demo", "alex", now=1.0)
     rejected = svc.reject_suggestion("demo", "alex", rows[0]["suggestion_id"], ts=2.0)
@@ -168,3 +168,60 @@ def test_assoc_k_suppression_on_postgres(pg):
     svc.observe("privacy", "bea", "note", {"tags": ["topic:rain", "pref:mint"]}, ts=2.0)
 
     assert pair in svc.store.load_assoc("privacy", user="cora", min_users=2).edges
+
+
+def test_parallel_writes_keep_every_hit_on_postgres(pg):
+    import threading
+    svc = FernService(store=PostgresStore(pg))
+    site = f"par-{uuid.uuid4().hex[:6]}"
+    svc.consent(site, "u", True)
+
+    def worker(i):
+        for j in range(15):
+            svc.observe(site, "u", "chat", {"tags": ["pref:tea"]}, ts=float(i * 100 + j))
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    ug = svc.store.load_user(site, "u")
+    assert ug.edges["pref:tea"].hits == 90
+    assert len(ug.history["pref:tea"]) == svc.cfg.history_cap
+
+
+def test_failed_write_rolls_back_on_postgres(pg, monkeypatch):
+    svc = FernService(store=PostgresStore(pg))
+    site = f"rb-{uuid.uuid4().hex[:6]}"
+    svc.consent(site, "u", True)
+    svc.observe(site, "u", "chat", {"tags": ["pref:tea"]})
+
+    def boom(_ev):
+        raise RuntimeError("disk full")
+    monkeypatch.setattr(svc.store, "append_event", boom)
+    with pytest.raises(RuntimeError):
+        svc.observe(site, "u", "chat", {"tags": ["pref:coffee"]})
+    monkeypatch.undo()
+    assert "pref:coffee" not in svc.store.load_user(site, "u").edges
+
+
+def test_parallel_writes_from_separate_store_instances_on_postgres(pg):
+    import threading
+    site = f"multi-{uuid.uuid4().hex[:6]}"
+    FernService(store=PostgresStore(pg)).consent(site, "u", True)
+    services = [FernService(store=PostgresStore(pg)) for _ in range(4)]
+
+    def worker(svc):
+        for _ in range(15):
+            svc.observe(site, "u", "chat", {"tags": ["pref:tea"]})
+    threads = [threading.Thread(target=worker, args=(s,)) for s in services]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert services[0].store.load_user(site, "u").edges["pref:tea"].hits == 60
+
+
+def test_postgres_processes_share_one_secret(pg):
+    a, b = FernService(store=PostgresStore(pg)), FernService(store=PostgresStore(pg))
+    assert a.audit_key == b.audit_key
+    assert a._secret == b._secret

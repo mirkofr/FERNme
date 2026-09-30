@@ -24,6 +24,9 @@ FERNMARK_VCS = (
     "fernmark @ git+https://github.com/mirkofr/FERNmark.git@"
     "23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae")
 PLUGIN_VERSION = PACKAGE_VERSION
+# Released tags up to v0.4.0b4 import mcp.server.fastmcp (mcp 1.x only); the
+# plugin pins the SDK so a fresh uvx resolve cannot pull an incompatible 2.x.
+MCP_SDK_PIN = "mcp>=1.0,<2"
 
 
 def _read_json(path):
@@ -34,9 +37,9 @@ def _assert_uvx_git_mcp(mcp):
     server = mcp["mcpServers"]["fernme"]
     assert server["command"] == "uvx"
     assert server["args"] == [
-        "--with", FERNMARK_VCS, "--from", UVX_FROM, "fernme-mcp"]
-    assert "[mcp]" in server["args"][3]
-    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][3]
+        "--with", FERNMARK_VCS, "--with", MCP_SDK_PIN, "--from", UVX_FROM, "fernme-mcp"]
+    assert "[mcp]" in server["args"][5]
+    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][5]
     assert server["env"]["FERNME_DB"] == ""
     assert server["env"]["FERNME_MANAGED_DOCUMENTS"] == "true"
 
@@ -56,7 +59,8 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert f'__version__ = "{PACKAGE_VERSION}"' in init_text
     assert pyproject["project"]["scripts"]["fernme-mcp"] == "fernme.api.mcp_server:main"
     assert pyproject["project"]["scripts"]["fernme-ui"] == "fernme.api.serve:main"
-    assert "mcp>=1.0" in pyproject["project"]["dependencies"]
+    assert "mcp>=1.0,<3" in pyproject["project"]["dependencies"]
+    assert pyproject["project"]["optional-dependencies"]["mcp"] == ["mcp>=1.0,<3"]
     assert pyproject["project"]["readme"] == "README.md"
     assert pyproject["project"]["license"] == {"text": "Apache-2.0"}
     package_data = pyproject["tool"]["setuptools"]["package-data"]["fernme"]

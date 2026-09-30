@@ -5,6 +5,7 @@ tests/test_postgres.py, which uses the rootless `pgserver`).
 Note: `user` is reserved in Postgres, so it is quoted everywhere."""
 from __future__ import annotations
 import json, threading
+from contextlib import contextmanager
 from typing import List, Optional, Dict
 import psycopg
 from psycopg.rows import dict_row
@@ -130,7 +131,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_owner_sha_active
 class PostgresStore:
     def __init__(self, dsn: str):
         self.dsn = dsn
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
         self._conn.execute(SCHEMA)
         for col in ("fast", "salience"):   # forward-compat for DBs created before these columns
@@ -143,8 +144,45 @@ class PostgresStore:
         )
         self._backfill_assoc_contributors()
 
+    @contextmanager
+    def transaction(self, lock_key: str = None):
+        """Atomic, serialized read-modify-write across store calls. Nested use
+        (including the per-method transactions below) becomes a savepoint.
+
+        The thread lock serializes this process; a transaction-scoped advisory
+        lock on ``lock_key`` (the site) serializes other processes and servers
+        writing the same site, since writes read-modify-write shared rows."""
+        with self._lock, self._conn.transaction():
+            self._conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
+                               (f"fernme:{lock_key or '*'}",))
+            yield self
+
     def _q(self, sql, args=()):
-        return self._conn.execute(sql, args)
+        with self._lock:
+            return self._conn.execute(sql, args)
+
+    def load_or_create_secret(self):
+        """Per-deployment secret shared by every process on this database, for
+        deployments that do not set FERNME_SECRET_KEY. Returns (hex, audit_legacy)."""
+        import secrets as _secrets
+        with self._lock, self._conn.transaction():
+            self._conn.execute(
+                "CREATE TABLE IF NOT EXISTS fernme_secret("
+                "id INT PRIMARY KEY, key_hex TEXT NOT NULL, audit_legacy BOOLEAN NOT NULL)")
+            self._conn.execute("SELECT pg_advisory_xact_lock(hashtext('fernme:secret'))")
+            row = self._conn.execute(
+                "SELECT key_hex, audit_legacy FROM fernme_secret WHERE id=1").fetchone()
+            if row:
+                return row["key_hex"], bool(row["audit_legacy"])
+            has_audit = self._conn.execute(
+                "SELECT to_regclass('audit') IS NOT NULL AS ok").fetchone()["ok"]
+            legacy = bool(has_audit) and self._conn.execute(
+                "SELECT 1 FROM audit LIMIT 1").fetchone() is not None
+            key_hex = _secrets.token_hex(32)
+            self._conn.execute(
+                "INSERT INTO fernme_secret(id, key_hex, audit_legacy) VALUES(1,%s,%s)",
+                (key_hex, legacy))
+            return key_hex, legacy
 
     @staticmethod
     def _assoc_key(a, b):
@@ -216,6 +254,13 @@ class PostgresStore:
 
     # ---- user graph ----
     def load_user(self, site, user) -> UserGraph:
+        with self._lock:
+            ug = self._load_user_unlocked(site, user)
+        ug._persisted_edges = set(ug.edges)
+        ug._persisted_history = {a: tuple(ts) for a, ts in ug.history.items()}
+        return ug
+
+    def _load_user_unlocked(self, site, user) -> UserGraph:
         ug = UserGraph(site, user)
         for r in self._q('SELECT * FROM user_edges WHERE site=%s AND "user"=%s', (site, user)).fetchall():
             ug.edges[r["attr"]] = Edge(r["weight"], r["confidence"], r["source"],
@@ -233,21 +278,62 @@ class PostgresStore:
         return ug
 
     def save_user(self, ug: UserGraph):
-        with self._lock, self._conn.cursor() as c:
-            c.execute('DELETE FROM user_edges WHERE site=%s AND "user"=%s', (ug.site, ug.user))
-            c.executemany('INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
-                          [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
-                            e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
-                           for a, e in ug.edges.items()])
+        persisted_edges = getattr(ug, "_persisted_edges", None)
+        persisted_hist = getattr(ug, "_persisted_history", None)
+        with self._lock, self._conn.transaction(), self._conn.cursor() as c:
+            if persisted_edges is None or persisted_hist is None:
+                c.execute('DELETE FROM user_edges WHERE site=%s AND "user"=%s', (ug.site, ug.user))
+                c.execute('DELETE FROM user_history WHERE site=%s AND "user"=%s', (ug.site, ug.user))
+                hist_rows = [(ug.site, ug.user, a, t) for a, ts in ug.history.items() for t in ts]
+            else:
+                removed = persisted_edges - set(ug.edges)
+                if removed:
+                    c.executemany('DELETE FROM user_edges WHERE site=%s AND "user"=%s AND attr=%s',
+                                  [(ug.site, ug.user, a) for a in removed])
+                hist_rows = []
+                for a in set(persisted_hist) - set(ug.history):
+                    c.execute('DELETE FROM user_history WHERE site=%s AND "user"=%s AND attr=%s',
+                              (ug.site, ug.user, a))
+                for a, ts in ug.history.items():
+                    before = persisted_hist.get(a, ())
+                    n0 = len(before)
+                    if len(ts) >= n0 and tuple(ts[:n0]) == before:
+                        tail = ts[n0:]
+                    else:
+                        c.execute('DELETE FROM user_history WHERE site=%s AND "user"=%s AND attr=%s',
+                                  (ug.site, ug.user, a))
+                        tail = ts
+                    hist_rows.extend((ug.site, ug.user, a, t) for t in tail)
+            if ug.edges:
+                c.executemany(
+                    'INSERT INTO user_edges VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) '
+                    'ON CONFLICT(site,"user",attr) DO UPDATE SET weight=EXCLUDED.weight, '
+                    'confidence=EXCLUDED.confidence, source=EXCLUDED.source, '
+                    'last_reinforced=EXCLUDED.last_reinforced, hits=EXCLUDED.hits, '
+                    'fast=EXCLUDED.fast, salience=EXCLUDED.salience, provenance=EXCLUDED.provenance',
+                    [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
+                      e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
+                     for a, e in ug.edges.items()])
             c.execute('DELETE FROM user_numeric WHERE site=%s AND "user"=%s', (ug.site, ug.user))
-            c.executemany('INSERT INTO user_numeric VALUES(%s,%s,%s,%s)',
-                          [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
-            c.execute('DELETE FROM user_history WHERE site=%s AND "user"=%s', (ug.site, ug.user))
-            c.executemany('INSERT INTO user_history VALUES(%s,%s,%s,%s)',
-                          [(ug.site, ug.user, a, t) for a, ts in ug.history.items() for t in ts])
+            if ug.numeric:
+                c.executemany('INSERT INTO user_numeric VALUES(%s,%s,%s,%s)',
+                              [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
+            if hist_rows:
+                c.executemany('INSERT INTO user_history VALUES(%s,%s,%s,%s)', hist_rows)
+        ug._persisted_edges = set(ug.edges)
+        ug._persisted_history = {a: tuple(ts) for a, ts in ug.history.items()}
 
     def delete_user(self, site, user):
-        with self._lock:
+        with self._lock, self._conn.transaction():
+            persons = [r["person"] for r in self._q(
+                "SELECT DISTINCT person FROM identities WHERE site=%s AND local_user=%s",
+                (site, user)).fetchall()]
+            self._q("DELETE FROM identities WHERE site=%s AND local_user=%s", (site, user))
+            for person in persons:
+                left = self._q("SELECT 1 FROM identities WHERE person=%s LIMIT 1",
+                               (person,)).fetchone()
+                if left is None:
+                    self._q("DELETE FROM share_policy WHERE person=%s", (person,))
             ids = [r["entity_id"] for r in self._q(
                 'SELECT entity_id FROM entities WHERE site=%s AND "user"=%s',
                 (site, user)).fetchall()]
@@ -310,12 +396,25 @@ class PostgresStore:
             ag.edges[(r["a"], r["b"])] = r["weight"]
         return ag
 
+    def load_assoc_pairs(self, site, pairs) -> AssocGraph:
+        ag = AssocGraph(site)
+        keys = list(dict.fromkeys(self._assoc_key(a, b) for a, b in pairs))
+        with self._lock:
+            for a, b in keys:
+                r = self._q("SELECT weight FROM assoc_edges WHERE site=%s AND a=%s AND b=%s",
+                            (site, a, b)).fetchone()
+                if r is not None:
+                    ag.edges[(a, b)] = r["weight"]
+        return ag
+
     def save_assoc(self, ag: AssocGraph, contributor_user=None, touched_pairs=None):
         touched_pairs = [self._assoc_key(a, b) for a, b in (touched_pairs or [])]
-        with self._lock, self._conn.cursor() as c:
-            c.executemany("INSERT INTO assoc_edges(site,a,b,weight) VALUES(%s,%s,%s,%s) "
-                          "ON CONFLICT(site,a,b) DO UPDATE SET weight=EXCLUDED.weight",
-                          [(ag.site, k[0], k[1], v) for k, v in ag.edges.items()])
+        keys = touched_pairs if touched_pairs else list(ag.edges)
+        rows = [(ag.site, k[0], k[1], ag.edges[k]) for k in dict.fromkeys(keys) if k in ag.edges]
+        with self._lock, self._conn.transaction(), self._conn.cursor() as c:
+            if rows:
+                c.executemany("INSERT INTO assoc_edges(site,a,b,weight) VALUES(%s,%s,%s,%s) "
+                              "ON CONFLICT(site,a,b) DO UPDATE SET weight=EXCLUDED.weight", rows)
             if contributor_user and touched_pairs:
                 c.executemany(
                     'INSERT INTO assoc_edge_users(site,"user",a,b,hits) '
@@ -660,10 +759,13 @@ class PostgresStore:
         return pp
 
     def save_prior(self, pp: PopulationPrior):
-        with self._lock, self._conn.cursor() as c:
-            c.executemany("INSERT INTO prior_node VALUES(%s,%s,%s,%s) "
-                          "ON CONFLICT(site,attr) DO UPDATE SET sum=EXCLUDED.sum, n=EXCLUDED.n",
-                          [(pp.site, a, pp._sum[a], pp._n[a]) for a in pp._sum])
+        """Replace the site's prior with ``pp`` (stale attributes removed)."""
+        with self._lock, self._conn.transaction(), self._conn.cursor() as c:
+            c.execute("DELETE FROM prior_node WHERE site=%s", (pp.site,))
+            if pp._sum:
+                c.executemany("INSERT INTO prior_node VALUES(%s,%s,%s,%s) "
+                              "ON CONFLICT(site,attr) DO UPDATE SET sum=EXCLUDED.sum, n=EXCLUDED.n",
+                              [(pp.site, a, pp._sum[a], pp._n[a]) for a in pp._sum])
             c.execute("INSERT INTO prior_meta VALUES(%s,%s) "
                       "ON CONFLICT(site) DO UPDATE SET n_users=EXCLUDED.n_users",
                       (pp.site, pp.n_users))

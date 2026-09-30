@@ -2,7 +2,7 @@
 through, with more old history than new. A counter that can't forget stays stuck
 on stale favorites; FERN's decay tracks the change. Shows FERN is strong on BOTH
 regimes (static recall AND drift) where each baseline is strong on only one.
-Run: python -m fern.eval.drift"""
+Run: python -m fernme.eval.drift"""
 from __future__ import annotations
 import statistics, random
 from dataclasses import replace

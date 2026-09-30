@@ -1,4 +1,4 @@
-"""Render the Q1 cost-flatness figure to a PNG. Run: python -m fern.eval.plot"""
+"""Render the Q1 cost-flatness figure to a PNG. Run: python -m fernme.eval.plot"""
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

@@ -232,7 +232,7 @@ def test_mcp_import_obsidian_round_trip_is_redacted(tmp_path):
                         "import_obsidian",
                         {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
                     )
-                    assert denied.isError
+                    assert getattr(denied, "is_error", getattr(denied, "isError", None))
                     await session.call_tool(
                         "grant_consent",
                         {"site": "demo.local", "user": "elena", "granted": True},

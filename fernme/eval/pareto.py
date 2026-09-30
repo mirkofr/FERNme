@@ -9,7 +9,7 @@ What is MODELED (explicit, tunable assumptions — no real LLM is called here):
 
 So this shows the STRUCTURE of the cost/quality trade-off under stated assumptions
 -- not a measured real-world number. All assumptions are at the top; change them
-and the table updates. Run: python -m fern.eval.pareto
+and the table updates. Run: python -m fernme.eval.pareto
 """
 from __future__ import annotations
 import statistics

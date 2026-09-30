@@ -6,17 +6,13 @@
 
 *Agent personalization memory that models the user, not the transcript.*
 
-**A user-owned personalization memory layer for AI agents: zero-LLM deterministic core, with optional low-cost human-approved enrichment. It turns consented interactions into an inspectable model of each person's preferences, habits, communication style, and constraints, staying token-flat as it grows while people can see, edit, delete, and own what agents use to personalize.**
+**Memory for AI agents that costs zero LLM calls to write, keeps the prompt small no matter how much it remembers, and lets each person see, edit, and delete what it knows about them.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2471a3.svg)](LICENSE)
+[![CI](https://github.com/mirkofr/FERNme/actions/workflows/ci.yml/badge.svg)](https://github.com/mirkofr/FERNme/actions/workflows/ci.yml)
 [![Site](https://img.shields.io/badge/site-fernme.dev-1d9e75.svg)](https://fernme.dev)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1d9e75.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-247%20passing%20%7C%202%20skipped-1d9e75.svg)](#-honest-status)
-[![Storage](https://img.shields.io/badge/storage-SQLite%20%7C%20Postgres-854f0b.svg)](#-architecture)
 [![Status](https://img.shields.io/badge/status-v0.4%20research%20preview-7f77dd.svg)](#-honest-status)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/fernme?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/fernme)
-
-*Cheap to write · flat to read · interpretable by design · owned by the user*
 
 [**fernme.dev**](https://fernme.dev)
 
@@ -24,13 +20,43 @@
 
 ---
 
-## ✨ The one-paragraph pitch
+## Three claims, each reproducible
 
-Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world: agents that act for many people, in any domain. It starts where agents already act today, websites, and builds a user-owned personalization model the person can inspect and control. Each user is a sparse, fuzzily-weighted node in a per-site graph; the graph also supports opt-in typed entities with labeled, Hebbian-weighted relations while the deterministic write/recall core stays at zero LLM calls. Optional propose-only enrichment can add connection suggestions powered by the agent you already use or a model you choose; nothing lands in memory truth until a human accepts it. Retrieval is **spreading activation**, and the prompt-facing card stores only **deviations from a population prior**.
+| | FERNme | For comparison | Reproduce |
+|---|---|---|---|
+| **LLM calls to write a memory** | **0**. Writes are graph arithmetic. | Mem0 OSS 2.2.1: 1 extraction call per message, with a ~8,400-token system prompt (counted from Mem0's own prompts) | `python -m fernme.eval.cost_race --with-mem0-prompts` |
+| **Prompt tokens per turn** | **~40**, flat from message 10 to message 300 | Pasting the history: 6,051 tokens by message 300 | `python -m fernme.eval.cost_race` |
+| **User control** | Every memory is visible, explainable (`why`), editable, exportable, and deletable; consent-gated, per-site isolated | Mem0, Zep, and Letta are built around one agent or one user ([comparison](COMPARISON.md)) | `python run_demo.py` |
 
----
+All numbers above come from synthetic, fictional message streams, not real users.
+FERNme does not win every recall benchmark; see the [benchmarks](#-benchmarks) for
+where simple baselines beat it. A real-model recall head-to-head against Mem0 is
+[wired and owner-run](docs/mem0-head-to-head.md).
 
-## What it is / is not
+## Try it in 60 seconds
+
+```bash
+pip install "fernme[mcp] @ git+https://github.com/mirkofr/FERNme"
+```
+
+```python
+from fernme.service import FernService
+
+svc = FernService(db_path=":memory:")
+svc.consent("shop.example", "elena", True)
+svc.observe("shop.example", "elena", "chat",
+            {"tags": ["pref:concise", "pref:oat_milk"],
+             "text": "Elena prefers concise answers and oat milk."})
+print(svc.card("shop.example", "elena")["wire"])   # the card your agent injects
+```
+
+Use it from Claude Code, Codex, or any MCP client: run `fernme-mcp`, or add the
+bundled plugin (`/plugin marketplace add mirkofr/FERNme`). See
+[MCP and plugin packaging](#mcp-and-plugin-packaging).
+
+## How it works
+
+Most agent memory is **written by an LLM on every turn** (expensive, hallucination-prone), **evaluated on question-answering** (not actions), and **assumes a single user**. FERNme is built for the opposite world: agents that act for many people, in any domain. Each user is a sparse, fuzzily-weighted node in a per-site graph; the graph also supports opt-in typed entities with labeled, Hebbian-weighted relations while the deterministic write/recall core stays at zero LLM calls. Optional propose-only enrichment can add connection suggestions powered by the agent you already use or a model you choose; nothing lands in memory truth until a human accepts it. Retrieval is **spreading activation**, and the prompt-facing card stores only **deviations from a population prior**.
 
 | FERNme is | FERNme is not |
 |---|---|
@@ -41,29 +67,9 @@ Most agent memory is **written by an LLM on every turn** (expensive, hallucinati
 | An inspectable and editable user model | Hidden behavioral profiling |
 | Consent-first, per-site, default-deny sharing | Cross-site surveillance |
 
----
-
-## 🎯 Why FERNme (the strong points)
-
-| | |
-|---|---|
-| **Zero-LLM deterministic core** | Every write and recall runs with no model calls and bounded cost. Optional opt-in enrichment only proposes connections for human approval, powered by the agent you already use or a model you choose. |
-| 📉 **Flat token cost forever** | The prompt card holds **~25 tokens** whether it's a visitor's first day or fifth year. A full-history baseline is **77.4× larger** by 120 interactions. |
-| 🧠 **Measured trade-offs, no collapse** | The unified synthetic harness is the README source of truth: FERNme stays zero-call and token-flat across static, abrupt/gradual drift, staleness, context, fragmented-entity, and outcome regimes. It does not win every table, but it is the only method with entity aggregation and an outcome feedback loop. |
-| 🧬 **Typed people & relations** | Entities with aliases, contact fields, labeled relations (`ceo_of`, `family_of`, ...), and inert relation facts strengthened Hebbian-style; deterministic path queries; opt-in and byte-identical when off. |
-| **Suggest-and-approve canonicalization** | Deterministic alias/entity-link candidates land in a human review queue. Rejections stick, accepted suggestions use existing reversible entity alias APIs, and nothing auto-applies to memory truth. |
-| 🪟 **Glass-box & user-owned** | Every preference is visible and editable. People fix what's wrong, delete everything, or export it. Privacy becomes a feature, not a liability. |
-| 🏬 **Built for outcomes** | Evaluated by **conversion**, not QA. A simulated storefront shows **+17% conversion lift** vs. non-personalized recommendations. |
-| 🧩 **User-owned supernode** | Sign in across sites → your memories assemble like Lego into one profile **you control**, default-deny, sensitive data walled off. Not surveillance — the mirror image of it. |
-| **Cost/quality dial** | One engine, a default-off enrichment gate: free key-less `pure` by default, optional agent/model proposal sources when you need typed links and relation candidates, and human approval before truth changes. |
-| 🔐 **Verifiable & unlearnable** | Every action is logged in a tamper-evident HMAC chain the user can replay to detect any alteration; `forget_everywhere` wipes the profile **and** unlearns the person from the population prior — provable right-to-be-forgotten. |
-| 🛡 **Injection-proof by design** | Writes are arithmetic, not LLM extraction, so page/user text can't be "talked into" becoming a belief — tested that injected instructions never enter memory. |
-| 🧠 **Private collective intelligence** | New users benefit from crowd patterns on turn one (cold-start from a population prior), with **k-anonymity + differential privacy** so no individual leaks. A network-effect moat single-user memories can't have. |
-| **Cross-user assoc isolation** | Shared co-occurrence edges are k-suppressed by default (`assoc_min_users=2`): a rare pair from one user stays visible to that user, but cannot influence another user's retrieval until at least two users reinforce it. |
-| 🗣 **Style & mood memory** | Learns *how* each person communicates (terse/verbose, formal/casual, energy) and tracks their **mood with trend detection**, so the agent can match tone and notice when someone's frustration is rising — in any domain. |
-| 🎯 **Outcome-learning, any goal** | Memory is reinforced by *results* — not just recall. `record_outcome(success)` strengthens what worked and weakens what backfired, where "success" is any goal (purchase, booking, resolved ticket, completed lesson…). |
-| 🔍 **Explainable** | Ask `why(user, attr)` — get the evidence (observations + good/bad outcomes + dates). No black box. |
-| 🔌 **Deployable plumbing** (research preview; harden per SECURITY.md) | SQLite or **Postgres** (tested on real PG 16), REST + **MCP** servers, consent gating, injection-safe writes, proactive triggers — all tested. |
+The full feature list (collective priors, supernode, style and mood memory,
+outcome learning, tamper-evident audit chain, and more) is in
+[docs/features.md](docs/features.md).
 
 ---
 
@@ -96,6 +102,10 @@ engine is solid; the extraction quality is the agent's.)*
 > Reproduce: `python -m fernme.eval.cost_variance` · `... quality` · `... drift` · `... context` · `... retention` · `... ablation` · `... pilot` · `... entities`
 
 > Unified harness: `python -m fernme.eval.harness --seeds 6 --json reports/eval_harness.json`
+
+> Token race (FERNme vs full history vs Mem0's measured prompts): `python -m fernme.eval.cost_race --turns 300 --with-mem0-prompts --json reports/cost_race.json --html token_race.html`
+
+> Mem0 recall head-to-head (owner-run, needs an API key): `python -m fernme.eval.mem0_h2h --check`, then see [docs/mem0-head-to-head.md](docs/mem0-head-to-head.md)
 
 > Canonicalization queue: `python -m fernme.eval.canonicalization --seeds 6 --json reports/canonicalization.json`
 
@@ -157,7 +167,7 @@ zero-call, but it does not dominate every synthetic regime.
 |---|---|---|
 | card size | **25.1 ± 0.6 tokens** (flat) | full history grows linearly |
 | at 120 interactions | **1×** | **77.4× ± 1.3** larger |
-| LLM calls per write | **0** | ~2 (extraction memory) |
+| LLM calls per write | **0** | 1 per message for Mem0 OSS 2.2.1 (measured with `cost_race`); older extraction designs use ~2 |
 
 Older focused recall modules remain regression checks, but the unified harness
 above is the README source of truth for cross-method quality claims.
@@ -286,12 +296,12 @@ visible node stays synthetic and every relation remains explainable.*
 ## 🚀 Quickstart
 
 ```bash
-pip install <path-to>/fernmark-0.4.0a9-py3-none-any.whl
-pip install -e ".[dev,api,fernmark]"
+git clone https://github.com/mirkofr/FERNme && cd FERNme
+pip install -e ".[dev,api]"          # add ,fernmark / ,media / ,pgtest for the optional suites
 
 python run_demo.py                      # cold-start → learning → glass-box edit
 python supernode_demo.py                # one person, three sites, one owned profile
-python -m pytest tests -q               # 283 passing, 2 skipped with FERNmark installed
+python -m pytest tests -q               # 338 passed, 61 skipped without the fernmark/media/pgtest extras
 
 # experiments
 python -m fernme.eval.drift               # FERNme beats a frequency counter when tastes change
@@ -350,7 +360,7 @@ mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
 The shipped MCP configs run:
 
 ```bash
-uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
+uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --with "mcp>=1.0,<2" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
 ```
 
 The bundled plugin enables managed documents. It can preview an explicitly
@@ -505,8 +515,8 @@ FERNme is a **different category** from conversational memories — it is a user
 
 ## ⚖️ Honest status
 
-Done & tested (283 passing, 2 skipped with FERNmark installed; 274 passing,
-11 skipped without the optional extra): engine, SQLite + real-Postgres stores,
+Done & tested (338 passed, 61 skipped on Python 3.11 without the optional
+fernmark, media, and pgtest extras; checked on 2026-09-30 with mcp 1.30 and 2.2): engine, SQLite + real-Postgres stores,
 supernode + sign-in, triggers, safety, REST/MCP, bundled local SPA, 2D/spatial
 memory graph view, canonical entity-kind filters, review-backed re-kind
 suggestions, selected-node evidence cards, class-targeted volatility retention,
@@ -544,7 +554,7 @@ behavior.
 
 🚧 **Still open (genuinely needs the outside world):**
 - A **real-human per-site pilot** — only live users close the loop a simulator can't.
-- The **Mem0 (LLM) head-to-head** — harness wired; run locally with `OPENAI_API_KEY`.
+- The **Mem0 (LLM) recall head-to-head** — `fernme.eval.mem0_h2h` runs real Mem0 on the harness scenarios; needs `OPENAI_API_KEY` ([how](docs/mem0-head-to-head.md)).
 - **Embeddings** for context-to-attribute matching; optional propose-only enrichment for messy inputs.
 - **Silent staleness verify** -- age-only verify remains off by default. In the synthetic sweep, the best age-only point was still weak (precision **0.461**, recall **0.651**, nag **0.214**), so silent-stale detection needs the next milestone: learned per-edge volatility or outside corroboration.
 
@@ -567,7 +577,7 @@ fernme/
   api/       rest.py (FastAPI) · mcp_server.py · serve.py
   web/       app/ (React SPA source) · static/app/ (bundled local UI assets)
   eval/      simulator - cost - quality - drift - context - ablation - pilot - entities - harness - enrichment
-tests/       274 passing, 2 skipped   ·   *_demo.py walkthroughs
+tests/       338 passed, 61 skipped without optional extras   ·   *_demo.py walkthroughs
 ```
 
 ---

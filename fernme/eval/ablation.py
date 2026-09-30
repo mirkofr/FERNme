@@ -1,7 +1,7 @@
 """ABLATION - does the population PRIOR (differential encoding) help at cold start?
 Compares FERN with prior cold-start vs FERN with an empty start, at early turns,
 on a population that shares structure. This isolates the load-bearing claim from
-file 10/09. Run: python -m fern.eval.ablation"""
+file 10/09. Run: python -m fernme.eval.ablation"""
 from __future__ import annotations
 import statistics
 from ..core.graph import UserGraph, AssocGraph

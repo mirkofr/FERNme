@@ -42,7 +42,12 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
             s_in = max(s_in, cfg.salience_neg)
         if s_in > e.salience:
             e.salience = min(1.0, s_in)
-        ug.history.setdefault(attr, []).append(event.ts)
+        hist = ug.history.setdefault(attr, [])
+        hist.append(event.ts)
+        cap = int(getattr(cfg, "history_cap", 0) or 0)
+        if cap >= 2 and len(hist) > cap:
+            ordered = sorted(hist)
+            ug.history[attr] = [ordered[0]] + ordered[-(cap - 1):]
 
     # 2) strengthen attr <-> attr (Hebb: fire together, wire together)
     for i in range(len(active)):
@@ -51,6 +56,25 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
             b, mb = active[j]
             assoc.set_edge(a, b, _saturating_bump(assoc.get(a, b),
                                                   cfg.beta, ma * mb, cfg.w_max))
+
+
+def effective_edge(attr: str, e: Edge, now: float, cfg: Config = DEFAULT,
+                   conflict: float = 0.0, ctx: Dict = None) -> Tuple[float, float]:
+    """(weight, fast) as ``decay()`` would leave them at ``now``, without mutating
+    the edge. Used by the card so stale memories fade even between batch jobs."""
+    if e.source == "override":
+        return e.weight, e.fast
+    dt = max(0.0, now - e.last_reinforced)
+    if cfg.resolution:
+        edge_ctx = dict(ctx or {})
+        edge_ctx.setdefault("now", now)
+        lam_eff = _resolution.lambda_eff(attr, e, edge_ctx, conflict, cfg)
+    else:
+        lam_eff = cfg.lam * (1.0 - cfg.salience_beta * e.salience)
+    w = e.weight * math.exp(-lam_eff * dt)
+    if (cfg.identity_sticky and e.source != "superseded" and is_permanent_attr(attr)):
+        w = max(w, cfg.floor)
+    return w, e.fast * math.exp(-cfg.lam_fast * dt)
 
 
 def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,

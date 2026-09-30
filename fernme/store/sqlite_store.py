@@ -3,6 +3,7 @@ Swap to Postgres later behind this same interface. Isolation is enforced by
 (site, user) on every query."""
 from __future__ import annotations
 import sqlite3, json, threading, os
+from contextlib import contextmanager
 from ..audit import entry_hash, GENESIS
 from typing import List, Optional, Dict
 from ..core.graph import UserGraph, AssocGraph, Edge, Event
@@ -130,7 +131,10 @@ class SQLiteStore:
         self.path = path
         d = os.path.dirname(os.path.abspath(path))
         os.makedirs(d, exist_ok=True)
-        self._lock = threading.Lock()
+        # Re-entrant: transaction() holds it across a whole load-modify-save while
+        # the individual store methods it calls take it again.
+        self._lock = threading.RLock()
+        self._tx_depth = 0
         self._conn = sqlite3.connect(path, check_same_thread=False, timeout=30.0)
         self._conn.row_factory = sqlite3.Row
         try:
@@ -140,7 +144,43 @@ class SQLiteStore:
             pass
         self._conn.executescript(SCHEMA)
         self._migrate()
-        self._conn.commit()
+        self._commit()
+
+    def _commit(self):
+        """Commit unless an enclosing transaction() will commit (or roll back)."""
+        if self._tx_depth == 0:
+            self._conn.commit()
+
+    @contextmanager
+    def transaction(self, lock_key: str = None):
+        """Atomic, serialized read-modify-write across store calls.
+
+        Holds the store lock for the whole block and opens ``BEGIN IMMEDIATE`` so
+        another process sharing the file (e.g. the MCP server and the UI) waits
+        for the write lock instead of interleaving. Nested use joins the outer
+        transaction. Any exception rolls the whole block back."""
+        with self._lock:
+            outer = self._tx_depth == 0
+            if outer:
+                if self._conn.in_transaction:
+                    self._conn.commit()
+                self._conn.execute("BEGIN IMMEDIATE")
+            self._tx_depth += 1
+            try:
+                yield self
+            except BaseException:
+                self._tx_depth -= 1
+                if outer:
+                    self._conn.rollback()
+                raise
+            else:
+                self._tx_depth -= 1
+                if outer:
+                    try:
+                        self._conn.commit()
+                    except BaseException:
+                        self._conn.rollback()
+                        raise
 
     def _migrate(self):
         """Add columns introduced after a DB was first created (CREATE TABLE IF NOT
@@ -225,11 +265,12 @@ class SQLiteStore:
                 "INSERT INTO consents(site,user,granted,ts) VALUES(?,?,?,?) "
                 "ON CONFLICT(site,user) DO UPDATE SET granted=excluded.granted, ts=excluded.ts",
                 (site, user, int(granted), ts))
-            self._conn.commit()
+            self._commit()
 
     def has_consent(self, site: str, user: str) -> bool:
-        r = self._conn.execute(
-            "SELECT granted FROM consents WHERE site=? AND user=?", (site, user)).fetchone()
+        with self._lock:
+            r = self._conn.execute(
+                "SELECT granted FROM consents WHERE site=? AND user=?", (site, user)).fetchone()
         return bool(r["granted"]) if r else False
 
     def list_consented_contexts(self, limit: int = 20):
@@ -239,6 +280,14 @@ class SQLiteStore:
 
     # ---- user graph ----
     def load_user(self, site: str, user: str) -> UserGraph:
+        with self._lock:
+            ug = self._load_user_unlocked(site, user)
+        # Snapshot of what is persisted, so save_user can write only the delta.
+        ug._persisted_edges = set(ug.edges)
+        ug._persisted_history = {a: tuple(ts) for a, ts in ug.history.items()}
+        return ug
+
+    def _load_user_unlocked(self, site: str, user: str) -> UserGraph:
         ug = UserGraph(site, user)
         for r in self._conn.execute(
                 "SELECT * FROM user_edges WHERE site=? AND user=?", (site, user)):
@@ -263,24 +312,64 @@ class SQLiteStore:
         return ug
 
     def save_user(self, ug: UserGraph):
+        persisted_edges = getattr(ug, "_persisted_edges", None)
+        persisted_hist = getattr(ug, "_persisted_history", None)
         with self._lock:
             c = self._conn
-            c.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
+            if persisted_edges is None or persisted_hist is None:
+                # Graph not loaded from this store: full rewrite (original behavior).
+                c.execute("DELETE FROM user_edges WHERE site=? AND user=?", (ug.site, ug.user))
+                c.execute("DELETE FROM user_history WHERE site=? AND user=?", (ug.site, ug.user))
+                hist_rows = [(ug.site, ug.user, a, t) for a, ts in ug.history.items() for t in ts]
+            else:
+                removed = persisted_edges - set(ug.edges)
+                c.executemany("DELETE FROM user_edges WHERE site=? AND user=? AND attr=?",
+                              [(ug.site, ug.user, a) for a in removed])
+                hist_rows = []
+                for a in set(persisted_hist) - set(ug.history):
+                    c.execute("DELETE FROM user_history WHERE site=? AND user=? AND attr=?",
+                              (ug.site, ug.user, a))
+                for a, ts in ug.history.items():
+                    before = persisted_hist.get(a, ())
+                    n0 = len(before)
+                    if len(ts) >= n0 and tuple(ts[:n0]) == before:
+                        tail = ts[n0:]          # append-only: write just the new hits
+                    else:
+                        c.execute("DELETE FROM user_history WHERE site=? AND user=? AND attr=?",
+                                  (ug.site, ug.user, a))
+                        tail = ts
+                    hist_rows.extend((ug.site, ug.user, a, t) for t in tail)
             c.executemany(
-                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO user_edges VALUES(?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(site,user,attr) DO UPDATE SET weight=excluded.weight, "
+                "confidence=excluded.confidence, source=excluded.source, "
+                "last_reinforced=excluded.last_reinforced, hits=excluded.hits, "
+                "fast=excluded.fast, salience=excluded.salience, provenance=excluded.provenance",
                 [(ug.site, ug.user, a, e.weight, e.confidence, e.source,
                   e.last_reinforced, e.hits, e.fast, e.salience, e.provenance)
                  for a, e in ug.edges.items()])
             c.execute("DELETE FROM user_numeric WHERE site=? AND user=?", (ug.site, ug.user))
             c.executemany("INSERT INTO user_numeric VALUES(?,?,?,?)",
                           [(ug.site, ug.user, k, str(v)) for k, v in ug.numeric.items()])
-            c.execute("DELETE FROM user_history WHERE site=? AND user=?", (ug.site, ug.user))
-            rows = [(ug.site, ug.user, a, t) for a, ts in ug.history.items() for t in ts]
-            c.executemany("INSERT INTO user_history VALUES(?,?,?,?)", rows)
-            c.commit()
+            c.executemany("INSERT INTO user_history VALUES(?,?,?,?)", hist_rows)
+            self._commit()
+        ug._persisted_edges = set(ug.edges)
+        ug._persisted_history = {a: tuple(ts) for a, ts in ug.history.items()}
 
     def delete_user(self, site: str, user: str):
         with self._lock:
+            # the person's link to this site goes too; a person with no remaining
+            # linked sites also loses their sharing rules
+            persons = [r["person"] for r in self._conn.execute(
+                "SELECT DISTINCT person FROM identities WHERE site=? AND local_user=?",
+                (site, user))]
+            self._conn.execute("DELETE FROM identities WHERE site=? AND local_user=?",
+                               (site, user))
+            for person in persons:
+                left = self._conn.execute(
+                    "SELECT 1 FROM identities WHERE person=? LIMIT 1", (person,)).fetchone()
+                if left is None:
+                    self._conn.execute("DELETE FROM share_policy WHERE person=?", (person,))
             ids = [r["entity_id"] for r in self._conn.execute(
                 "SELECT entity_id FROM entities WHERE site=? AND user=?", (site, user))]
             for entity_id in ids:
@@ -316,7 +405,7 @@ class SQLiteStore:
                 "DELETE FROM documents WHERE site=? AND user=?", (site, user))
             self._conn.execute(
                 "DELETE FROM assets WHERE site=? AND user=?", (site, user))
-            self._conn.commit()
+            self._commit()
 
     def export_user(self, site: str, user: str) -> Dict:
         ug = self.load_user(site, user)
@@ -328,6 +417,10 @@ class SQLiteStore:
 
     # ---- assoc graph (per site) ----
     def load_assoc(self, site: str, user: str = None, min_users: int = 1) -> AssocGraph:
+        with self._lock:
+            return self._load_assoc_unlocked(site, user, min_users)
+
+    def _load_assoc_unlocked(self, site: str, user: str = None, min_users: int = 1) -> AssocGraph:
         ag = AssocGraph(site)
         min_users = int(min_users or 1)
         if min_users <= 1:
@@ -348,20 +441,38 @@ class SQLiteStore:
             ag.edges[(r["a"], r["b"])] = r["weight"]
         return ag
 
+    def load_assoc_pairs(self, site: str, pairs) -> AssocGraph:
+        """Only the given attribute pairs: what a single write needs, so the write
+        cost does not grow with the size of the site's association graph."""
+        ag = AssocGraph(site)
+        keys = list(dict.fromkeys(self._assoc_key(a, b) for a, b in pairs))
+        with self._lock:
+            for a, b in keys:
+                r = self._conn.execute(
+                    "SELECT weight FROM assoc_edges WHERE site=? AND a=? AND b=?",
+                    (site, a, b)).fetchone()
+                if r is not None:
+                    ag.edges[(a, b)] = r["weight"]
+        return ag
+
     def save_assoc(self, ag: AssocGraph, contributor_user: str = None, touched_pairs=None):
+        """Persist association weights. With ``touched_pairs`` only those pairs are
+        written (a write changes nothing else); without it, every edge in ``ag``."""
         touched_pairs = [self._assoc_key(a, b) for a, b in (touched_pairs or [])]
+        keys = touched_pairs if touched_pairs else list(ag.edges)
         with self._lock:
             self._conn.executemany(
                 "INSERT INTO assoc_edges(site,a,b,weight) VALUES(?,?,?,?) "
                 "ON CONFLICT(site,a,b) DO UPDATE SET weight=excluded.weight",
-                [(ag.site, k[0], k[1], v) for k, v in ag.edges.items()])
+                [(ag.site, k[0], k[1], ag.edges[k]) for k in dict.fromkeys(keys)
+                 if k in ag.edges])
             if contributor_user and touched_pairs:
                 self._conn.executemany(
                     "INSERT INTO assoc_edge_users(site,user,a,b,hits) VALUES(?,?,?,?,1) "
                     "ON CONFLICT(site,user,a,b) DO UPDATE SET hits=hits+1",
                     [(ag.site, contributor_user, a, b) for a, b in touched_pairs])
                 self._refresh_assoc_user_counts(ag.site, touched_pairs)
-            self._conn.commit()
+            self._commit()
 
     # ---- cabinet (events) ----
     def append_event(self, ev: Event):
@@ -370,11 +481,16 @@ class SQLiteStore:
                 "INSERT INTO events(site,user,ts,type,payload,attrs) VALUES(?,?,?,?,?,?)",
                 (ev.site, ev.user, ev.ts, ev.type, json.dumps(ev.payload),
                  json.dumps(ev.attrs)))
-            self._conn.commit()
+            self._commit()
             return int(cursor.lastrowid)
 
     def recall(self, site: str, user: str, type: Optional[str] = None,
                contains: Optional[str] = None, limit: int = 20) -> List[Dict]:
+        with self._lock:
+            return self._recall_unlocked(site, user, type, contains, limit)
+
+    def _recall_unlocked(self, site: str, user: str, type: Optional[str] = None,
+                         contains: Optional[str] = None, limit: int = 20) -> List[Dict]:
         q = "SELECT ts,type,payload,attrs FROM events WHERE site=? AND user=?"
         args = [site, user]
         if type:
@@ -441,7 +557,7 @@ class SQLiteStore:
                 "INSERT INTO assoc_edge_users(site,user,a,b,hits) VALUES(?,?,?,?,?)",
                 rows,
             )
-            self._conn.commit()
+            self._commit()
 
     def delete_document_artifacts(self, site: str, user: str,
                                   source_sha256: str,
@@ -488,7 +604,7 @@ class SQLiteStore:
                     "DELETE FROM canonicalization_suggestions WHERE suggestion_id=?",
                     [(suggestion_id,) for suggestion_id in suggestion_ids],
                 )
-            self._conn.commit()
+            self._commit()
         return {"events": removed, "suggestions_deleted": len(suggestion_ids)}
 
     # ---- durable document catalog and approved tag provenance ----
@@ -515,7 +631,7 @@ class SQLiteStore:
                  float(row["imported_ts"]), row["status"], int(row.get("pinned", False)),
                  int(row.get("authoritative", False)), row.get("superseded_by", "")),
             )
-            self._conn.commit()
+            self._commit()
         return self.get_document(row["site"], row["user"], row["document_id"])
 
     def get_document(self, site: str, user: str, document_id_or_sha256: str):
@@ -565,7 +681,7 @@ class SQLiteStore:
                 " WHERE site=? AND user=? AND document_id=?",
                 (*values, site, user, document_id),
             )
-            self._conn.commit()
+            self._commit()
         return self.get_document(site, user, document_id)
 
     def add_document_tags(self, site: str, user: str, document_id: str,
@@ -581,7 +697,7 @@ class SQLiteStore:
                 "approved_ts=excluded.approved_ts",
                 rows,
             )
-            self._conn.commit()
+            self._commit()
         return self.list_document_tags(site, user, document_id)
 
     def list_document_tags(self, site: str, user: str,
@@ -608,7 +724,7 @@ class SQLiteStore:
                 "DELETE FROM documents WHERE site=? AND user=? AND document_id=?",
                 (site, user, document_id),
             )
-            self._conn.commit()
+            self._commit()
         return {"documents_deleted": int(cursor.rowcount),
                 "tag_mappings_deleted": len(tags)}
 
@@ -633,7 +749,7 @@ class SQLiteStore:
                  row["source"], row["thumbnail_uri"], int(row["exif_stripped"]),
                  int(row["sensitive"]), int(row["consent"]), row["status"]),
             )
-            self._conn.commit()
+            self._commit()
         return self.get_asset(row["site"], row["user"], row["id"])
 
     def get_asset(self, site: str, user: str, asset_id_or_sha256: str,
@@ -662,7 +778,7 @@ class SQLiteStore:
                 "AND id=? AND status='active'",
                 (int(sensitive), site, user, asset_id),
             )
-            self._conn.commit()
+            self._commit()
         return self.get_asset(site, user, asset_id)
 
     def delete_asset_row(self, site: str, user: str, asset_id: str):
@@ -671,7 +787,7 @@ class SQLiteStore:
                 "DELETE FROM assets WHERE site=? AND user=? AND id=?",
                 (site, user, asset_id),
             )
-            self._conn.commit()
+            self._commit()
 
     def delete_asset_artifacts(self, site: str, user: str, asset_id: str,
                                source_sha256: str) -> Dict:
@@ -712,7 +828,7 @@ class SQLiteStore:
                 "WHERE site=? AND user=? AND id=?",
                 (site, user, asset_id),
             )
-            self._conn.commit()
+            self._commit()
         return {"events": removed, "suggestions_deleted": len(suggestion_ids)}
 
     # ---- prior ----
@@ -725,7 +841,10 @@ class SQLiteStore:
         return pp
 
     def save_prior(self, pp: PopulationPrior):
+        """Replace the site's prior with ``pp`` (attributes no longer present are
+        removed, so a forgotten user's unique traits do not linger)."""
         with self._lock:
+            self._conn.execute("DELETE FROM prior_node WHERE site=?", (pp.site,))
             self._conn.executemany(
                 "INSERT INTO prior_node VALUES(?,?,?,?) "
                 "ON CONFLICT(site,attr) DO UPDATE SET sum=excluded.sum, n=excluded.n",
@@ -734,7 +853,7 @@ class SQLiteStore:
                 "INSERT INTO prior_meta VALUES(?,?) "
                 "ON CONFLICT(site) DO UPDATE SET n_users=excluded.n_users",
                 (pp.site, pp.n_users))
-            self._conn.commit()
+            self._commit()
 
     # ---- identity links (the supernode wiring; created when a user signs in) ----
     def link_identity(self, person: str, site: str, local_user: str, ts: float = 0.0):
@@ -742,14 +861,14 @@ class SQLiteStore:
             self._conn.execute(
                 "INSERT OR IGNORE INTO identities(person,site,local_user,ts) VALUES(?,?,?,?)",
                 (person, site, local_user, ts))
-            self._conn.commit()
+            self._commit()
 
     def unlink_identity(self, person: str, site: str, local_user: str):
         with self._lock:
             self._conn.execute(
                 "DELETE FROM identities WHERE person=? AND site=? AND local_user=?",
                 (person, site, local_user))
-            self._conn.commit()
+            self._commit()
 
     def list_identities(self, person: str):
         return [(r["site"], r["local_user"]) for r in self._conn.execute(
@@ -762,7 +881,7 @@ class SQLiteStore:
                 "INSERT INTO share_policy(person,target_site,category,allowed) VALUES(?,?,?,?) "
                 "ON CONFLICT(person,target_site,category) DO UPDATE SET allowed=excluded.allowed",
                 (person, target_site, category, int(allowed)))
-            self._conn.commit()
+            self._commit()
 
     def get_shares(self, person: str, target_site: str):
         return {r["category"]: bool(r["allowed"]) for r in self._conn.execute(
@@ -777,7 +896,7 @@ class SQLiteStore:
                 "INSERT INTO entities(entity_id,site,user,kind,display_name,created_at) "
                 "VALUES(?,?,?,?,?,?)",
                 (entity_id, site, user, kind, display_name, created_at))
-            self._conn.commit()
+            self._commit()
 
     def get_entity(self, site: str, user: str, entity_id: str):
         row = self._conn.execute(
@@ -801,14 +920,14 @@ class SQLiteStore:
                 "ON CONFLICT(site,user,alias_attr) DO UPDATE SET "
                 "entity_id=excluded.entity_id, source=excluded.source, confidence=excluded.confidence",
                 (site, user, alias_attr, entity_id, source, float(confidence)))
-            self._conn.commit()
+            self._commit()
 
     def unlink_entity_alias(self, site: str, user: str, entity_id: str, alias_attr: str):
         with self._lock:
             self._conn.execute(
                 "DELETE FROM entity_aliases WHERE site=? AND user=? AND entity_id=? AND alias_attr=?",
                 (site, user, entity_id, alias_attr))
-            self._conn.commit()
+            self._commit()
 
     def list_entity_aliases(self, site: str, user: str, entity_id: str):
         return [dict(r) for r in self._conn.execute(
@@ -825,7 +944,7 @@ class SQLiteStore:
             self._conn.execute(
                 "UPDATE entities SET kind=? WHERE site=? AND user=? AND entity_id=?",
                 (kind, site, user, entity_id))
-            self._conn.commit()
+            self._commit()
 
     def set_entity_field(self, entity_id: str, field: str, value: str,
                          provenance: str, ts: float):
@@ -835,7 +954,7 @@ class SQLiteStore:
                 "ON CONFLICT(entity_id,field) DO UPDATE SET "
                 "value=excluded.value, provenance=excluded.provenance, ts=excluded.ts",
                 (entity_id, field, value, provenance, float(ts)))
-            self._conn.commit()
+            self._commit()
 
     def list_entity_fields(self, entity_id: str):
         return [dict(r) for r in self._conn.execute(
@@ -862,7 +981,7 @@ class SQLiteStore:
                 (row["site"], row["user"], row["subject_id"], row["relation"],
                  row["object_id"], row["weight"], row["confidence"], row["hits"],
                  row["last_reinforced"], row["salience"], row["provenance"], row["note"]))
-            self._conn.commit()
+            self._commit()
 
     def list_entity_relations(self, site: str, user: str, entity_id: str = None):
         if entity_id is None:
@@ -898,7 +1017,7 @@ class SQLiteStore:
                 self._conn.execute(
                     "UPDATE relation_facts SET ts=?, provenance=?, event_id=? WHERE fact_id=?",
                     (row["ts"], row["provenance"], row.get("event_id"), existing["fact_id"]))
-                self._conn.commit()
+                self._commit()
                 updated = self.get_relation_fact(existing["fact_id"])
                 updated["created"] = False
                 return updated
@@ -908,7 +1027,7 @@ class SQLiteStore:
                 (row["fact_id"], row["site"], row["user"], row["subject_id"],
                  row["relation"], row["object_id"], row["note"], row["ts"],
                  row["provenance"], row.get("event_id")))
-            self._conn.commit()
+            self._commit()
             created = self.get_relation_fact(row["fact_id"])
             created["created"] = True
             return created
@@ -924,7 +1043,7 @@ class SQLiteStore:
         with self._lock:
             cur = self._conn.execute(
                 "DELETE FROM relation_facts WHERE fact_id=?", (fact_id,))
-            self._conn.commit()
+            self._commit()
             return cur.rowcount > 0
 
     def delete_entity_relation(self, site: str, user: str, subject_id: str,
@@ -938,7 +1057,7 @@ class SQLiteStore:
                 "DELETE FROM entity_relations WHERE site=? AND user=? AND subject_id=? "
                 "AND relation=? AND object_id=?",
                 (site, user, subject_id, relation, object_id))
-            self._conn.commit()
+            self._commit()
 
     def delete_entity(self, site: str, user: str, entity_id: str):
         with self._lock:
@@ -960,7 +1079,7 @@ class SQLiteStore:
                 "AND (payload LIKE ? OR payload LIKE ? OR payload LIKE ?)",
                 (site, user, f'%"entity_id":"{entity_id}"%',
                  f'%"subject_id":"{entity_id}"%', f'%"object_id":"{entity_id}"%'))
-            self._conn.commit()
+            self._commit()
 
     def count_entity_references(self, entity_id: str) -> int:
         queries = [
@@ -996,7 +1115,7 @@ class SQLiteStore:
                         "UPDATE canonicalization_suggestions SET payload=?, score=? "
                         "WHERE suggestion_id=?",
                         (payload, float(row["score"]), row["suggestion_id"]))
-                self._conn.commit()
+                self._commit()
                 return self.get_suggestion(row["suggestion_id"])
             self._conn.execute(
                 "INSERT INTO canonicalization_suggestions("
@@ -1005,7 +1124,7 @@ class SQLiteStore:
                 (row["suggestion_id"], row["site"], row["user"], row["kind"],
                  payload, float(row["score"]), row["status"], float(row["created_ts"]),
                  row.get("decided_ts")))
-            self._conn.commit()
+            self._commit()
             return self.get_suggestion(row["suggestion_id"])
 
     def get_suggestion(self, suggestion_id: str):
@@ -1029,7 +1148,7 @@ class SQLiteStore:
                 "UPDATE canonicalization_suggestions SET status=?, decided_ts=? "
                 "WHERE suggestion_id=?",
                 (status, float(decided_ts), suggestion_id))
-            self._conn.commit()
+            self._commit()
         return self.get_suggestion(suggestion_id)
 
     def purge_expired_suggestions(self, site: str, user: str, now: float, ttl_days: float):
@@ -1039,7 +1158,7 @@ class SQLiteStore:
                 "DELETE FROM canonicalization_suggestions WHERE site=? AND user=? "
                 "AND status='pending' AND created_ts<?",
                 (site, user, cutoff))
-            self._conn.commit()
+            self._commit()
             return cur.rowcount
 
     def trim_pending_suggestions(self, site: str, user: str, cap: int):
@@ -1051,7 +1170,7 @@ class SQLiteStore:
             self._conn.executemany(
                 "DELETE FROM canonicalization_suggestions WHERE suggestion_id=?",
                 [(row["suggestion_id"],) for row in drop])
-            self._conn.commit()
+            self._commit()
         return len(drop)
 
     def delete_suggestions_for_entity(self, site: str, user: str, entity_id: str):
@@ -1068,7 +1187,7 @@ class SQLiteStore:
             self._conn.executemany(
                 "DELETE FROM canonicalization_suggestions WHERE suggestion_id=?",
                 [(sid,) for sid in ids])
-            self._conn.commit()
+            self._commit()
         return len(ids)
 
     # ---- verifiable audit log (#4) ----
@@ -1082,15 +1201,18 @@ class SQLiteStore:
             h = entry_hash(key, prev, seq, ts, action, detail)
             self._conn.execute("INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)",
                                (site, user, seq, ts, action, json.dumps(detail), prev, h))
-            self._conn.commit()
+            self._commit()
             return {"seq": seq, "hash": h}
 
     def read_audit(self, site, user):
-        return [{"seq": r["seq"], "ts": r["ts"], "action": r["action"],
-                 "detail": json.loads(r["detail"]), "hash": r["hash"]}
-                for r in self._conn.execute(
-                    "SELECT * FROM audit WHERE site=? AND user=? ORDER BY seq", (site, user))]
+        with self._lock:
+            return [{"seq": r["seq"], "ts": r["ts"], "action": r["action"],
+                     "detail": json.loads(r["detail"]), "hash": r["hash"]}
+                    for r in self._conn.execute(
+                        "SELECT * FROM audit WHERE site=? AND user=? ORDER BY seq",
+                        (site, user))]
 
     def list_users(self, site):
-        return [r["user"] for r in self._conn.execute(
-            "SELECT DISTINCT user FROM user_edges WHERE site=?", (site,))]
+        with self._lock:
+            return [r["user"] for r in self._conn.execute(
+                "SELECT DISTINCT user FROM user_edges WHERE site=?", (site,))]

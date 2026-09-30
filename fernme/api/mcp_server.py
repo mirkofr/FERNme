@@ -194,10 +194,39 @@ def _configured_service(db_path: str) -> FernService:
     """Build the MCP service with default-off media settings from fern.toml."""
     return FernService(db_path=db_path, cfg=configured_features())
 
-try:
-    from mcp.server.fastmcp import FastMCP
-except Exception as e:  # pragma: no cover
-    FastMCP = None
+def _load_fastmcp():
+    """Return (server_class, import_error) across supported MCP SDK majors.
+
+    mcp 1.x exposes ``mcp.server.fastmcp.FastMCP``; mcp 2.x renamed it to
+    ``mcp.server.mcpserver.MCPServer`` with the same ``tool()``/``run()`` surface
+    FERNme uses. Anything else yields ``(None, error)`` so ``main`` can explain
+    what is wrong instead of claiming the package is missing.
+    """
+    try:
+        from mcp.server.fastmcp import FastMCP as server_cls
+        return server_cls, None
+    except Exception as v1_error:  # ImportError, or a broken SDK install
+        try:
+            from mcp.server.mcpserver import MCPServer as server_cls
+            return server_cls, None
+        except Exception:
+            return None, v1_error
+
+
+def _mcp_unavailable_message(error) -> str:
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+        installed = version("mcp")
+    except PackageNotFoundError:
+        return "The 'mcp' package is not installed: pip install \"fernme[mcp]\""
+    except Exception:  # pragma: no cover - metadata backends vary
+        installed = "unknown"
+    return (f"Installed 'mcp' {installed} is not supported by FERNme "
+            f"({type(error).__name__}: {error}). "
+            "Reinstall with: pip install \"mcp>=1.0,<3\"")
+
+
+FastMCP, _FASTMCP_IMPORT_ERROR = _load_fastmcp()
 
 if FastMCP is not None:
     mcp = FastMCP("fernme")
@@ -469,7 +498,7 @@ def main(argv=None, run_server: bool = True):
         print(default_db_path())
         return 0
     if FastMCP is None:
-        raise SystemExit("Install the 'mcp' package: pip install mcp")
+        raise SystemExit(_mcp_unavailable_message(_FASTMCP_IMPORT_ERROR))
     resolved = ensure_default_db_path()
     global svc
     svc = _configured_service(resolved)

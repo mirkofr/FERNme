@@ -2,7 +2,7 @@
   Q1 - per-turn token cost vs profile size: FERN should stay FLAT while a
        full-history-in-context agent grows linearly.
   Q2 - write cost: LLM calls per write. FERN = 0; LLM-extraction memory >= 1.
-Run:  python -m fern.eval.experiment
+Run:  python -m fernme.eval.experiment
 """
 from __future__ import annotations
 import sys, random, statistics

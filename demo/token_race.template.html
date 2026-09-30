@@ -1,0 +1,231 @@
+<title>FERNme Token Race</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a meter board. One race panel (three lanes + scrubber), one log chart, one calculator, then method notes. */
+:root {
+  --bg: #f2f4f3; --panel: #ffffff; --ink: #15201c; --muted: #5a6964; --rule: #d6ddda;
+  --fern: #1d8a66; --hist: #b26a12; --mem0: #7446a3; --focus: #1d8a66;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1513; --panel: #161e1b; --ink: #e5ece9; --muted: #93a39d; --rule: #2a3531;
+  --fern: #3cc496; --hist: #e39a3c; --mem0: #b48be0; --focus: #3cc496; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1513; --panel: #161e1b; --ink: #e5ece9; --muted: #93a39d; --rule: #2a3531;
+  --fern: #3cc496; --hist: #e39a3c; --mem0: #b48be0; --focus: #3cc496; color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 5vw, 44px); line-height: 1.08; font-weight: 700; max-width: 22ch; }
+h2 { font-size: 20px; font-weight: 700; }
+.lede { color: var(--muted); max-width: 64ch; margin: 10px 0 0; }
+.eyebrow { font-family: var(--mono); font-size: 13px; letter-spacing: 0.02em; color: var(--muted); margin: 0 0 10px; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; display: grid; gap: 18px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+button { font: 500 14px var(--body); color: var(--bg); background: var(--ink); border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; min-width: 84px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.turn { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--muted); }
+.turn b { color: var(--ink); font-weight: 500; }
+input[type=range] { flex: 1 1 200px; accent-color: var(--ink); min-width: 0; }
+.lanes { display: grid; gap: 14px; }
+.lane { display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr); gap: 8px 16px; align-items: center; }
+.lane .name { font-weight: 500; }
+.lane .name small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; line-height: 1.35; }
+.track { position: relative; height: 34px; border-radius: 5px; background: color-mix(in srgb, var(--rule) 45%, transparent); overflow: hidden; }
+.bar { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 5px; min-width: 3px; }
+.lane[data-k=fern] .bar { background: var(--fern); } .lane[data-k=hist] .bar { background: var(--hist); } .lane[data-k=mem0] .bar { background: var(--mem0); }
+.read { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); background: var(--panel); border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
+.stats { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 18px; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--muted); }
+.stats b { color: var(--ink); font-weight: 500; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+.chart { width: 100%; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.calc label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.calc input { font: 500 15px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--rule); font-size: 14px; }
+th { font-weight: 500; color: var(--muted); font-size: 12.5px; }
+td.num, th.num { text-align: right; font-family: var(--mono); }
+.notes { display: grid; gap: 10px; max-width: 70ch; }
+.notes p, .notes li { margin: 0; color: var(--ink); }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+code { font-family: var(--mono); font-size: 13px; background: color-mix(in srgb, var(--rule) 50%, transparent); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.flag { font-family: var(--mono); font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; justify-self: start; }
+@media (max-width: 620px) {
+  .lane { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .bar { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Synthetic benchmark · one fictional user · 300 messages</p>
+    <h1>Same user, 300 messages. What does each memory cost?</h1>
+    <p class="lede">Three ways to give an agent memory, fed the identical message stream. FERNme injects a small card built without any model call. Pasting the history injects everything said so far. Mem0 runs one LLM extraction call on every message, and its prompts are counted here from the real Mem0 pipeline.</p>
+  </header>
+
+  <section class="panel" aria-label="Token race">
+    <div class="controls">
+      <button id="play" type="button" aria-pressed="false">Play</button>
+      <input id="scrub" type="range" min="1" max="300" value="300" aria-label="Turn">
+      <span class="turn">turn <b id="tnum">300</b> / <span id="tmax">300</span></span>
+    </div>
+    <div class="lanes" id="lanes">
+      <div class="lane" data-k="fern">
+        <div class="name">FERNme<small>card injected each turn</small></div>
+        <div class="track"><div class="bar"></div><span class="read"></span></div>
+        <div class="stats"></div>
+      </div>
+      <div class="lane" data-k="hist">
+        <div class="name">Full history<small>every note pasted into the prompt</small></div>
+        <div class="track"><div class="bar"></div><span class="read"></span></div>
+        <div class="stats"></div>
+      </div>
+      <div class="lane" data-k="mem0">
+        <div class="name">Mem0 <span id="m0v"></span><small>extraction call per message + retrieved memories</small></div>
+        <div class="track"><div class="bar"></div><span class="read"></span></div>
+        <div class="stats"></div>
+      </div>
+    </div>
+    <span class="flag">bar = cumulative tokens so far (linear)</span>
+  </section>
+
+  <section class="panel" aria-label="Tokens per turn">
+    <h2>Tokens spent per turn</h2>
+    <div class="legend">
+      <span style="--c: var(--fern)">FERNme card</span>
+      <span style="--c: var(--hist)">Full history</span>
+      <span style="--c: var(--mem0)">Mem0 write + read</span>
+    </div>
+    <div class="chart" id="chart"></div>
+    <p class="lede" style="margin:0">Log scale. FERNme and Mem0 both stay bounded per turn. The difference is size: Mem0's extraction prompt alone is about 8,400 tokens before your message is added.</p>
+  </section>
+
+  <section class="panel" aria-label="Cost calculator">
+    <h2>Scale it to your traffic</h2>
+    <div class="calc">
+      <label for="users">Users<input id="users" type="number" min="1" step="1" value="1000"></label>
+      <label for="price">Your price per 1M input tokens (USD)<input id="price" type="number" min="0" step="0.01" value="0.40"></label>
+      <label for="msgs">Messages per user<input id="msgs" type="number" min="1" max="300" step="1" value="300"></label>
+    </div>
+    <div class="chart">
+      <table>
+        <thead><tr><th>Approach</th><th class="num">Tokens</th><th class="num">LLM calls</th><th class="num">Est. cost</th></tr></thead>
+        <tbody id="costrows"></tbody>
+      </table>
+    </div>
+    <p class="lede" style="margin:0">The default price is an example; enter your provider's rate. Output tokens are billed at the input rate here for simplicity. Providers that cache repeated prompts can discount Mem0's fixed system prompt.</p>
+  </section>
+
+  <section class="notes" aria-label="Method">
+    <h2>How this was measured</h2>
+    <ul>
+      <li>The user and all 300 messages are synthetic and fictional, with a change of taste at message 150. Nothing here describes real users.</li>
+      <li>FERNme numbers are the real card tokens from the engine after each message, with zero LLM calls on the write path. In practice your agent also emits a few tag tokens per reply for FERNme to store.</li>
+      <li>Mem0 numbers come from the real Mem0 open-source pipeline, driven by a deterministic stand-in model so no API was called. Input tokens are counted from the exact prompts Mem0 built; output tokens approximate the reply size. Read tokens are the top 10 memories returned by search.</li>
+      <li>This compares cost only. Recall quality needs the owner-run head-to-head with a real model.</li>
+      <li>Reproduce: <code>python -m fernme.eval.cost_race --turns 300 --with-mem0-prompts</code></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const D = __DATA__;
+const N = D.turns;
+const mem0Turn = D.m_in.map((v, i) => v + D.m_out[i] + D.m_read[i]);
+const S = {
+  fern: { turn: D.fern, calls: i => 0 },
+  hist: { turn: D.hist, calls: i => 0 },
+  mem0: { turn: mem0Turn, calls: i => i + 1 },
+};
+const cum = {};
+for (const k in S) { let r = 0; cum[k] = S[k].turn.map(v => (r += v)); }
+const fmt = n => Math.round(n).toLocaleString("en-US");
+const $ = s => document.querySelector(s);
+$("#tmax").textContent = N; $("#scrub").max = N;
+$("#m0v").textContent = D.mem0v ? "(" + D.mem0v + ")" : "";
+
+function paint(t) {
+  const i = t - 1, maxCum = Math.max(cum.fern[i], cum.hist[i], cum.mem0[i], 1);
+  $("#tnum").textContent = t;
+  document.querySelectorAll(".lane").forEach(el => {
+    const k = el.dataset.k;
+    el.querySelector(".bar").style.width = (100 * cum[k][i] / maxCum) + "%";
+    el.querySelector(".read").textContent = fmt(cum[k][i]) + " tok";
+    el.querySelector(".stats").innerHTML =
+      `<span>this turn <b>${fmt(S[k].turn[i])}</b></span>` +
+      `<span>LLM calls <b>${fmt(S[k].calls(i))}</b></span>`;
+  });
+  drawCursor(t);
+}
+
+// ---- chart (SVG, log y)
+const W = 880, H = 300, L = 58, R = 16, T = 14, B = 34;
+const yMin = 10, yMax = 20000;
+const x = t => L + (W - L - R) * (t - 1) / (N - 1);
+const y = v => T + (H - T - B) * (1 - (Math.log10(Math.max(v, yMin)) - Math.log10(yMin)) / (Math.log10(yMax) - Math.log10(yMin)));
+function path(arr) { return arr.map((v, i) => (i ? "L" : "M") + x(i + 1).toFixed(1) + " " + y(v).toFixed(1)).join(" "); }
+function buildChart() {
+  const ticks = [10, 100, 1000, 10000];
+  let g = "";
+  for (const v of ticks) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rule)" stroke-width="1"/>` +
+    `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" font-family="var(--mono)" fill="var(--muted)">${v.toLocaleString("en-US")}</text>`;
+  for (const t of [1, 50, 100, 150, 200, 250, 300].filter(t => t <= N))
+    g += `<text x="${x(t)}" y="${H - 12}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="var(--muted)">${t}</text>`;
+  g += `<text x="${W - R}" y="${H - 1}" text-anchor="end" font-size="11" fill="var(--muted)">message number</text>`;
+  const mid = Math.floor(N / 2) + 1;
+  g += `<line x1="${x(mid)}" x2="${x(mid)}" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 4" stroke-width="1"/>` +
+       `<text x="${x(mid) + 6}" y="${T + 12}" font-size="11" fill="var(--muted)">taste changes</text>`;
+  g += `<path d="${path(mem0Turn)}" fill="none" stroke="var(--mem0)" stroke-width="2"/>`;
+  g += `<path d="${path(D.hist)}" fill="none" stroke="var(--hist)" stroke-width="2"/>`;
+  g += `<path d="${path(D.fern)}" fill="none" stroke="var(--fern)" stroke-width="2.5"/>`;
+  g += `<line id="cur" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--ink)" stroke-width="1"/>`;
+  g += `<g id="dots"></g>`;
+  $("#chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tokens per turn, log scale">${g}</svg>`;
+}
+function drawCursor(t) {
+  const cx = x(t), c = $("#cur"); if (!c) return;
+  c.setAttribute("x1", cx); c.setAttribute("x2", cx);
+  const i = t - 1;
+  $("#dots").innerHTML = [["mem0", mem0Turn[i]], ["hist", D.hist[i]], ["fern", D.fern[i]]]
+    .map(([k, v]) => `<circle cx="${cx}" cy="${y(v)}" r="4" fill="var(--${k})" stroke="var(--panel)" stroke-width="1.5"/>`).join("");
+}
+
+// ---- calculator
+function calc() {
+  const users = Math.max(1, +$("#users").value || 1);
+  const price = Math.max(0, +$("#price").value || 0);
+  const m = Math.min(N, Math.max(1, Math.round(+$("#msgs").value || 1)));
+  const rows = [["FERNme", "fern", 0], ["Full history", "hist", 0], ["Mem0", "mem0", m]];
+  $("#costrows").innerHTML = rows.map(([name, k, calls]) => {
+    const tok = cum[k][m - 1] * users;
+    return `<tr><td>${name}</td><td class="num">${fmt(tok)}</td><td class="num">${fmt(calls * users)}</td>` +
+      `<td class="num">$${(tok / 1e6 * price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+  }).join("");
+}
+["users", "price", "msgs"].forEach(id => $("#" + id).addEventListener("input", calc));
+
+// ---- playback
+let timer = null;
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function stop() { clearInterval(timer); timer = null; $("#play").textContent = "Play"; $("#play").setAttribute("aria-pressed", "false"); }
+$("#play").addEventListener("click", () => {
+  if (timer) return stop();
+  let t = +$("#scrub").value; if (t >= N) t = 1;
+  $("#play").textContent = "Pause"; $("#play").setAttribute("aria-pressed", "true");
+  timer = setInterval(() => {
+    t = Math.min(N, t + (reduce ? 25 : 2)); $("#scrub").value = t; paint(t);
+    if (t >= N) stop();
+  }, reduce ? 400 : 40);
+});
+$("#scrub").addEventListener("input", e => { stop(); paint(+e.target.value); });
+
+buildChart(); paint(N); calc();
+</script>

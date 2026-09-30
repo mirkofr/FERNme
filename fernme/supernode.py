@@ -79,6 +79,12 @@ class Supernode:
             cat = category_of(attr)
             own = target_site in slot["sources"]
             allowed = shares.get(cat) is True
+            if slot["sensitive"] and not own and not is_sensitive(cat):
+                # sharing an ordinary category ("topic") never carries sensitive
+                # memories inside it ("topic:mental_health") along; those cross
+                # only with an explicit "sensitive:<category>" rule. Sharing a
+                # sensitive category by name ("allergy") is itself explicit.
+                allowed = shares.get(f"sensitive:{cat}") is True
             if not (own or allowed):
                 continue
             out.append({"attr": attr, "w": int(round(slot["weight"])),

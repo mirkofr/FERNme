@@ -50,6 +50,11 @@ class Config:
     beta_fast: float = 0.5    # how much the fast lane boosts ranking
     floor: float = 1.0        # drop edges below this after decay
     bl_decay: float = 0.5     # ACT-R base-level decay exponent d
+    # Keep at most this many reinforcement timestamps per attribute: the first
+    # plus the most recent (history_cap - 1). Base-level activation adds a closed-form
+    # estimate for the dropped middle hits (Petrov 2006), so write/read cost stays
+    # bounded as history grows. 0 = keep every timestamp (pre-0.4.0b5 behavior).
+    history_cap: int = 64
     # --- salience (emotional/behavioral significance -> slower forgetting) ---
     salience_beta: float = 0.5    # 0 = OFF (old decay behavior); >0: salient edges decay slower
     salience_neg: float = 0.5     # dislikes (negative edges) get this salience floor
@@ -124,7 +129,20 @@ class Config:
 
     # --- Retrieval (retrieve/) ---
     hops: int = 2             # spreading-activation hops
+    # Read-time decay: the card applies each edge's decay rate on the user's own
+    # activity clock (their latest reinforcement) and moves memories that have
+    # faded below `floor` behind every current one, even if no decay() batch job
+    # has run. Weights on the card are the decayed ones. Storage is not modified.
+    # False = pre-0.4.0b5 behavior (stored weights, no demotion).
+    card_read_decay: bool = True
     top_n: int = 8            # max attributes on the wire card
+    # Cold-start seeding from the population prior is released through the
+    # private prior only: attributes held by fewer than prior_k_anon users are
+    # never seeded, surviving means get Laplace noise (prior_epsilon), and
+    # sensitive attributes (health, dating, finance, ...) are never seeded.
+    prior_k_anon: int = 5
+    prior_epsilon: float = 1.0
+    prior_exclude_sensitive: bool = True
     card_exclude_ns: frozenset = field(default_factory=frozenset)
     # Extra namespaces to keep out of the compact card, merged with built-ins.
 

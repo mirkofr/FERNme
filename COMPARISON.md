@@ -61,7 +61,7 @@ privately from one deployment with a collective cold-start, and carries a real
 privacy/ownership story (consent, DP, scoped cross-site sharing, right-to-be-forgotten
 that also unlearns from the prior). Ori isn't built for any of that.
 
-**Where FERNme is weaker.** Ori is far more mature: v0.5 vs v0.1, ~579 tests vs 83, an
+**Where FERNme is weaker.** Ori is far more mature: v0.5 vs FERNme's v0.4 beta, ~579 tests vs ~360, an
 installable npm package, agent adapters, and **head-to-head benchmarks on standard
 datasets** (HotpotQA, LoCoMo) against Mem0. Its retrieval (RL Q-values, bandit stage
 selection, recursive decomposition) is more sophisticated than FERNme's plain spreading
@@ -162,7 +162,7 @@ memory); it's a different product.
   3. **User-owned cross-surface supernode** — assembled by sign-in, consent-gated,
      default-deny scoped sharing, sensitive categories walled off.
   4. **Outcome orientation** — reinforced by results (conversion/booking/resolution), not QA.
-- **Honest weaknesses to own publicly:** early maturity (v0.1, 83 tests), **no standard
+- **Honest weaknesses to own publicly:** early maturity (v0.4 beta, one maintainer), **no standard
   benchmark** yet (synthetic/LLM-authored only), and a simpler, less-proven retrieval path.
   The single highest-leverage next step is a real benchmark (LoCoMo-style for memory, or a
   live personalization pilot) so the claims stop being synthetic.

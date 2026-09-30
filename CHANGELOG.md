@@ -2,6 +2,98 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [Unreleased]
+
+### Security and privacy (from the 2026-09-30 review)
+- **Population prior leak.** A newcomer's cold-start card was seeded from the raw
+  prior, so a trait only one user had (for example a health condition) appeared
+  on every new user's card, and it survived `forget_everywhere` because
+  `save_prior` never removed rows. Cold start now uses only the private release
+  (k-anonymous with `prior_k_anon=5`, sensitive attributes excluded, Laplace noise
+  keyed by the install secret); `save_prior` replaces the site's rows; `delete`,
+  consent withdrawal, and `forget_everywhere` recompute the prior. Behavior
+  change: sites with fewer than 5 users holding an attribute no longer seed it.
+- **Lost writes under concurrency.** Parallel writers (REST thread pool, MCP + UI
+  on one DB) could load a half-rewritten graph and save it back: 8 threads x 50
+  writes kept 17 hits. Store writes now run in one transaction per service call
+  (`store.transaction()`, `BEGIN IMMEDIATE` on SQLite; on Postgres a real
+  transaction plus a per-site advisory lock, so separate server processes also
+  serialize); a failure, including a failed commit, rolls back the graph,
+  Cabinet event, and audit together.
+- **REST exposure.** CORS allowed every origin and keyless servers answered any
+  host. CORS is now local-only by default (`FERNME_CORS_ORIGINS`), keyless servers
+  only answer local host names (`FERNME_ALLOWED_HOSTS`), the key check is
+  constant-time, and `/runtime-defaults` needs the key when one is set.
+- **Prompt injection via stored names.** `edit()` accepted free text as a memory
+  name and glosses were stored verbatim; both now go through the tag and display
+  sanitizers, which also catch `_`/`-` spellings such as
+  `ignore_all_previous_instructions`. Behavior change: `edit()` raises
+  `ValueError` (REST 400) for a *new* name that is not a valid tag; memories
+  already in the graph stay editable under their existing names.
+- **Obsidian import** no longer follows symlinks out of the vault.
+- **Audit chain** was keyed with a constant published in the source. New
+  databases get a per-install secret (`fernme/install_key.py`: `FERNME_SECRET_KEY`,
+  else a `<db>.key` file created atomically next to a SQLite DB, else one secret
+  stored per Postgres database); existing databases keep verifying with the legacy
+  key and say so. Edit entries store a reference keyed by that secret instead of
+  the memory name. Keep the `.key` file with its database.
+- **Differential privacy seed** defaulted to 0, so the noise could be recomputed;
+  `private_prior()` now derives it from the install secret unless a seed is passed.
+- **Supernode:** sharing an ordinary category (`topic`) no longer carries
+  sensitive members (`topic:mental_health_*`) along; that needs an explicit
+  `sensitive:<category>` rule. Deleting a user also removes their identity links
+  and, when no linked site remains, their sharing rules.
+
+### Performance
+- Writes no longer rewrite the user's whole history or load the site's whole
+  association graph: only changed edges, new history rows, and the touched
+  attribute pairs are read and written.
+- `history_cap=64` timestamps per attribute (first + most recent), with a
+  closed-form estimate for the dropped hits in base-level activation (Petrov
+  2006). Synthetic check: |error| < 0.02 in log activation; harness results
+  unchanged. Single-user write latency (synthetic, one machine): about 6 ms at
+  10k stored events, previously about 18 ms at 1k and over 280 ms at 10k.
+
+### Changed
+- `card_read_decay=True`: the card applies decay on the user's own activity clock
+  and moves memories that have faded below `floor` behind current ones, even if
+  no `decay()` job runs. On the 300-message synthetic race the card drops the
+  pre-drift `topic:python` / `food:croissant` and shows `pref:mint-tea`; the
+  unified harness is unchanged in every quality cell (tokens within 0.4). A card
+  requested with `now=0` (the MCP default) is not decayed, and memories written
+  with `ts=0` are not aged against wall-clock writes. Set `card_read_decay=False`
+  for the previous behavior.
+
+### Fixed
+- `tests/test_postgres.py::test_canonicalization_suggestions_on_postgres` used an
+  alias pair below the suggestion threshold and failed on main whenever Postgres
+  tests ran; it now uses a namespace duplicate like the SQLite test.
+- `fernme-mcp` failed on any fresh install because `mcp>=1.0` resolved to the
+  2.x SDK, which renamed `mcp.server.fastmcp.FastMCP` to
+  `mcp.server.mcpserver.MCPServer`; the server then exited with the misleading
+  "Install the 'mcp' package". The server now loads on both SDK majors
+  (dependency range `mcp>=1.0,<3`) and reports the installed version when an
+  SDK is present but unusable.
+- The bundled Claude/Codex plugin configs add `--with "mcp>=1.0,<2"` so the
+  already-tagged `v0.4.0b4` build (1.x-only) resolves a compatible SDK.
+
+### Added
+- `python -m fernme.eval.cost_race`: deterministic synthetic token race over one
+  fictional user (FERNme card vs full history). `--with-mem0-prompts` also runs
+  the real Mem0 OSS pipeline with a stand-in model (no API calls) and counts the
+  tokens of Mem0's own extraction prompts; `--html` fills `demo/token_race.template.html`.
+- `python -m fernme.eval.mem0_h2h`: owner-run recall head-to-head against real
+  Mem0 on the unified harness scenarios, with an offline `--check` preflight and
+  a key-less `--backend stub` plumbing mode. See `docs/mem0-head-to-head.md`.
+
+### Changed
+- README front page cut to one pitch, three reproducible claims, and a 60-second
+  quickstart; the long feature list moved to `docs/features.md`. Test counts now
+  match a real run, the quickstart no longer needs a local FERNmark wheel, and the
+  Mem0 write cost cites the measured 1 call per message (Mem0 OSS 2.2.1).
+- Eval module docstrings use `python -m fernme.eval.*` instead of the old
+  `fern.eval.*` module path.
+
 ## [0.4.0b2] - entity layer, local UI, and document import
 
 ### Added
