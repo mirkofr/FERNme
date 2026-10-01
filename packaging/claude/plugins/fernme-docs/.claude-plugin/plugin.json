@@ -1,7 +1,7 @@
 {
   "name": "fernme-docs",
   "displayName": "FERNme Documents and Photos",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Optional add-on for FERNme Memory: managed document evidence (FERNmark) and photo memory in the same database. Install fernme-memory first.",
   "author": {
     "name": "Acquilab Inc."

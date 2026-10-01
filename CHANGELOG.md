@@ -2,6 +2,16 @@
 
 All notable changes to FERNme. Pre-1.0: anything may change (semver 0.y.z).
 
+## [0.4.2] - 2026-10-01
+
+### Fixed
+- PyPI release. PyPI rejects packages whose dependencies point at a git URL, so
+  the `fernmark` extra (FERNmark from a git commit) made every upload since
+  0.4.0b3 fail (0.4.0b4 and 0.4.1 never reached PyPI). The extra is removed; install
+  FERNmark directly (`pip install "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5..."`),
+  as the `fernme-docs` plugin already does. A test now fails if a direct URL
+  dependency comes back. Otherwise identical to 0.4.1.
+
 ## [0.4.1] - 2026-10-01
 
 Includes everything listed below under 0.4.0b5 and earlier unreleased work

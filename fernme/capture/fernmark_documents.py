@@ -38,8 +38,10 @@ def _fernmark():
         import fernmark
     except ImportError as exc:
         raise FernmarkDocumentError(
-            "FERNmark document support requires the fernme[fernmark] optional "
-            "extra (fernmark==0.4.0a9 from immutable commit 23e16ea5b01f)"
+            "FERNmark document support requires FERNmark (fernmark==0.4.0a9 from "
+            "immutable commit 23e16ea5b01f): pip install "
+            "\"fernmark @ git+https://github.com/mirkofr/FERNmark.git@"
+            "23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae\""
         ) from exc
     return fernmark
 

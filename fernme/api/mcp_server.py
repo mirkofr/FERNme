@@ -145,7 +145,7 @@ def _import_document(path: str, site: str, user: str, confirm: bool = False,
                 site, user, resolved, dry_run=not confirm, max_bytes=max_bytes)
     except FernmarkDocumentError as exc:
         message = str(exc)
-        if "fernme[fernmark]" in message:
+        if "requires FERNmark" in message:
             return _document_tool_error(message)
         return _document_tool_error("invalid FERNmark document envelope")
     except DocumentStorageError as exc:

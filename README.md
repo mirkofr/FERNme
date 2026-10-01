@@ -374,9 +374,9 @@ The shipped configs run:
 
 ```bash
 # fernme-memory
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools core
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.2" fernme-mcp --tools core
 # fernme-docs (needs the FERNmark package)
-uvx --with "<fernmark package>" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools documents,photos
+uvx --with "<fernmark package>" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.2" fernme-mcp --tools documents,photos
 ```
 
 `fernme-mcp --tools` accepts `core`, `documents`, `photos`, `all`, or `auto`
@@ -400,7 +400,7 @@ Every consent request also appears in the FERNme app's Review queue, where you c
 approve or deny it; `FERNME_CONSENT_MODE=inbox` makes that the only way to grant
 consent (the default for remote agents).
 
-The plugins are pinned to the release tag `v0.4.1`, so external testers get the
+The plugins are pinned to the release tag `v0.4.2`, so external testers get the
 same server build once the owner pushes that tag. See `docs/mcp.md` for local
 development alternatives.
 
@@ -428,7 +428,7 @@ pinned to an immutable public Git commit. Use a placeholder path in shared
 instructions, never a machine-specific path:
 
 ```bash
-pip install "fernme[fernmark]"
+pip install fernme "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae"
 set FERNME_MANAGED_DOCUMENTS=true
 set FERNME_VAULT=<vault-root>
 ```

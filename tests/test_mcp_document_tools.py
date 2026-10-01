@@ -138,7 +138,7 @@ def test_missing_fernmark_extra_returns_clean_install_error(
         str(envelope), "demo.com", "elena", confirm=False)
 
     assert report["ok"] is False
-    assert "fernme[fernmark]" in report["error"]
+    assert "requires FERNmark" in report["error"]
     assert "fernmark==0.4.0a9" in report["error"]
     assert "Traceback" not in json.dumps(report)
 

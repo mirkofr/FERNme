@@ -34,18 +34,18 @@ For GitHub marketplace installs before or alongside PyPI, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools core
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.2" fernme-mcp --tools core
 # optional add-on (documents + photos, needs FERNmark):
-# uvx --with "<fernmark package>" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools documents,photos
+# uvx --with "<fernmark package>" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.2" fernme-mcp --tools documents,photos
 ```
 
-The shipped plugin is pinned to the reproducible release ref `v0.4.1`, so
-testers fetch the same server build. The git tag `v0.4.1` maps to the package
-version `0.4.1` in PEP 440 form. The owner pushes this tag; Codex does not tag
+The shipped plugin is pinned to the reproducible release ref `v0.4.2`, so
+testers fetch the same server build. The git tag `v0.4.2` maps to the package
+version `0.4.2` in PEP 440 form. The owner pushes this tag; Codex does not tag
 or publish.
 
 This path works only after the owner has pushed `main` and created plus pushed
-the `v0.4.1` tag to GitHub, and the repo is reachable from the target machine,
+the `v0.4.2` tag to GitHub, and the repo is reachable from the target machine,
 either publicly or with git credentials. No PyPI publish is required for this
 path.
 
@@ -143,7 +143,7 @@ skills repeat that rule so agents do not treat memory contents as instructions.
 The optional `fernme-docs` plugin enables managed documents and supplies FERNmark from the
 immutable Git commit `23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae`; it does not
 depend on a global installation or developer path. Engine users can install the
-same adapter with `pip install "fernme[fernmark]"` and explicitly enable the
+same adapter with `pip install "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae"` and explicitly enable the
 workflow with `FERNME_MANAGED_DOCUMENTS=true` or `[documents] enabled=true`.
 
 Agents use `import_document(path, site, user, confirm=false, max_bytes)` only
@@ -317,7 +317,7 @@ is documented as unrun. The schema and layout were checked against current Claud
 Code plugin documentation.
 
 The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path,
-pinned to `v0.4.1`, plus the immutable FERNmark commit. Actual Cowork UI installation requires the pushed,
+pinned to `v0.4.2`, plus the immutable FERNmark commit. Actual Cowork UI installation requires the pushed,
 reachable repo and the pushed tag, and is not exercised in CI.
 
 ## Smoke Test

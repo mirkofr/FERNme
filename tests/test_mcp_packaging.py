@@ -14,7 +14,7 @@ else:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_PACKAGE_VERSION = "0.4.1"
+EXPECTED_PACKAGE_VERSION = "0.4.2"
 PACKAGE_VERSION = tomllib.loads(
     (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 )["project"]["version"]
@@ -82,8 +82,7 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert "Homepage" in pyproject["project"]["urls"]
     assert pyproject["project"]["optional-dependencies"]["ui"] == [
         "fastapi>=0.110", "uvicorn[standard]>=0.27"]
-    assert pyproject["project"]["optional-dependencies"]["fernmark"] == [
-        FERNMARK_VCS]
+    assert "fernmark" not in pyproject["project"]["optional-dependencies"]
     assert pyproject["project"]["optional-dependencies"]["media"] == [
         "Pillow>=10"]
 
@@ -232,3 +231,14 @@ def test_tool_groups_keep_the_default_server_small(monkeypatch):
     assert server.resolve_tool_groups("all") == set(server.TOOL_GROUPS)
     with pytest.raises(SystemExit):
         server.resolve_tool_groups("everything")
+
+
+def test_no_direct_url_dependencies_so_pypi_accepts_the_upload():
+    """PyPI rejects any release whose metadata has a `name @ url` requirement
+    (this silently blocked 0.4.0b4 and 0.4.2). Plugins may still use git URLs."""
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject["project"]
+    requirements = list(project.get("dependencies", []))
+    for group in project.get("optional-dependencies", {}).values():
+        requirements.extend(group)
+    assert not [r for r in requirements if "@" in r.split(";")[0]], requirements
