@@ -63,6 +63,7 @@ export type GraphData = {
 export type PromptCard = {
   links?: Array<{ attr: string; weight?: number; confidence?: number; source?: string; known?: boolean }>;
   numeric?: Record<string, unknown>;
+  settings?: Record<string, string>;
   entities?: unknown[];
   [key: string]: unknown;
 };
@@ -75,6 +76,14 @@ export type Suggestion = {
   payload?: Record<string, unknown>;
   evidence?: unknown;
   [key: string]: unknown;
+};
+
+export type ConsentRequest = {
+  site: string;
+  user: string;
+  requested_by?: string;
+  requested_ts?: number;
+  status?: string;
 };
 
 export type RecallReplay = {

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fernme"
-version = "0.4.0b4"
+version = "0.4.1"
 description = "FERNme - a user-owned memory layer for AI agents: zero-LLM deterministic core with optional human-approved enrichment."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,7 +29,7 @@ dependencies = ["numpy>=1.24", "tiktoken>=0.5", "mcp>=1.0,<3"]
 api = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]
 mcp = ["mcp>=1.0,<3"]
 ui = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]
-postgres = ["psycopg[binary]>=3.1"]
+postgres = ["psycopg[binary]>=3.1", "psycopg-pool>=3.2"]
 viz = ["matplotlib>=3.7"]
 fernmark = ["fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae"]
 media = ["Pillow>=10"]
@@ -41,6 +41,7 @@ pgtest = ["psycopg[binary]>=3.1", "pgserver>=0.1; sys_platform != 'win32'"]
 [project.scripts]
 fernme-mcp = "fernme.api.mcp_server:main"
 fernme-ui = "fernme.api.serve:main"
+fernme-migrate = "fernme.store.migrate:main"
 
 [project.urls]
 Homepage = "https://fernme.dev"

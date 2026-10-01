@@ -8,16 +8,46 @@ signals via the supernode). Treat it accordingly.
 |---|---|
 | Transport auth | Optional API key (`FERNME_API_KEY` -> `X-API-Key` header, compared in constant time). Without a key the REST server answers only requests addressed to `localhost`/`127.0.0.1`/`[::1]` (DNS-rebinding guard; widen with `FERNME_ALLOWED_HOSTS`). |
 | Browser access (CORS) | Only local origins by default; list others in `FERNME_CORS_ORIGINS`. The bundled UI is same-origin and needs none. |
-| Audit chain key | Per-install secret: `FERNME_SECRET_KEY`, else a `<db>.key` file next to a SQLite DB (0600; keep it with the DB and out of backups you share), else one secret stored per Postgres database. Older DBs keep verifying with the legacy key and report `legacy_key: True`. |
-| Population prior | Newcomer cold start uses only the private release: attributes held by fewer than `prior_k_anon` (5) users are never seeded, sensitive attributes are never seeded, means carry Laplace noise keyed by the install secret. Deleting a user, withdrawing consent, or `forget_everywhere` recomputes the prior. |
+| Audit chain | HMAC hash chain on SQLite and Postgres (same format; `verify_audit` works on both). A store without an audit log runs unaudited with a warning (refused in strict mode; `audit=False` opts out). |
+| Audit chain key | Per-install secret: `FernService(secret_key=...)`, else `FERNME_SECRET_KEY` (alias `FERNME_AUDIT_KEY`), else a `<db>.key` file next to a SQLite DB (0600; keep it with the DB and out of backups you share), else one secret stored per Postgres database. Older SQLite DBs keep verifying with the legacy public key, report `legacy_key: True`, and warn at startup; strict mode (`strict=True` / `FERNME_STRICT=1`) refuses the legacy key and keys that would not survive a restart. |
+| Population prior | Newcomer cold start uses only the private release: attributes held by fewer than `prior_k_anon` (5) users are never seeded, sensitive attributes are never seeded, means carry Laplace noise keyed by the install secret. Card ranking (rarity weighting) treats counts below `prior_k_anon` as zero, so it never depends on how many (fewer than k) others share a trait. Per site, `set_site_policy(site, cold_start=False)` stops seeding and `prior=False` keeps no prior at all (global defaults: `Config.cold_start`, `Config.prior_enabled`). Deleting a user, withdrawing consent, or `forget_everywhere` recomputes the prior. |
 | Tenant isolation | Enforced by `(site, user)` on every query; covered by tests. |
 | Consent | Required for all reads/writes; withdrawal purges the profile. |
 | Right to delete / export | Implemented (`/delete`, `/export`). |
 | Cross-site sharing | Default-deny; sensitive categories opt-in only. |
-| DB at rest | SQLite, **unencrypted**. Use disk encryption; keep off cloud-synced folders. |
+| DB at rest | SQLite or Postgres, **unencrypted** by FERNme. Use disk/volume encryption; keep SQLite files off cloud-synced folders. |
+| Pinned settings | Always on the card, so values are restricted to short plain data (8 words, 120 chars, limited charset), Unicode-normalized with invisible/bidi characters removed, instruction phrases and links rejected, and quoted on the card. Treat them as user preferences (data), never instructions. |
 | Prompt injection | Tags, edited memory names, and glosses are sanitized (instruction-like text dropped, including `_`/`-` spellings). Free event `text` is stored as Cabinet data and returned verbatim by recall tools: treat it as untrusted. |
+| Concurrent writers | Every service write is one transaction. SQLite uses `BEGIN IMMEDIATE`; Postgres takes transaction-scoped advisory locks per (site, user) and per site, so several processes or servers sharing a database do not lose updates (tested with concurrent processes on Postgres 16). |
 | Rate limiting / abuse | Not implemented. |
 | PII in logs | Avoid logging payloads in production. |
+
+## Hosted, multi-user deployments
+
+FERNme's MCP server (`fernme-mcp`) and REST API (`fernme.api.rest`) take `site`
+and `user` from the caller. That is right for one person's own memory on their
+own machine, and for the remote MCP mode, where each bearer token is locked to
+one profile. It is **not** an authentication layer for many users:
+
+- **Embed `FernService` in your own backend** and derive `user` from your own
+  sign-in (session, OAuth token), never from request bodies, tool arguments, or
+  anything a model wrote. Pick `site` on the server too.
+- **Do not expose FERNme's REST API or MCP tools directly to your users or to
+  their agents.** Put your own tools in front (for example `get_preferences` /
+  `save_preference`) that call the service with the authenticated user.
+- Keep `FERNME_CORS_ORIGINS` empty unless a browser app on another origin must
+  call FERNme directly; the default allows only local origins.
+- Use Postgres with `schema="fernme"`, a pool (`pool_size=` or `pool=`), and
+  `auto_migrate=False` plus `fernme-migrate` in your deploy step
+  (see `docs/embedding.md`).
+- Set `secret_key=` (or `FERNME_SECRET_KEY`) from your secret store and turn on
+  `strict=True`, so every server signs the audit chain with the same private key.
+- Treat stored memory and settings values as untrusted data when you put them
+  into a prompt: FERNme filters instruction-like text, but your prompt should
+  still keep memory in a data section, not in system instructions.
+- Consent stays per (site, user): ask your users once, record it with
+  `consent(site, user, True)`, and offer export and deletion (`export`,
+  `delete` / `forget_everywhere`).
 
 ## Before any real deployment
 - Turn on `FERNME_API_KEY` (or front with a real auth proxy) and serve over TLS.

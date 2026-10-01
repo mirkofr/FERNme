@@ -13,6 +13,10 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS consents(
   site TEXT, user TEXT, granted INTEGER, ts REAL,
   PRIMARY KEY(site, user));
+CREATE TABLE IF NOT EXISTS consent_requests(
+  site TEXT NOT NULL, user TEXT NOT NULL, requested_by TEXT NOT NULL DEFAULT '',
+  requested_ts REAL NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+  decided_ts REAL, PRIMARY KEY(site, user));
 CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, user TEXT, attr TEXT, weight REAL, confidence REAL,
   source TEXT, last_reinforced REAL, hits INTEGER, fast REAL DEFAULT 0, salience REAL DEFAULT 0,
@@ -107,8 +111,16 @@ CREATE TABLE IF NOT EXISTS assets(
 CREATE TABLE IF NOT EXISTS audit(
   site TEXT, user TEXT, seq INTEGER, ts REAL, action TEXT, detail TEXT,
   prev_hash TEXT, hash TEXT, PRIMARY KEY(site, user, seq));
+CREATE TABLE IF NOT EXISTS settings(
+  site TEXT NOT NULL, user TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+  text TEXT NOT NULL DEFAULT '', ts REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY(site, user, key));
+CREATE TABLE IF NOT EXISTS site_policy(
+  site TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+  PRIMARY KEY(site, key));
 CREATE INDEX IF NOT EXISTS idx_events_user ON events(site, user, ts);
 CREATE INDEX IF NOT EXISTS idx_hist_user ON user_history(site, user, attr);
+CREATE INDEX IF NOT EXISTS idx_assoc_edges_b ON assoc_edges(site, b);
 CREATE INDEX IF NOT EXISTS idx_assoc_edge_users_edge
   ON assoc_edge_users(site, a, b);
 CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
@@ -127,6 +139,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_owner_sha_active
 
 
 class SQLiteStore:
+    # Neighbourhood loading pays off only on large graphs; below this many edges
+    # (or once a lookup has fetched a third of the graph) one full scan is faster.
+    _NEIGHBORHOOD_MIN_EDGES = 20000
+    _NEIGHBORHOOD_MAX_FRACTION = 1 / 3
     def __init__(self, path: str = "fernme.db"):
         self.path = path
         d = os.path.dirname(os.path.abspath(path))
@@ -152,7 +168,8 @@ class SQLiteStore:
             self._conn.commit()
 
     @contextmanager
-    def transaction(self, lock_key: str = None):
+    def transaction(self, lock_key: str = None, user_key: str = None,
+                    site_lock: bool = True):
         """Atomic, serialized read-modify-write across store calls.
 
         Holds the store lock for the whole block and opens ``BEGIN IMMEDIATE`` so
@@ -272,6 +289,39 @@ class SQLiteStore:
             r = self._conn.execute(
                 "SELECT granted FROM consents WHERE site=? AND user=?", (site, user)).fetchone()
         return bool(r["granted"]) if r else False
+
+    # ---- consent requests (the memory inbox) ----
+    def upsert_consent_request(self, site: str, user: str, requested_by: str, ts: float,
+                               reopen_denied: bool = True) -> str:
+        """File (or refresh) a request; returns its status afterwards. A denied
+        request is reopened only when ``reopen_denied``."""
+        keep = "" if reopen_denied else " WHERE consent_requests.status <> 'denied'"
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO consent_requests(site,user,requested_by,requested_ts,status) "
+                "VALUES(?,?,?,?,'pending') ON CONFLICT(site,user) DO UPDATE SET "
+                "requested_by=excluded.requested_by, requested_ts=excluded.requested_ts, "
+                "status='pending', decided_ts=NULL" + keep, (site, user, requested_by, ts))
+            self._commit()
+            row = self._conn.execute(
+                "SELECT status FROM consent_requests WHERE site=? AND user=?",
+                (site, user)).fetchone()
+        return row["status"] if row else "pending"
+
+    def list_consent_requests(self, status: str = "pending", limit: int = 100):
+        with self._lock:
+            return [dict(r) for r in self._conn.execute(
+                "SELECT site,user,requested_by,requested_ts,status,decided_ts "
+                "FROM consent_requests WHERE status=? ORDER BY requested_ts DESC LIMIT ?",
+                (status, int(limit)))]
+
+    def decide_consent_request(self, site: str, user: str, status: str, ts: float) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE consent_requests SET status=?, decided_ts=? "
+                "WHERE site=? AND user=? AND status='pending'", (status, ts, site, user))
+            self._commit()
+            return cur.rowcount > 0
 
     def list_consented_contexts(self, limit: int = 20):
         return [dict(r) for r in self._conn.execute(
@@ -394,7 +444,8 @@ class SQLiteStore:
             self._conn.execute(
                 "DELETE FROM assoc_edge_users WHERE site=? AND user=?", (site, user))
             self._refresh_assoc_user_counts(site, assoc_pairs, delete_empty=True)
-            for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
+            for t in ("user_edges", "user_numeric", "user_history", "events", "consents",
+                      "consent_requests", "settings"):
                 self._conn.execute(f"DELETE FROM {t} WHERE site=? AND user=?", (site, user))
             self._conn.execute(
                 "DELETE FROM canonicalization_suggestions WHERE site=? AND user=?",
@@ -413,7 +464,44 @@ class SQLiteStore:
         return {"site": site, "user": user,
                 "edges": {a: e.__dict__ for a, e in ug.edges.items()},
                 "numeric": ug.numeric, "events": evs,
+                "settings": self.list_settings(site, user),
                 "consent": self.has_consent(site, user)}
+
+    # ---- pinned settings ----
+    def upsert_setting(self, site, user, key, value, text, ts):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO settings(site,user,key,value,text,ts) VALUES(?,?,?,?,?,?) "
+                "ON CONFLICT(site,user,key) DO UPDATE SET value=excluded.value, "
+                "text=excluded.text, ts=excluded.ts", (site, user, key, value, text, ts))
+            self._commit()
+
+    def list_settings(self, site, user) -> List[Dict]:
+        with self._lock:
+            return [dict(r) for r in self._conn.execute(
+                "SELECT key,value,text,ts FROM settings WHERE site=? AND user=? ORDER BY key",
+                (site, user))]
+
+    def delete_setting(self, site, user, key) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM settings WHERE site=? AND user=? AND key=?", (site, user, key))
+            self._commit()
+            return cur.rowcount > 0
+
+    # ---- per-site policy ----
+    def get_site_policy(self, site) -> Dict[str, str]:
+        with self._lock:
+            return {r["key"]: r["value"] for r in self._conn.execute(
+                "SELECT key,value FROM site_policy WHERE site=?", (site,))}
+
+    def set_site_policy(self, site, key, value):
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO site_policy(site,key,value) VALUES(?,?,?) "
+                "ON CONFLICT(site,key) DO UPDATE SET value=excluded.value",
+                (site, key, str(value)))
+            self._commit()
 
     # ---- assoc graph (per site) ----
     def load_assoc(self, site: str, user: str = None, min_users: int = 1) -> AssocGraph:
@@ -439,6 +527,57 @@ class SQLiteStore:
                 (user, site, min_users))
         for r in rows:
             ag.edges[(r["a"], r["b"])] = r["weight"]
+        return ag
+
+    def load_assoc_neighborhood(self, site: str, nodes, hops: int = 2, user: str = None,
+                                min_users: int = 1) -> AssocGraph:
+        """Only the association edges spreading activation can reach from
+        ``nodes`` in ``hops`` steps: every edge touching the start nodes, then
+        every edge touching their neighbours, and so on. Same result as
+        ``load_assoc`` for a card, without reading the whole site's graph.
+        Each step is two index lookups (by ``a`` and by ``b``); the cross-user
+        k-suppression filter is applied in Python. On dense graphs, where the
+        neighbourhood is most of the graph anyway, one full scan is cheaper, so
+        small graphs, and lookups that reach a third of the graph, use that."""
+        ag = AssocGraph(site)
+        fetched = 0
+        min_users = int(min_users or 1)
+        frontier = set(n for n in nodes if n)
+        seen = set()
+        with self._lock:
+            total = self._conn.execute(
+                "SELECT COUNT(*) n FROM assoc_edges WHERE site=?", (site,)).fetchone()["n"]
+            if total <= self._NEIGHBORHOOD_MIN_EDGES:
+                return self._load_assoc_unlocked(site, user, min_users)
+            own = set()
+            if min_users > 1 and user is not None:
+                own = {(r["a"], r["b"]) for r in self._conn.execute(
+                    "SELECT a,b FROM assoc_edge_users WHERE site=? AND user=?", (site, user))}
+            for _ in range(max(1, int(hops))):
+                batch = sorted(frontier - seen)
+                if not batch:
+                    break
+                seen |= set(batch)
+                found = set()
+                for i in range(0, len(batch), 400):
+                    chunk = batch[i:i + 400]
+                    marks = ",".join("?" * len(chunk))
+                    rows = self._conn.execute(
+                        f"SELECT a,b,weight,users FROM assoc_edges WHERE site=? AND a IN ({marks}) "
+                        f"UNION ALL SELECT a,b,weight,users FROM assoc_edges "
+                        f"WHERE site=? AND b IN ({marks})",
+                        (site, *chunk, site, *chunk))
+                    for r in rows:
+                        fetched += 1
+                        if fetched > total * self._NEIGHBORHOOD_MAX_FRACTION:
+                            return self._load_assoc_unlocked(site, user, min_users)
+                        key = (r["a"], r["b"])
+                        if min_users > 1 and (r["users"] or 0) < min_users and not (
+                                user is not None and key in own):
+                            continue
+                        ag.edges[key] = r["weight"]
+                        found.add(key[0]); found.add(key[1])
+                frontier = found
         return ag
 
     def load_assoc_pairs(self, site: str, pairs) -> AssocGraph:
@@ -497,7 +636,7 @@ class SQLiteStore:
             q += " AND type=?"; args.append(type)
         if contains:
             q += " AND payload LIKE ?"; args.append(f"%{contains}%")
-        q += " ORDER BY ts DESC LIMIT ?"; args.append(limit)
+        q += " ORDER BY ts DESC, id DESC LIMIT ?"; args.append(limit)
         out = []
         for r in self._conn.execute(q, args):
             out.append({"ts": r["ts"], "type": r["type"],

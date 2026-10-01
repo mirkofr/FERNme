@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getJson, GraphData, postJson, PromptCard, RecallReplay, Suggestion } from "./api";
+import { ConsentRequest, getJson, GraphData, postJson, PromptCard, RecallReplay, Suggestion } from "./api";
 
 type RuntimeDefaults = { site: string; user: string };
 type GraphRefreshOptions = {
@@ -22,6 +22,7 @@ type FernState = {
   graph: GraphData | null;
   card: PromptCard | null;
   suggestions: Suggestion[];
+  consentRequests: ConsentRequest[];
   events: unknown[];
   audit: unknown[];
   replay: RecallReplay | null;
@@ -40,7 +41,11 @@ type FernState = {
   refreshSuggestions: () => Promise<void>;
   acceptSuggestion: (suggestion: Suggestion) => Promise<void>;
   rejectSuggestion: (suggestion: Suggestion) => Promise<void>;
+  refreshConsentRequests: () => Promise<void>;
+  decideConsent: (request: ConsentRequest, approve: boolean) => Promise<void>;
   editAttr: (attr: string, weight: number) => Promise<void>;
+  setSetting: (key: string, value: string) => Promise<void>;
+  clearSetting: (key: string) => Promise<void>;
   forgetUser: () => Promise<void>;
 };
 
@@ -81,6 +86,7 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [card, setCard] = useState<PromptCard | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>([]);
   const [events, setEvents] = useState<unknown[]>([]);
   const [audit, setAudit] = useState<unknown[]>([]);
   const [replay, setReplay] = useState<RecallReplay | null>(null);
@@ -187,6 +193,29 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     refreshAll();
   }, [refreshAll]);
 
+  // Consent requests are not tied to the selected site/user: an agent may ask
+  // for a profile the owner has not opened yet, so load them independently.
+  const refreshConsentRequests = useCallback(async () => {
+    try {
+      const data = await postJson<ConsentRequest[]>("/consent-requests/list", {});
+      setConsentRequests(Array.isArray(data) ? data : []);
+    } catch {
+      setConsentRequests([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshConsentRequests();
+  }, [refreshConsentRequests]);
+
+  const decideConsent = useCallback(async (request: ConsentRequest, approve: boolean) => {
+    await postJson("/consent-requests/decide", { site: request.site, user: request.user, approve });
+    await refreshConsentRequests();
+    if (approve && request.site === site && request.user === user) {
+      await refreshAll();
+    }
+  }, [refreshAll, refreshConsentRequests, site, user]);
+
   const acceptSuggestion = useCallback(async (suggestion: Suggestion) => {
     await postJson("/suggestions/accept", { ...payload, suggestion_id: suggestionId(suggestion) });
     await refreshAll();
@@ -199,6 +228,16 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
 
   const editAttr = useCallback(async (attr: string, weight: number) => {
     await postJson("/edit", { ...payload, attr, weight });
+    await refreshAll();
+  }, [payload, refreshAll]);
+
+  const setSetting = useCallback(async (key: string, value: string) => {
+    await postJson("/settings/set", { ...payload, key, value });
+    await refreshAll();
+  }, [payload, refreshAll]);
+
+  const clearSetting = useCallback(async (key: string) => {
+    await postJson("/settings/clear", { ...payload, key });
     await refreshAll();
   }, [payload, refreshAll]);
 
@@ -223,6 +262,7 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     graph,
     card,
     suggestions,
+    consentRequests,
     events,
     audit,
     replay,
@@ -241,7 +281,11 @@ export function FernProvider({ children }: { children: React.ReactNode }) {
     refreshSuggestions,
     acceptSuggestion,
     rejectSuggestion,
+    refreshConsentRequests,
+    decideConsent,
     editAttr,
+    setSetting,
+    clearSetting,
     forgetUser
   };
 

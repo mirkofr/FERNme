@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import {
   Activity,
@@ -8,6 +9,7 @@ import {
   Gauge,
   Inbox,
   ListFilter,
+  Pin,
   RefreshCw,
   ScrollText,
   ShieldCheck,
@@ -16,7 +18,7 @@ import {
 } from "lucide-react";
 import logoUrl from "./assets/logo.png";
 import GraphView from "./GraphView";
-import { PromptCard, Suggestion } from "./api";
+import { ConsentRequest, PromptCard, Suggestion } from "./api";
 import { useFern } from "./store";
 
 type JsonRecord = Record<string, unknown>;
@@ -81,15 +83,30 @@ function Shell() {
 
 function ReviewQueue() {
   const fern = useFern();
+  const refreshBoth = async () => {
+    await Promise.all([fern.refreshSuggestions(), fern.refreshConsentRequests()]);
+  };
   return (
     <PageShell>
       <PageHeader
         icon={<Inbox aria-hidden="true" />}
         title="Review queue"
-        count={fern.suggestions.length}
+        count={fern.suggestions.length + fern.consentRequests.length}
         actionLabel="Refresh"
-        onAction={fern.refreshSuggestions}
+        onAction={refreshBoth}
       />
+      {fern.consentRequests.length > 0 ? (
+        <div className="review-grid">
+          {fern.consentRequests.map((request) => (
+            <ConsentRequestCard
+              key={`${request.site}/${request.user}`}
+              request={request}
+              onApprove={() => fern.decideConsent(request, true)}
+              onDeny={() => fern.decideConsent(request, false)}
+            />
+          ))}
+        </div>
+      ) : null}
       {fern.suggestions.length === 0 ? (
         <EmptyState text="No pending suggestions for this context." />
       ) : (
@@ -121,6 +138,7 @@ function MemoryEditor() {
           actionLabel="Refresh"
           onAction={fern.refreshAll}
         />
+        <PinnedSettings />
         {links.length === 0 ? (
           <EmptyState text="No card links are available yet." />
         ) : (
@@ -223,6 +241,31 @@ function HealthView() {
   );
 }
 
+function ConsentRequestCard({
+  request,
+  onApprove,
+  onDeny
+}: {
+  request: ConsentRequest;
+  onApprove: () => void;
+  onDeny: () => void;
+}) {
+  const asked = request.requested_ts ? new Date(request.requested_ts * 1000).toLocaleString() : "";
+  return (
+    <article className="review-card">
+      <div className="row-main">
+        <span className="row-kicker">Consent request</span>
+        <h2>{request.requested_by || "An agent"} asks to remember "{request.user}" on "{request.site}"</h2>
+        <p>Nothing is stored until you approve.{asked ? ` Asked ${asked}.` : ""}</p>
+      </div>
+      <div className="row-actions">
+        <button type="button" className="button button--primary" onClick={onApprove}><Check className="icon" aria-hidden="true" /> Approve</button>
+        <button type="button" className="button" onClick={onDeny}><X className="icon" aria-hidden="true" /> Deny</button>
+      </div>
+    </article>
+  );
+}
+
 function SuggestionCard({
   suggestion,
   onAccept,
@@ -291,6 +334,61 @@ function SidePanel({ icon, title, children }: { icon: React.ReactNode; title: st
       </div>
       {children}
     </aside>
+  );
+}
+
+function PinnedSettings() {
+  const fern = useFern();
+  const settings = fern.card?.settings || {};
+  const keys = Object.keys(settings);
+  const [key, setKey] = useState("");
+  const [value, setValue] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const run = async (action: () => Promise<void>) => {
+    setProblem(null);
+    try {
+      await action();
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : String(err));
+    }
+  };
+  return (
+    <section className="settings-block" aria-label="Pinned settings">
+      <div className="settings-head">
+        <Pin className="icon" aria-hidden="true" />
+        <h2>Pinned settings</h2>
+        <span className="count">{keys.length}</span>
+      </div>
+      <p className="settings-note">Choices the user stated outright. They never fade and every agent sees all of them.</p>
+      {keys.map((k) => (
+        <article className="memory-row" key={k}>
+          <div className="row-main">
+            <span className="row-kicker">setting</span>
+            <h2>{k} = {settings[k]}</h2>
+          </div>
+          <button type="button" className="button" onClick={() => run(() => fern.clearSetting(k))}>
+            <X className="icon" aria-hidden="true" /> Remove
+          </button>
+        </article>
+      ))}
+      <form
+        className="settings-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!key.trim() || !value.trim()) return;
+          run(async () => {
+            await fern.setSetting(key.trim(), value.trim());
+            setKey("");
+            setValue("");
+          });
+        }}
+      >
+        <input aria-label="Setting key" placeholder="plot.style" value={key} onChange={(e) => setKey(e.target.value)} />
+        <input aria-label="Setting value" placeholder="box" value={value} onChange={(e) => setValue(e.target.value)} />
+        <button type="submit" className="button button--primary"><Pin className="icon" aria-hidden="true" /> Pin</button>
+      </form>
+      {problem ? <p className="settings-error" role="alert">{problem}</p> : null}
+    </section>
   );
 }
 

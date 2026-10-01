@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "fernme-docs": {
+      "command": "fernme-mcp",
+      "args": [
+        "--tools",
+        "documents,photos"
+      ],
+      "env": {
+        "FERNME_MANAGED_DOCUMENTS": "true"
+      }
+    }
+  }
+}

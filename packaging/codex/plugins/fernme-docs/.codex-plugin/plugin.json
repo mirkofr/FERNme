@@ -1,0 +1,24 @@
+{
+  "name": "fernme-docs",
+  "version": "0.4.1",
+  "description": "Optional FERNme add-on: managed document evidence and photo memory.",
+  "author": {
+    "name": "Acquilab Inc."
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "FERNme Documents and Photos",
+    "shortDescription": "Optional document and photo tools for FERNme Memory.",
+    "longDescription": "Adds managed FERNmark document evidence and photo memory to the FERNme database used by the fernme-memory plugin. Install fernme-memory first.",
+    "developerName": "Acquilab Inc.",
+    "category": "Productivity",
+    "capabilities": [
+      "MCP",
+      "Document Import",
+      "Managed Document Evidence",
+      "Photo Memory"
+    ],
+    "defaultPrompt": "Use FERNme document tools only when I ask to import, read, or forget a document or photo."
+  },
+  "mcpServers": "./.mcp.json"
+}

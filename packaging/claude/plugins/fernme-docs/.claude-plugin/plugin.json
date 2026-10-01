@@ -1,0 +1,20 @@
+{
+  "name": "fernme-docs",
+  "displayName": "FERNme Documents and Photos",
+  "version": "0.4.1",
+  "description": "Optional add-on for FERNme Memory: managed document evidence (FERNmark) and photo memory in the same database. Install fernme-memory first.",
+  "author": {
+    "name": "Acquilab Inc."
+  },
+  "homepage": "https://fernme.dev",
+  "repository": "https://github.com/mirkofr/FERNme",
+  "license": "Apache-2.0",
+  "keywords": [
+    "memory",
+    "mcp",
+    "document-import",
+    "document-catalog",
+    "photo-memory"
+  ],
+  "skills": "./skills/"
+}

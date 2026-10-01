@@ -51,6 +51,8 @@ class Supernode:
             slot["weight"] = max(slot["weight"], e.weight)        # strongest evidence anywhere
             slot["confidence"] = max(slot["confidence"], e.confidence)
         for k, v in ug.numeric.items():
+            if k.startswith("_"):              # internal bookkeeping, not a memory
+                continue
             slot = self.numeric.setdefault(k, {"value": v, "sources": []})
             if site not in slot["sources"]:
                 slot["sources"].append(site)

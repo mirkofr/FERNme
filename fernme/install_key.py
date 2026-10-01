@@ -4,8 +4,11 @@ The audit chain used to be keyed with a constant that is public in the source,
 so anyone with database access could rewrite history and still pass
 ``verify_audit``. The key now comes from, in order:
 
+0. an explicit ``FernService(secret_key=...)`` (host applications that keep
+   secrets in their own vault);
 1. ``FERNME_SECRET_KEY`` (any string; set the same value on every process that
-   shares a database, e.g. a Postgres deployment);
+   shares a database, e.g. a Postgres deployment). ``FERNME_AUDIT_KEY`` is
+   accepted as an alias;
 2. a key file next to a SQLite database (``<db>.key``, created with 0600
    permissions on first use) so the MCP server, the UI and the CLI that share one
    database also share one key, while the key does not live inside the database;
@@ -34,6 +37,7 @@ from typing import Tuple
 
 LEGACY_AUDIT_KEY = b"fernme-default-audit-key"
 ENV_VAR = "FERNME_SECRET_KEY"
+ENV_ALIASES = (ENV_VAR, "FERNME_AUDIT_KEY")
 
 
 def _key_path_for(store) -> Path | None:
@@ -82,31 +86,49 @@ def _create_key_file(path: Path, key: bytes, legacy: bool) -> Tuple[bytes, bool]
             pass
 
 
-def resolve(store) -> Tuple[bytes, bool]:
+def resolve(store, explicit=None) -> Tuple[bytes, bool]:
     """Return ``(secret, audit_legacy)`` for this store.
 
     ``secret`` keys the private prior's noise (and new audit chains).
     ``audit_legacy`` means existing audit chains were signed with the legacy
     constant and must keep being verified with it."""
-    env = os.environ.get(ENV_VAR)
-    if env:
-        return hashlib.sha256(env.encode("utf-8")).digest(), False
+    secret, legacy, _source = resolve_detailed(store, explicit)
+    return secret, legacy
+
+
+def _from_text(value) -> bytes:
+    raw = value.encode("utf-8") if isinstance(value, str) else bytes(value)
+    if not raw:
+        raise ValueError("secret_key must not be empty")
+    return hashlib.sha256(raw).digest()
+
+
+def resolve_detailed(store, explicit=None) -> Tuple[bytes, bool, str]:
+    """Like :func:`resolve`, plus where the key came from: ``explicit``, ``env``,
+    ``key_file``, ``database`` or ``ephemeral`` (a random key that does not
+    survive a restart)."""
+    if explicit is not None:
+        return _from_text(explicit), False, "explicit"
+    for name in ENV_ALIASES:
+        env = os.environ.get(name)
+        if env:
+            return _from_text(env), False, "env"
     key_path = _key_path_for(store)
     if key_path is not None:
         if key_path.is_file():
-            return _read_key_file(key_path)
+            return (*_read_key_file(key_path), "key_file")
         try:
-            return _create_key_file(key_path, secrets.token_bytes(32),
-                                    _has_audit_rows(store))
+            return (*_create_key_file(key_path, secrets.token_bytes(32),
+                                      _has_audit_rows(store)), "key_file")
         except OSError as exc:             # read-only folder, no hard links, ...
             print(f"FERNme: could not write key file ({exc}); "
                   f"set {ENV_VAR} for a stable key.", file=sys.stderr)
-            return secrets.token_bytes(32), _has_audit_rows(store)
+            return secrets.token_bytes(32), _has_audit_rows(store), "ephemeral"
     shared = getattr(store, "load_or_create_secret", None)
     if callable(shared):                     # e.g. Postgres: one secret per database
         key_hex, legacy = shared()
-        return bytes.fromhex(key_hex), legacy
-    return secrets.token_bytes(32), False
+        return bytes.fromhex(key_hex), legacy, "database"
+    return secrets.token_bytes(32), False, "ephemeral"
 
 
 def derive(key: bytes, purpose: str) -> bytes:

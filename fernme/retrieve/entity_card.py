@@ -17,6 +17,7 @@ from .card import (
     _namespace,
     card_exclude_namespaces,
     compile_card,
+    faded_view,
     estimate_tokens,
 )
 from .. import resolution as _resolution
@@ -100,6 +101,7 @@ def compile_entity_card(
         data["representative"]: entity_id for entity_id, data in entity_scores.items()
     }
 
+    fresh_of, shown = faded_view(ug, now, cfg)
     scored = []
     for attr, edge in ug.edges.items():
         if edge.source == "superseded" or _namespace(attr) in exclude_ns:
@@ -118,8 +120,16 @@ def compile_entity_card(
         score = active * (idf + 1.0) + fast_boost + salience_boost
         scored.append((attr, max((real, score), entity_scores.get(entity_id, {}).get(
             "score_floor", (real, score))), edge))
-    scored.sort(key=lambda row: (-row[1][0], -row[1][1], row[0]))
-    top = scored[:cfg.top_n]
+    # same read-time decay as the plain card: faded memories rank behind current
+    # ones. An aggregated entity is current if any of its aliases is.
+    def fresh(attr):
+        entity_id = alias_to_entity.get(attr)
+        if cfg.entity_aggregation and entity_id in entity_scores:
+            return max((fresh_of.get(a, 1) for a in aliases_by_entity.get(entity_id, [attr])),
+                       default=1)
+        return fresh_of.get(attr, 1)
+    scored.sort(key=lambda row: (-row[1][0], -fresh(row[0]), -row[1][1], row[0]))
+    top = [(attr, score, shown.get(attr, edge)) for attr, score, edge in scored[:cfg.top_n]]
 
     base_parts = _base_parts(top, ug, now, cfg)
     parts = []
@@ -174,7 +184,7 @@ def _individual_alias_scores(
 
 
 def _clean_numeric(ug: UserGraph) -> Dict:
-    return {k: v for k, v in ug.numeric.items() if not k.startswith("mood")}
+    return {k: v for k, v in ug.numeric.items() if not k.startswith(("mood", "_"))}
 
 
 def _wire(ug: UserGraph, parts: List[str]) -> str:

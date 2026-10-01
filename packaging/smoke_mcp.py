@@ -37,7 +37,7 @@ async def run_smoke(command: str, args: list[str] | None = None) -> dict:
                 tool_names = sorted(tool.name for tool in tools.tools)
                 await session.call_tool(
                     "grant_consent",
-                    {"site": "demo.local", "user": "elena", "granted": True},
+                    {"site": "demo.local", "user": "elena", "granted": True, "confirm": True},
                 )
                 await session.call_tool(
                     "remember",

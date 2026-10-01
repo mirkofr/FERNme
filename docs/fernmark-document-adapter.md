@@ -6,7 +6,7 @@ FERNme supports two document paths:
   `.fernmark.json` files through `FernService.import_fernmark()`.
 - The managed workflow accepts raw FERNmark-supported files or existing
   envelopes through `import_document`. It is additive, default-off in the
-  engine, and enabled by the bundled plugin.
+  engine, and enabled by the optional `fernme-docs` plugin.
 
 FERNmark remains the conversion and envelope-validation boundary. FERNme uses
 its public `convert()`, `load_document()`, and `dumps_document()` APIs. The

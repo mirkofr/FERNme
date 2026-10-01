@@ -225,3 +225,15 @@ def test_postgres_processes_share_one_secret(pg):
     a, b = FernService(store=PostgresStore(pg)), FernService(store=PostgresStore(pg))
     assert a.audit_key == b.audit_key
     assert a._secret == b._secret
+
+
+def test_consent_denial_sticks_and_recall_ties_on_postgres(pg):
+    svc = FernService(store=PostgresStore(pg))
+    svc.request_consent("inbox.example", "dana", requested_by="agent")
+    svc.decide_consent_request("inbox.example", "dana", approve=False)
+    assert svc.request_consent("inbox.example", "dana", reopen_denied=False)["denied"] is True
+    assert svc.request_consent("inbox.example", "dana")["pending"] is True
+    svc.decide_consent_request("inbox.example", "dana", approve=True)
+    for tag in ("pref:tea", "pref:coffee"):
+        svc.observe("inbox.example", "dana", "chat", {"tags": [tag]}, ts=0.0)
+    assert svc.record_outcome("inbox.example", "dana", True)["attrs"] == ["pref:coffee"]

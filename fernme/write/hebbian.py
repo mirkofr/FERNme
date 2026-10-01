@@ -58,13 +58,23 @@ def observe(ug: UserGraph, assoc: AssocGraph, event: Event,
                                                   cfg.beta, ma * mb, cfg.w_max))
 
 
+DECAY_CLOCK_KEY = "_decay_clock"
+
+
+def _decay_start(e: Edge, clock) -> float:
+    """Weights are current as of the later of the last reinforcement and the last
+    decay pass, so decay continues from there without touching last_reinforced."""
+    return max(e.last_reinforced, float(clock)) if clock is not None else e.last_reinforced
+
+
 def effective_edge(attr: str, e: Edge, now: float, cfg: Config = DEFAULT,
-                   conflict: float = 0.0, ctx: Dict = None) -> Tuple[float, float]:
+                   conflict: float = 0.0, ctx: Dict = None,
+                   decay_clock=None) -> Tuple[float, float]:
     """(weight, fast) as ``decay()`` would leave them at ``now``, without mutating
     the edge. Used by the card so stale memories fade even between batch jobs."""
     if e.source == "override":
         return e.weight, e.fast
-    dt = max(0.0, now - e.last_reinforced)
+    dt = max(0.0, now - _decay_start(e, decay_clock))
     if cfg.resolution:
         edge_ctx = dict(ctx or {})
         edge_ctx.setdefault("now", now)
@@ -83,6 +93,7 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
     decay. Returns number of edges dropped. Forgetting is a feature: it keeps the
     card small and cheap regardless of tenure."""
     dropped = []
+    clock = ug.numeric.get(DECAY_CLOCK_KEY)
     for attr, e in ug.edges.items():
         if e.source == "override":
             continue
@@ -91,7 +102,7 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
             and e.source != "superseded"
             and is_permanent_attr(attr)
         )
-        dt = max(0.0, now - e.last_reinforced)
+        dt = max(0.0, now - _decay_start(e, clock))
         if cfg.resolution:
             edge_ctx = dict(ctx or {})
             edge_ctx.setdefault("now", now)
@@ -104,10 +115,13 @@ def decay(ug: UserGraph, now: float, cfg: Config = DEFAULT,
         e.fast = e.fast * math.exp(-cfg.lam_fast * dt)   # fast lane fades much quicker
         if sticky_permanent:
             e.weight = max(e.weight, cfg.floor)
-        e.last_reinforced = now            # reset clock -> safe to call periodically
+        # last_reinforced stays the real "last seen" time (conflict detection and
+        # verify depend on it); the per-user decay clock below makes repeated
+        # decay() calls safe instead.
         if e.weight < cfg.floor:
             dropped.append(attr)
     for attr in dropped:
         del ug.edges[attr]
         ug.history.pop(attr, None)
+    ug.numeric[DECAY_CLOCK_KEY] = max(float(now), float(clock)) if clock is not None else float(now)
     return len(dropped)

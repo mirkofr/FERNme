@@ -111,27 +111,29 @@ engine is solid; the extraction quality is the agent's.)*
 
 > Propose-only enrichment: `python -m fernme.eval.enrichment --seeds 6 --json reports/enrichment.json`
 
-**Unified Phase 8.1 harness** - synthetic hidden-answer-key scenarios for static,
-abrupt drift, gradual drift, staleness, contextual, fragmented-entity, and outcome
-regimes. Same events/probes for every method; BM25 reads Cabinet event text with a
+**Unified harness** - synthetic hidden-answer-key scenarios for static,
+abrupt drift, gradual drift, staleness, contextual, fragmented-entity, outcome, and
+slot-change regimes (updated 2026-09-30: the fixtures no longer use FERNme's reserved
+`style:` namespace, which the card never shows and which had capped FERNme's recall;
+`slot_change` is new and tests one-value-at-a-time facts such as city or employer). Same events/probes for every method; BM25 reads Cabinet event text with a
 pure-Python scorer; all methods in this table make no model calls. Outcome rows include action
 quality; non-FERN baselines do not have an outcome feedback mechanism.
 
 | regime | method | recall@5 | precision@5 | stale recall | action | tokens | LLM calls |
 |---|---|---:|---:|---:|---:|---:|---:|
-| static | FERNme pure | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 0.600 +/- 0.000 | 41.7 +/- 0.7 | 0 |
-| static | FERNme entities | 0.750 +/- 0.000 | 0.600 +/- 0.000 | 0.000 +/- 0.000 | 0.600 +/- 0.000 | 38.0 +/- 1.2 | 0 |
-| static | recency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 0.467 +/- 0.094 | 25.7 +/- 1.1 | 0 |
-| static | frequency | 0.958 +/- 0.093 | 0.767 +/- 0.075 | 0.000 +/- 0.000 | 0.767 +/- 0.075 | 26.8 +/- 0.4 | 0 |
+| static | FERNme pure | 0.917 +/- 0.118 | 0.733 +/- 0.094 | 0.000 +/- 0.000 | 0.733 +/- 0.094 | 40.8 +/- 1.1 | 0 |
+| static | FERNme entities | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 38.8 +/- 2.2 | 0 |
+| static | recency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 0.467 +/- 0.094 | 25.5 +/- 1.3 | 0 |
+| static | frequency | 0.958 +/- 0.093 | 0.767 +/- 0.075 | 0.000 +/- 0.000 | 0.767 +/- 0.075 | 26.3 +/- 0.5 | 0 |
 | static | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 119.8 +/- 35.2 | 0 |
-| abrupt drift | FERNme pure | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 0.500 +/- 0.100 | 40.8 +/- 4.5 | 0 |
-| abrupt drift | FERNme entities | 0.625 +/- 0.125 | 0.500 +/- 0.100 | 0.417 +/- 0.118 | 0.500 +/- 0.100 | 40.8 +/- 4.5 | 0 |
+| abrupt drift | FERNme pure | 0.833 +/- 0.186 | 0.667 +/- 0.149 | 0.208 +/- 0.172 | 0.667 +/- 0.149 | 44.8 +/- 1.8 | 0 |
+| abrupt drift | FERNme entities | 0.833 +/- 0.186 | 0.667 +/- 0.149 | 0.208 +/- 0.172 | 0.667 +/- 0.149 | 44.8 +/- 1.8 | 0 |
 | abrupt drift | recency | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 28.7 +/- 0.9 | 0 |
 | abrupt drift | frequency | 0.292 +/- 0.093 | 0.233 +/- 0.075 | 0.958 +/- 0.093 | 0.233 +/- 0.075 | 29.3 +/- 0.7 | 0 |
 | abrupt drift | BM25 Cabinet | 0.250 +/- 0.000 | 0.200 +/- 0.000 | 1.000 +/- 0.000 | 0.200 +/- 0.000 | 907.3 +/- 30.6 | 0 |
-| gradual drift | FERNme pure | 0.625 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 48.7 +/- 0.5 | 0 |
-| gradual drift | FERNme entities | 0.625 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 48.7 +/- 0.5 | 0 |
-| gradual drift | recency | 0.562 +/- 0.062 | 0.900 +/- 0.100 | 0.000 +/- 0.000 | 0.900 +/- 0.100 | 31.0 +/- 0.6 | 0 |
+| gradual drift | FERNme pure | 0.625 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 49.0 +/- 0.0 | 0 |
+| gradual drift | FERNme entities | 0.625 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 49.0 +/- 0.0 | 0 |
+| gradual drift | recency | 0.562 +/- 0.062 | 0.900 +/- 0.100 | 0.000 +/- 0.000 | 0.900 +/- 0.100 | 30.8 +/- 0.9 | 0 |
 | gradual drift | frequency | 0.562 +/- 0.062 | 0.900 +/- 0.100 | 0.167 +/- 0.167 | 0.900 +/- 0.100 | 32.5 +/- 0.5 | 0 |
 | gradual drift | BM25 Cabinet | 0.479 +/- 0.047 | 0.767 +/- 0.075 | 0.389 +/- 0.124 | 0.767 +/- 0.075 | 86.0 +/- 17.0 | 0 |
 | staleness | FERNme pure | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 36.7 +/- 2.7 | 0 |
@@ -139,13 +141,13 @@ quality; non-FERN baselines do not have an outcome feedback mechanism.
 | staleness | recency | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 32.0 +/- 0.6 | 0 |
 | staleness | frequency | 0.571 +/- 0.000 | 0.800 +/- 0.000 | 0.250 +/- 0.000 | 0.800 +/- 0.000 | 31.8 +/- 0.4 | 0 |
 | staleness | BM25 Cabinet | 0.714 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 58.7 +/- 16.6 | 0 |
-| contextual | FERNme pure | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 0.600 +/- 0.115 | 42.5 +/- 0.5 | 0 |
+| contextual | FERNme pure | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 0.600 +/- 0.115 | 42.8 +/- 0.9 | 0 |
 | contextual | FERNme entities | 0.750 +/- 0.144 | 0.600 +/- 0.115 | 0.000 +/- 0.000 | 0.600 +/- 0.115 | 42.5 +/- 0.5 | 0 |
 | contextual | recency | 0.542 +/- 0.093 | 0.433 +/- 0.075 | 0.000 +/- 0.000 | 0.433 +/- 0.075 | 28.5 +/- 1.0 | 0 |
 | contextual | frequency | 0.583 +/- 0.118 | 0.467 +/- 0.094 | 0.000 +/- 0.000 | 0.467 +/- 0.094 | 28.5 +/- 0.5 | 0 |
 | contextual | BM25 Cabinet | 1.000 +/- 0.000 | 0.800 +/- 0.000 | 0.000 +/- 0.000 | 0.800 +/- 0.000 | 842.0 +/- 0.0 | 0 |
-| fragmented entity | FERNme pure | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 47.7 +/- 0.9 | 0 |
-| fragmented entity | FERNme entities | 0.500 +/- 0.500 | 0.100 +/- 0.100 | 0.000 +/- 0.000 | 0.100 +/- 0.100 | 43.8 +/- 3.0 | 0 |
+| fragmented entity | FERNme pure | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 47.5 +/- 1.4 | 0 |
+| fragmented entity | FERNme entities | 0.500 +/- 0.500 | 0.100 +/- 0.100 | 0.000 +/- 0.000 | 0.100 +/- 0.100 | 43.7 +/- 3.0 | 0 |
 | fragmented entity | recency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 30.2 +/- 1.8 | 0 |
 | fragmented entity | frequency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 31.0 +/- 0.0 | 0 |
 | fragmented entity | BM25 Cabinet | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 90.0 +/- 0.0 | 0 |
@@ -154,12 +156,20 @@ quality; non-FERN baselines do not have an outcome feedback mechanism.
 | outcome | recency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 28.0 +/- 0.0 | 0 |
 | outcome | frequency | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 28.0 +/- 0.0 | 0 |
 | outcome | BM25 Cabinet | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 0.000 +/- 0.000 | 60.0 +/- 0.0 | 0 |
+| slot change | FERNme pure | 0.933 +/- 0.094 | 0.933 +/- 0.094 | 0.111 +/- 0.157 | 0.933 +/- 0.094 | 47.8 +/- 0.9 | 0 |
+| slot change | FERNme entities | 0.933 +/- 0.094 | 0.933 +/- 0.094 | 0.111 +/- 0.157 | 0.933 +/- 0.094 | 47.8 +/- 0.9 | 0 |
+| slot change | recency | 1.000 +/- 0.000 | 1.000 +/- 0.000 | 0.000 +/- 0.000 | 1.000 +/- 0.000 | 27.0 +/- 0.0 | 0 |
+| slot change | frequency | 0.400 +/- 0.000 | 0.400 +/- 0.000 | 1.000 +/- 0.000 | 0.400 +/- 0.000 | 28.0 +/- 0.0 | 0 |
+| slot change | BM25 Cabinet | 0.400 +/- 0.000 | 0.400 +/- 0.000 | 1.000 +/- 0.000 | 0.400 +/- 0.000 | 70.0 +/- 24.2 | 0 |
 
 Read this as a quality gate, not a victory lap: BM25 wins when query text directly
 matches Cabinet prose but spends far more context tokens; recency wins the deliberately
 abrupt drift fixture; frequency fails staleness; entity flags matter on fragmented
 identity; and only FERNme exercises the outcome loop. FERNme stays compact and
-zero-call, but it does not dominate every synthetic regime.
+zero-call, but it does not dominate every synthetic regime. The slot-change
+regime was written together with the feature it tests (the newest confirmed value
+wins in single-value slots such as city or employer), so treat its FERNme rows as a
+mechanism check; plain recency still wins it.
 
 **Cost** — per-turn memory tokens vs. profile size (5 seeds):
 
@@ -337,45 +347,62 @@ else. `fernme-mcp --print-db-path` prints the resolved path to stdout and exits;
 normal MCP startup logs the path to stderr so stdout remains clean for JSON-RPC.
 Set that same `FERNME_DB` in Codex/Cowork MCP config `env`, the CLI importer, and
 the UI process when you want the agent and graph to use the same memory. Optional
-`FERNME_SITE` and `FERNME_USER` provide local defaults for tools that omit them.
+`FERNME_SITE` and `FERNME_USER` set the profile tools use, and lock MCP tools to it (see Agent safety below).
 For the graph UI dependencies, install `pip install "fernme[ui]"`.
 
-Bundled local plugin manifests live under `packaging/`:
+Two plugins live under `packaging/` (Claude Code / Cowork and Codex layouts):
+
+| plugin | what it adds | MCP tools | tool-description tokens* |
+|---|---|---:|---:|
+| `fernme-memory` | the memory: recall, remember, pinned settings, edit, forget, outcomes, why, export, review queue | 20 | ~3,200 |
+| `fernme-docs` (optional add-on) | managed documents (FERNmark) and photo memory, same database | 11 | ~2,070 |
+
+\*Every tool description is loaded into each agent session, so the default
+plugin ships only the memory tools. Rough estimate (characters / 4).
 
 ```bash
 codex plugin marketplace add ./packaging/codex
 claude plugin marketplace add ./packaging/claude
 ```
 
-The Codex package includes `.codex-plugin/plugin.json`, `.mcp.json`, and a
-`fernme-memory` skill. The Claude Code/Cowork package follows the current
-`.claude-plugin/plugin.json` plus `.mcp.json` layout, and the repo root includes
-`.claude-plugin/marketplace.json` for GitHub marketplace discovery.
+For Claude Code CLI: `/plugin marketplace add mirkofr/FERNme`, then
+`/plugin install fernme-memory@fernme-local` (and optionally
+`fernme-docs@fernme-local`). For Cowork: Customize > Plugins > "+" > Add
+marketplace from GitHub > enter the repo URL > install `fernme-memory`.
 
-For Cowork after the owner pushes the repo: Customize > Plugins > "+" > Add
-marketplace from GitHub > enter the repo URL > Install `fernme-memory` >
-authorize the MCP server. For Claude Code CLI: `/plugin marketplace add
-mirkofr/FERNme`, then `/plugin install fernme-memory@fernme-local`.
-
-The shipped MCP configs run:
+The shipped configs run:
 
 ```bash
-uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --with "mcp>=1.0,<2" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
+# fernme-memory
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools core
+# fernme-docs (needs the FERNmark package)
+uvx --with "<fernmark package>" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools documents,photos
 ```
 
-The bundled plugin enables managed documents. It can preview an explicitly
-named raw FERNmark-supported file or existing envelope using
-`import_document(..., confirm=false)` and returns only redacted metadata. After
-the user agrees, `confirm=true` writes UTF-8 Markdown plus a canonical envelope
-below `FERNME_VAULT`, stores a durable catalog row, and returns only relative
-pointers. Semantic tags remain proposals until a human accepts them.
+`fernme-mcp --tools` accepts `core`, `documents`, `photos`, `all`, or `auto`
+(default: core, plus documents/photos when `FERNME_MANAGED_DOCUMENTS` or
+`[media] enabled` turn them on). `FERNME_MCP_TOOLS` sets the same from the
+environment. Both plugins read and write one database (`FERNME_DB`), and
+concurrent writers are safe.
 
-No PyPI publish is required for the plugin route. The plugin is pinned to the
-reproducible release ref `v0.4.0b4`, so external testers get the same server
-build. The owner must push `main` and create plus push the `v0.4.0b4` tag on a
-public or otherwise reachable repo before testers can fetch it. PyPI publish is
-an owner action triggered by that `v*` tag after trusted publishing is configured.
-See `docs/mcp.md` for local development alternatives.
+Cloud agents (OpenAI dots, xAI Grok Bot, and others that connect to remote MCP
+servers) use `fernme-mcp --transport http` with one token per agent, each locked
+to its own profile. Remote agents never get tools that read files on your machine,
+and only you approve consent and suggested merges; see
+[docs/cloud-agents.md](docs/cloud-agents.md).
+
+Agent safety on the MCP tools: `grant_consent` asks first (the agent must show
+the returned question and call again with `confirm=true` only after you say yes);
+setting `FERNME_SITE` / `FERNME_USER` locks the server to that profile so an agent
+cannot read or write another one (`FERNME_ALLOW_OTHER_PROFILES=true` turns the
+lock off); `import_obsidian` previews by default (`dry_run=false` to write).
+Every consent request also appears in the FERNme app's Review queue, where you can
+approve or deny it; `FERNME_CONSENT_MODE=inbox` makes that the only way to grant
+consent (the default for remote agents).
+
+The plugins are pinned to the release tag `v0.4.1`, so external testers get the
+same server build once the owner pushes that tag. See `docs/mcp.md` for local
+development alternatives.
 
 ### Import your Obsidian vault
 
@@ -406,7 +433,7 @@ set FERNME_MANAGED_DOCUMENTS=true
 set FERNME_VAULT=<vault-root>
 ```
 
-The engine flag is default-off; the bundled plugin enables it. Preview performs
+The engine flag is default-off; the optional `fernme-docs` plugin enables it. Preview performs
 conversion and validation in memory with zero persistent writes. Confirmation
 stores full Markdown as Cabinet evidence and catalog metadata separately from
 the normal hot graph, and writes through the same single `CapturePipeline` ->
@@ -460,6 +487,21 @@ svc.observe(
 
 print(svc.card("shop.example", "elena")["wire"])
 ```
+
+Pinned settings are for choices a user states outright ("always use box plots").
+One value per key, they never fade, and every card lists all of them, whatever the
+context, card budget or population prior:
+
+```python
+svc.set_setting("shop.example", "elena", "plot.style", "box", text="I like box plots")
+svc.card("shop.example", "elena")["settings"]      # {'plot.style': 'box'}
+svc.clear_setting("shop.example", "elena", "plot.style")
+```
+
+Embedding FERNme in a server app (Postgres schema, connection pool, migrations as
+a deploy step, per-user locking, hosted multi-user rules) is covered in
+[docs/embedding.md](docs/embedding.md) and the hosted section of
+[SECURITY.md](SECURITY.md).
 
 Typed entities are opt-in (`entities=True`, `entity_aggregation=True`):
 

@@ -214,6 +214,17 @@ def delete(b: UserRef): return svc.delete(b.site, b.user)
 @app.post("/triggers")
 def triggers(b: TriggersIn): return _guard(svc.triggers, b.site, b.user, b.now)
 
+class ConsentDecisionIn(BaseModel):
+    site: str; user: str; approve: bool
+
+@app.post("/consent-requests/list")
+def consent_requests_list(status: str = "pending"):
+    return svc.consent_requests(status=status)
+
+@app.post("/consent-requests/decide")
+def consent_requests_decide(b: ConsentDecisionIn):
+    return _guard(svc.decide_consent_request, b.site, b.user, b.approve)
+
 @app.post("/suggestions/list")
 def list_suggestions(b: SuggestionListIn):
     return _guard(svc.list_suggestions, b.site, b.user, b.now, b.refresh)
@@ -228,3 +239,32 @@ def reject_suggestion(b: SuggestionDecisionIn):
 
 @app.post("/prior_refresh")
 def prior_refresh(b: UserRef): return svc.prior_refresh(b.site)
+
+
+class SettingIn(BaseModel):
+    site: str; user: str; key: str; value: str; text: str = ""
+
+class SettingKeyIn(BaseModel):
+    site: str; user: str; key: str
+
+class SitePolicyIn(BaseModel):
+    site: str; prior: Optional[bool] = None; cold_start: Optional[bool] = None
+
+@app.post("/settings/set")
+def set_setting(b: SettingIn):
+    return _guard(svc.set_setting, b.site, b.user, b.key, b.value, b.text)
+
+@app.post("/settings/list")
+def get_settings(b: UserRef): return _guard(svc.get_settings, b.site, b.user)
+
+@app.post("/settings/clear")
+def clear_setting(b: SettingKeyIn): return _guard(svc.clear_setting, b.site, b.user, b.key)
+
+@app.post("/site-policy")
+def site_policy(b: SitePolicyIn):
+    if b.prior is None and b.cold_start is None:
+        return svc.site_policy(b.site)
+    try:
+        return _guard(svc.set_site_policy, b.site, prior=b.prior, cold_start=b.cold_start)
+    except TypeError as e:                       # a store without site policies
+        raise HTTPException(status_code=501, detail=str(e))

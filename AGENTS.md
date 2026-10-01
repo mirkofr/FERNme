@@ -18,6 +18,8 @@ FERNme ships an MCP server exposing these tools:
 | `grant_consent(site, user)` | one-time: allow remembering this user |
 | `recall_card(site, user, context)` | the token-minimal memory card to inject into the prompt |
 | `remember(site, user, tags, text, source)` | store tags (and optional text); `source` is `stated` or `inferred` |
+| `set_setting(key, value, text, site, user)` | pin an explicit choice (`plot.style=box`); never fades, always on the card |
+| `get_settings(site, user)` / `clear_setting(key, site, user)` | list or remove pinned settings |
 | `recall_events(site, user, contains)` | search the raw history (the Cabinet) |
 | `edit_memory(site, user, attr, weight)` | glass-box override of one memory |
 | `forget_me(site, user)` | delete everything (right to be forgotten) |

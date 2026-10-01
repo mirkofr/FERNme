@@ -17,6 +17,7 @@ def test_harness_reports_required_regimes_methods_and_metrics():
         "contextual",
         "fragmented_entity",
         "outcome",
+        "slot_change",
     ]
     assert report["methods"] == [
         "fern_pure", "fern_entities", "recency", "frequency", "bm25"]

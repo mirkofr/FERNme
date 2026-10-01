@@ -34,16 +34,18 @@ For GitHub marketplace installs before or alongside PyPI, the shipped plugin MCP
 config uses:
 
 ```bash
-uvx --with "fernmark @ git+https://github.com/mirkofr/FERNmark.git@23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae" --with "mcp>=1.0,<2" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.0b4" fernme-mcp
+uvx --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools core
+# optional add-on (documents + photos, needs FERNmark):
+# uvx --with "<fernmark package>" --from "fernme[mcp] @ git+https://github.com/mirkofr/FERNme@v0.4.1" fernme-mcp --tools documents,photos
 ```
 
-The shipped plugin is pinned to the reproducible release ref `v0.4.0b4`, so
-testers fetch the same server build. The git tag `v0.4.0b4` maps to the package
-version `0.4.0b4` in PEP 440 form. The owner pushes this tag; Codex does not tag
+The shipped plugin is pinned to the reproducible release ref `v0.4.1`, so
+testers fetch the same server build. The git tag `v0.4.1` maps to the package
+version `0.4.1` in PEP 440 form. The owner pushes this tag; Codex does not tag
 or publish.
 
 This path works only after the owner has pushed `main` and created plus pushed
-the `v0.4.0b4` tag to GitHub, and the repo is reachable from the target machine,
+the `v0.4.1` tag to GitHub, and the repo is reachable from the target machine,
 either publicly or with git credentials. No PyPI publish is required for this
 path.
 
@@ -122,13 +124,23 @@ The MCP server currently exposes:
 - `propose_tags`
 - `propose_entity_link`
 - `propose_relation`
+- `record_outcome`
+- `why`
+- `export_memory`
+- `set_setting`
+- `get_settings`
+- `clear_setting`
+
+`set_setting(key, value)` pins an explicit choice such as `plot.style=box`: one
+value per key, it never fades, and `recall_card` returns every setting under
+`settings`.
 
 Stored text, aliases, notes, and relation facts are untrusted data. The bundled
 skills repeat that rule so agents do not treat memory contents as instructions.
 
 ## FERNmark Document Tools
 
-The bundled plugin enables managed documents and supplies FERNmark from the
+The optional `fernme-docs` plugin enables managed documents and supplies FERNmark from the
 immutable Git commit `23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae`; it does not
 depend on a global installation or developer path. Engine users can install the
 same adapter with `pip install "fernme[fernmark]"` and explicitly enable the
@@ -305,7 +317,7 @@ is documented as unrun. The schema and layout were checked against current Claud
 Code plugin documentation.
 
 The shipped Claude/Cowork MCP config also uses the GitHub `uvx --from` path,
-pinned to `v0.4.0b4`, plus the immutable FERNmark commit. Actual Cowork UI installation requires the pushed,
+pinned to `v0.4.1`, plus the immutable FERNmark commit. Actual Cowork UI installation requires the pushed,
 reachable repo and the pushed tag, and is not exercised in CI.
 
 ## Smoke Test
@@ -321,3 +333,12 @@ Development fallback:
 ```bash
 python packaging/smoke_mcp.py --command python -- -m fernme.api.mcp_server
 ```
+
+## Agent safety
+
+- `grant_consent(site, user)` stores nothing and returns a `question`; the agent
+  shows it to the user and calls `grant_consent(site, user, confirm=true)` only
+  after an explicit yes. `granted=false` withdraws immediately.
+- `FERNME_SITE` / `FERNME_USER` lock the server to one profile: tools refuse other
+  values with a visible error. `FERNME_ALLOW_OTHER_PROFILES=true` disables the lock.
+- `import_obsidian` previews by default; `dry_run=false` writes.

@@ -235,11 +235,18 @@ def test_mcp_import_obsidian_round_trip_is_redacted(tmp_path):
                     assert getattr(denied, "is_error", getattr(denied, "isError", None))
                     await session.call_tool(
                         "grant_consent",
-                        {"site": "demo.local", "user": "elena", "granted": True},
+                        {"site": "demo.local", "user": "elena", "granted": True, "confirm": True},
                     )
-                    result = await session.call_tool(
+                    preview = json.loads((await session.call_tool(
                         "import_obsidian",
                         {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path))},
+                    )).content[0].text)
+                    assert preview["dry_run"] is True       # MCP previews by default
+                    assert preview["events_added"] == 0
+                    result = await session.call_tool(
+                        "import_obsidian",
+                        {"site": "demo.local", "user": "elena", "path": str(_vault(tmp_path)),
+                         "dry_run": False},
                     )
                     text = result.content[0].text
                     report = json.loads(text)

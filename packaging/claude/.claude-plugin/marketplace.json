@@ -11,6 +11,11 @@
       "name": "fernme-memory",
       "source": "./plugins/fernme-memory",
       "description": "Local FERNme memory MCP server and standing memory skill."
+    },
+    {
+      "name": "fernme-docs",
+      "source": "./plugins/fernme-docs",
+      "description": "Optional add-on: managed documents (FERNmark) and photo memory for FERNme."
     }
   ]
 }

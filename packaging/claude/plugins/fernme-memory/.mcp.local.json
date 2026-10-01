@@ -2,10 +2,11 @@
   "mcpServers": {
     "fernme": {
       "command": "fernme-mcp",
-      "args": [],
-      "env": {
-        "FERNME_MANAGED_DOCUMENTS": "true"
-      }
+      "args": [
+        "--tools",
+        "core"
+      ],
+      "env": {}
     }
   }
 }

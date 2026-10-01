@@ -23,7 +23,12 @@ def test_resolution_flag_off_preserves_existing_decay_math():
     expected_lam = cfg.lam * (1.0 - cfg.salience_beta * 0.8)
     assert math.isclose(ug.edges["pref:x"].weight,
                         5.0 * math.exp(-expected_lam * 10.0))
-    assert ug.edges["pref:x"].last_reinforced == 10.0
+    # last_reinforced keeps the real last-seen time; a per-user clock records the pass
+    assert ug.edges["pref:x"].last_reinforced == 0.0
+    assert ug.numeric["_decay_clock"] == 10.0
+    before = ug.edges["pref:x"].weight
+    decay(ug, now=10.0, cfg=cfg, conflict_map={"pref:x": 1.0})   # repeat: no double decay
+    assert math.isclose(ug.edges["pref:x"].weight, before)
 
 
 def test_non_override_keeps_positive_decay_floor():

@@ -32,8 +32,12 @@ METHOD_LABELS = {
     "frequency": "frequency",
     "bm25": "BM25 Cabinet",
 }
+# Scenario tags avoid FERNme's reserved `style:` namespace (communication style,
+# kept off the card by design). Until 2026-09-30 the fixtures used `style:` for
+# product-style preferences, which put never-showable attributes in the answer
+# keys and capped FERNme's recall; they now use `look:`.
 REGIME_ORDER = ("static", "abrupt_drift", "gradual_drift", "staleness",
-                "contextual", "fragmented_entity", "outcome")
+                "contextual", "fragmented_entity", "outcome", "slot_change")
 
 
 @dataclass(frozen=True)
@@ -107,7 +111,7 @@ def _static_scenario(seed: int) -> Scenario:
     core = (
         "pref:jasmine-tea",
         "pref:linen-shirts",
-        "style:minimal",
+        "look:minimal",
         "size:medium",
         "person:noah",
         "person:noah-k",
@@ -116,7 +120,7 @@ def _static_scenario(seed: int) -> Scenario:
     distractors = (
         "pref:espresso",
         "pref:wool-coat",
-        "style:maximal",
+        "look:maximal",
         "size:large",
         "food:blueberry-tart",
         "topic:gift-wrap",
@@ -173,13 +177,13 @@ def _abrupt_drift_scenario(seed: int) -> Scenario:
     old = (
         "pref:dark-roast",
         "food:cinnamon-roll",
-        "style:slow-browse",
+        "look:slow-browse",
         "brand:maple-home",
     )
     new = (
         "pref:mint-tea",
         "food:rice-bowl",
-        "style:quick-pickup",
+        "look:quick-pickup",
         "brand:river-studio",
     )
     neutral = ("topic:receipt", "topic:window-display", "topic:parking")
@@ -227,7 +231,7 @@ def _gradual_drift_scenario(seed: int) -> Scenario:
     persistent = (
         "pref:quiet-delivery",
         "pref:paper-receipts",
-        "style:direct-updates",
+        "look:direct-updates",
         "food:vegetable-soup",
         "brand:harbor-market",
     )
@@ -460,6 +464,39 @@ def _outcome_scenario(seed: int) -> Scenario:
     )
 
 
+def _slot_change_scenario(seed: int) -> Scenario:
+    """Facts that hold one value at a time change: a move, a new job, a new diet.
+    Stable preferences keep being mentioned; the old slot values were seen far
+    more often than the new ones."""
+    rng = random.Random(seed + 7000)
+    old = ("city:harbor-town", "employer:maple-labs", "diet:vegetarian")
+    new = ("city:river-city", "employer:cedar-works", "diet:vegan")
+    stable = ("pref:green-tea", "topic:cycling")
+    events: List[HarnessEvent] = []
+    ts = 0.0
+    for _ in range(40):
+        tags = [rng.choice(old), rng.choice(stable)]
+        events.append(_event(ts, "chat", tags,
+                             "Fictional chat about home, work, food, tea and cycling."))
+        ts += 1.0
+    for _ in range(10):
+        tags = [rng.choice(new), rng.choice(stable)]
+        events.append(_event(ts, "chat", tags,
+                             "Fictional chat after moving city, changing job and diet."))
+        ts += 1.0
+    return Scenario(
+        name="slot_change",
+        events=tuple(events),
+        probes=(Probe(
+            query="Where does the user live and work now, and what do they eat?",
+            context=("ctx:profile-update",),
+            relevant_attrs=new + stable,
+            stale_attrs=old,
+        ),),
+        cfg_overrides={},
+    )
+
+
 def build_scenarios(seed: int) -> Tuple[Scenario, ...]:
     """Return deterministic synthetic scenarios with hidden answer keys."""
     return (
@@ -470,6 +507,7 @@ def build_scenarios(seed: int) -> Tuple[Scenario, ...]:
         _contextual_scenario(seed),
         _fragmented_entity_scenario(seed),
         _outcome_scenario(seed),
+        _slot_change_scenario(seed),
     )
 
 

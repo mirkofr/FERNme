@@ -1,21 +1,45 @@
-"""Postgres-backed store for FERN — same interface as SQLiteStore, for production
-multi-tenant deployments. Tested against a real Postgres 16 instance (see
+"""Postgres-backed store for FERNme — same interface as SQLiteStore, for
+server deployments. Tested against a real Postgres 16 instance (see
 tests/test_postgres.py, which uses the rootless `pgserver`).
+
+Zero-config use is unchanged: ``PostgresStore(dsn)`` opens one connection and
+creates its tables in the default schema. For embedding in a host application:
+
+* ``schema="fernme"`` keeps every table in its own schema;
+* ``pool_size=(1, 10)`` uses a connection pool (``psycopg-pool``), or
+  ``pool=<host psycopg_pool.ConnectionPool>`` borrows the host's pool;
+* ``auto_migrate=False`` skips DDL at startup and only checks the schema
+  version; the host runs ``fernme-migrate --dsn ... --schema ...`` (or
+  ``PostgresStore.migrate_database(dsn, schema)``) in its own migration step.
+
+Each operation runs on one connection: the single connection under a lock, or
+a pooled connection per thread. Multi-statement writes run in a transaction,
+and service writes take transaction-scoped advisory locks per (site, user) and
+per site, so separate processes and servers do not lose updates.
 
 Note: `user` is reserved in Postgres, so it is quoted everywhere."""
 from __future__ import annotations
-import json, threading
+import json, re, threading
 from contextlib import contextmanager
 from typing import List, Optional, Dict
 import psycopg
 from psycopg.rows import dict_row
+from ..audit import entry_hash, GENESIS
 from ..core.graph import UserGraph, AssocGraph, Edge, Event
 from ..prior.population import PopulationPrior
+
+# Bump when SCHEMA or the migration steps in _migrate_unlocked change.
+SCHEMA_VERSION = 2
+_SCHEMA_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS consents(
   site TEXT, "user" TEXT, granted INT, ts DOUBLE PRECISION,
   PRIMARY KEY(site, "user"));
+CREATE TABLE IF NOT EXISTS consent_requests(
+  site TEXT NOT NULL, "user" TEXT NOT NULL, requested_by TEXT NOT NULL DEFAULT '',
+  requested_ts DOUBLE PRECISION NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+  decided_ts DOUBLE PRECISION, PRIMARY KEY(site, "user"));
 CREATE TABLE IF NOT EXISTS user_edges(
   site TEXT, "user" TEXT, attr TEXT, weight DOUBLE PRECISION, confidence DOUBLE PRECISION,
   source TEXT, last_reinforced DOUBLE PRECISION, hits INT, fast DOUBLE PRECISION DEFAULT 0,
@@ -117,6 +141,7 @@ CREATE INDEX IF NOT EXISTS idx_relation_facts_relation
   ON relation_facts(site, "user", subject_id, relation, object_id, ts);
 CREATE INDEX IF NOT EXISTS idx_canonicalization_suggestions_user
   ON canonicalization_suggestions(site, "user", status, created_ts);
+CREATE INDEX IF NOT EXISTS idx_assoc_edges_b ON assoc_edges(site, b);
 CREATE INDEX IF NOT EXISTS idx_documents_owner_status
   ON documents(site, "user", status, pinned, imported_ts);
 CREATE INDEX IF NOT EXISTS idx_document_tags_owner_tag
@@ -125,59 +150,312 @@ CREATE INDEX IF NOT EXISTS idx_assets_owner_status
   ON assets(site, "user", status, created_ts);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_owner_sha_active
   ON assets(site, "user", sha256) WHERE status='active';
+CREATE TABLE IF NOT EXISTS audit(
+  site TEXT, "user" TEXT, seq INT, ts DOUBLE PRECISION, action TEXT, detail TEXT,
+  prev_hash TEXT, hash TEXT, PRIMARY KEY(site, "user", seq));
+CREATE TABLE IF NOT EXISTS settings(
+  site TEXT NOT NULL, "user" TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+  text TEXT NOT NULL DEFAULT '', ts DOUBLE PRECISION NOT NULL DEFAULT 0,
+  PRIMARY KEY(site, "user", key));
+CREATE TABLE IF NOT EXISTS site_policy(
+  site TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+  PRIMARY KEY(site, key));
+CREATE TABLE IF NOT EXISTS fernme_secret(
+  id INT PRIMARY KEY, key_hex TEXT NOT NULL, audit_legacy BOOLEAN NOT NULL);
+CREATE TABLE IF NOT EXISTS fernme_schema_version(
+  id INT PRIMARY KEY, version INT NOT NULL);
 """
 
 
+class _Result:
+    """Fetched rows of one statement, so a pooled connection can go back to the
+    pool before the caller reads them (cursor-like: fetchone/fetchall/rowcount)."""
+    __slots__ = ("_rows", "rowcount", "_i")
+
+    def __init__(self, cur):
+        self._rows = cur.fetchall() if cur.description is not None else []
+        self.rowcount = cur.rowcount
+        self._i = 0
+
+    def fetchone(self):
+        if self._i >= len(self._rows):
+            return None
+        self._i += 1
+        return self._rows[self._i - 1]
+
+    def fetchall(self):
+        rows, self._i = self._rows[self._i:], len(self._rows)
+        return rows
+
+    def __iter__(self):
+        return iter(self.fetchall())
+
+
+class SchemaVersionError(RuntimeError):
+    """The database schema is missing or older than this FERNme version needs."""
+
+
 class PostgresStore:
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str = None, *, schema: str = None, pool=None,
+                 pool_size=None, auto_migrate: bool = True):
+        """``dsn``: libpq connection string. ``schema``: put FERNme's tables in
+        this schema (default: the connection's search_path, as before).
+        ``pool``: a host ``psycopg_pool.ConnectionPool`` to borrow connections
+        from; ``pool_size=(min, max)``: create a dedicated pool from ``dsn``.
+        Without either, one connection is shared under a lock (the default).
+        ``auto_migrate=False``: run no DDL here; require the schema version
+        created by ``fernme-migrate``."""
+        if schema is not None and not _SCHEMA_NAME_RE.match(schema):
+            raise ValueError("schema: lowercase letters, digits and '_' (max 63)")
+        if pool is not None and pool_size is not None:
+            raise ValueError("pass either pool or pool_size, not both")
+        if dsn is None and pool is None:
+            raise ValueError("PostgresStore needs a dsn or a pool")
         self.dsn = dsn
-        self._lock = threading.RLock()
-        self._conn = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
-        self._conn.execute(SCHEMA)
-        for col in ("fast", "salience"):   # forward-compat for DBs created before these columns
-            self._conn.execute("ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS %s DOUBLE PRECISION DEFAULT 0" % col)
-        self._conn.execute(
-            "ALTER TABLE user_edges ADD COLUMN IF NOT EXISTS provenance TEXT NOT NULL DEFAULT 'inferred'"
-        )
-        self._conn.execute(
-            "ALTER TABLE assoc_edges ADD COLUMN IF NOT EXISTS users INT NOT NULL DEFAULT 0"
-        )
-        self._backfill_assoc_contributors()
+        self.schema = schema
+        self._lock = threading.RLock()        # serializes the single connection
+        self._local = threading.local()       # per-thread pooled connection
+        self._single = None
+        self._pool = None
+        self._own_pool = False
+        if pool is not None:
+            self._pool = pool
+        elif pool_size is not None:
+            self._pool = self.create_pool(dsn, schema=schema, pool_size=pool_size)
+            self._own_pool = True
+        else:
+            self._single = psycopg.connect(dsn, autocommit=True, row_factory=dict_row)
+            if schema:                        # the schema itself is created by migrate()
+                self._single.execute("SELECT set_config('search_path', %s, false)",
+                                     (self._search_path(),))
+        try:
+            if auto_migrate:
+                self.migrate()
+            else:
+                self.check_schema()
+        except BaseException:
+            self.close()                      # do not leak the connection or our pool
+            raise
+
+    # ---- connections ----
+    @staticmethod
+    def create_pool(dsn: str, schema: str = None, pool_size=(1, 10), **pool_kwargs):
+        """A ``psycopg_pool.ConnectionPool`` configured for FERNme (autocommit,
+        dict rows, ``search_path`` set to ``schema``). Needs ``psycopg-pool``
+        (``pip install "fernme[postgres]"``)."""
+        try:
+            from psycopg_pool import ConnectionPool
+        except ImportError as exc:                       # pragma: no cover
+            raise ImportError('pooling needs psycopg-pool: pip install "fernme[postgres]"') from exc
+        if schema is not None and not _SCHEMA_NAME_RE.match(schema):
+            raise ValueError("schema: lowercase letters, digits and '_' (max 63)")
+        lo, hi = (pool_size, pool_size) if isinstance(pool_size, int) else pool_size
+        path = f'"{schema}"' if schema else None
+
+        def configure(conn):
+            conn.autocommit = True
+            conn.row_factory = dict_row
+            if path:
+                conn.execute("SELECT set_config('search_path', %s, false)", (path,))
+        pool_kwargs.setdefault("open", True)
+        return ConnectionPool(dsn, min_size=int(lo), max_size=int(hi),
+                              configure=configure, **pool_kwargs)
+
+    def close(self):
+        if self._single is not None:
+            self._single.close()
+        elif self._own_pool:
+            self._pool.close()
+
+    def _search_path(self) -> str:
+        # Only FERNme's schema (pg_catalog is always searched): a missing table
+        # must fail, never resolve to a same-named table in public.
+        return f'"{self.schema}"'
+
+    @property
+    def _conn(self):
+        if self._single is not None:
+            return self._single
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            raise RuntimeError("PostgresStore: no pooled connection outside a session")
+        return conn
 
     @contextmanager
-    def transaction(self, lock_key: str = None):
+    def _session(self):
+        """One connection for the duration of an operation (re-entrant)."""
+        if self._single is not None:
+            with self._lock:
+                yield self._single
+            return
+        depth = getattr(self._local, "depth", 0)
+        if depth:
+            self._local.depth = depth + 1
+            try:
+                yield self._local.conn
+            finally:
+                self._local.depth -= 1
+            return
+        with self._pool.connection() as conn:
+            restore = self._borrow(conn)
+            self._local.conn, self._local.depth = conn, 1
+            try:
+                yield conn
+            finally:
+                self._local.conn, self._local.depth = None, 0
+                self._give_back(conn, restore)
+
+    def _borrow(self, conn):
+        """Make a host-pool connection fit FERNme; return what to restore. A pool
+        made by create_pool() is already configured, so this costs nothing."""
+        if self._own_pool:
+            return None
+        restore = {"autocommit": conn.autocommit, "row_factory": conn.row_factory}
+        if not conn.autocommit:
+            conn.autocommit = True
+        conn.row_factory = dict_row
+        if self.schema:
+            row = conn.execute(
+                "SELECT current_setting('search_path') AS old, "
+                "set_config('search_path', %s, false)", (self._search_path(),)).fetchone()
+            restore["search_path"] = row["old"]
+        return restore
+
+    @staticmethod
+    def _give_back(conn, restore):
+        if not restore or conn.closed:
+            return
+        try:
+            if "search_path" in restore:
+                conn.execute("SELECT set_config('search_path', %s, false)",
+                             (restore["search_path"],))
+            conn.row_factory = restore["row_factory"]
+            conn.autocommit = restore["autocommit"]
+        except psycopg.Error:
+            pass                              # the pool discards broken connections
+
+    # ---- schema / migrations ----
+    # How long a migration waits for a table lock held by live traffic before it
+    # gives up (and can simply be retried), instead of stalling writers.
+    MIGRATION_LOCK_TIMEOUT = "30s"
+
+    def migrate(self):
+        """Create or upgrade FERNme's tables. Idempotent, and a no-op without any
+        DDL or table lock when the schema is already current, so restarting
+        servers never block live traffic. Concurrent runs (several processes or
+        deploy jobs) serialize on an advisory lock taken before any DDL."""
+        if self.schema_version() >= SCHEMA_VERSION:
+            return SCHEMA_VERSION
+        with self._session() as conn, conn.transaction():
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
+                         (f"fernme:migrate:{self.schema or ''}",))
+            conn.execute("SELECT set_config('lock_timeout', %s, true)",
+                         (self.MIGRATION_LOCK_TIMEOUT,))
+            if self.schema:
+                conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
+            if self._schema_version_unlocked(conn) < SCHEMA_VERSION:   # lost the race? done
+                self._migrate_unlocked(conn)
+        return SCHEMA_VERSION
+
+    def _missing_column(self, conn, table, column) -> bool:
+        return conn.execute(
+            "SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() "
+            "AND table_name=%s AND column_name=%s", (table, column)).fetchone() is None
+
+    def _migrate_unlocked(self, conn):
+        conn.execute(SCHEMA)
+        # Forward-compat for databases created before these columns; ALTER only
+        # when needed (ALTER takes an exclusive lock even with IF NOT EXISTS).
+        for col in ("fast", "salience"):
+            if self._missing_column(conn, "user_edges", col):
+                conn.execute("ALTER TABLE user_edges ADD COLUMN %s DOUBLE PRECISION DEFAULT 0" % col)
+        if self._missing_column(conn, "user_edges", "provenance"):
+            conn.execute("ALTER TABLE user_edges ADD COLUMN provenance TEXT NOT NULL "
+                         "DEFAULT 'inferred'")
+        if self._missing_column(conn, "assoc_edges", "users"):
+            conn.execute("ALTER TABLE assoc_edges ADD COLUMN users INT NOT NULL DEFAULT 0")
+        self._backfill_assoc_contributors()      # once, while upgrading
+        conn.execute(
+            "INSERT INTO fernme_schema_version(id, version) VALUES(1, %s) "
+            "ON CONFLICT(id) DO UPDATE SET version=GREATEST(fernme_schema_version.version, "
+            "EXCLUDED.version)", (SCHEMA_VERSION,))
+
+    def _schema_version_unlocked(self, conn) -> int:
+        table = (f'"{self.schema}".fernme_schema_version' if self.schema
+                 else "fernme_schema_version")
+        if not conn.execute("SELECT to_regclass(%s) IS NOT NULL AS ok",
+                            (table,)).fetchone()["ok"]:
+            return 0
+        row = conn.execute(f"SELECT version FROM {table} WHERE id=1").fetchone()
+        return int(row["version"]) if row else 0
+
+    def schema_version(self) -> int:
+        with self._session() as conn:
+            return self._schema_version_unlocked(conn)
+
+    def check_schema(self):
+        found = self.schema_version()
+        if found < SCHEMA_VERSION:
+            where = f" in schema '{self.schema}'" if self.schema else ""
+            raise SchemaVersionError(
+                f"FERNme needs database schema version {SCHEMA_VERSION}{where}, found "
+                f"{found or 'none'}. Run: fernme-migrate --dsn <dsn>"
+                + (f" --schema {self.schema}" if self.schema else ""))
+        return found
+
+    @classmethod
+    def migrate_database(cls, dsn: str, schema: str = None) -> int:
+        """Run FERNme's migrations once (for a host app's migration step)."""
+        store = cls(dsn, schema=schema, auto_migrate=True)
+        try:
+            return store.schema_version()
+        finally:
+            store.close()
+
+    # ---- locking ----
+    def _lock_name(self, *parts) -> str:
+        if self.schema:
+            return ":".join(("fernme", self.schema) + parts)
+        return ":".join(("fernme",) + parts)
+
+    @contextmanager
+    def transaction(self, lock_key: str = None, user_key: str = None,
+                    site_lock: bool = True):
         """Atomic, serialized read-modify-write across store calls. Nested use
         (including the per-method transactions below) becomes a savepoint.
 
-        The thread lock serializes this process; a transaction-scoped advisory
-        lock on ``lock_key`` (the site) serializes other processes and servers
-        writing the same site, since writes read-modify-write shared rows."""
-        with self._lock, self._conn.transaction():
-            self._conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
-                               (f"fernme:{lock_key or '*'}",))
+        Transaction-scoped advisory locks serialize other threads, processes and
+        servers: first the (site, user) lock when ``user_key`` is given, then the
+        site lock (``site_lock``) for writes that touch site-shared rows (the
+        association graph, the prior). Always in that order, so no deadlock."""
+        with self._session() as conn, conn.transaction():
+            if user_key is not None:
+                conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                             (self._lock_name(lock_key or "*", "user", str(user_key)),))
+            if site_lock or user_key is None:
+                conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
+                             (self._lock_name(lock_key or "*"),))
             yield self
 
     def _q(self, sql, args=()):
-        with self._lock:
-            return self._conn.execute(sql, args)
+        with self._session() as conn:
+            return _Result(conn.execute(sql, args))
 
     def load_or_create_secret(self):
         """Per-deployment secret shared by every process on this database, for
         deployments that do not set FERNME_SECRET_KEY. Returns (hex, audit_legacy)."""
         import secrets as _secrets
-        with self._lock, self._conn.transaction():
-            self._conn.execute(
-                "CREATE TABLE IF NOT EXISTS fernme_secret("
-                "id INT PRIMARY KEY, key_hex TEXT NOT NULL, audit_legacy BOOLEAN NOT NULL)")
-            self._conn.execute("SELECT pg_advisory_xact_lock(hashtext('fernme:secret'))")
+        with self._session(), self._conn.transaction():
+            self._conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
+                               (self._lock_name("secret"),))
             row = self._conn.execute(
                 "SELECT key_hex, audit_legacy FROM fernme_secret WHERE id=1").fetchone()
             if row:
                 return row["key_hex"], bool(row["audit_legacy"])
-            has_audit = self._conn.execute(
-                "SELECT to_regclass('audit') IS NOT NULL AS ok").fetchone()["ok"]
-            legacy = bool(has_audit) and self._conn.execute(
-                "SELECT 1 FROM audit LIMIT 1").fetchone() is not None
+            # Postgres never had chains signed with the legacy public key (older
+            # versions had no Postgres audit table), so a new secret is never
+            # legacy: rows that exist were signed with an explicit or env key.
+            legacy = False
             key_hex = _secrets.token_hex(32)
             self._conn.execute(
                 "INSERT INTO fernme_secret(id, key_hex, audit_legacy) VALUES(1,%s,%s)",
@@ -243,7 +521,7 @@ class PostgresStore:
 
     # ---- consent ----
     def set_consent(self, site, user, granted, ts=0.0):
-        with self._lock:
+        with self._session():
             self._q('INSERT INTO consents(site,"user",granted,ts) VALUES(%s,%s,%s,%s) '
                     'ON CONFLICT(site,"user") DO UPDATE SET granted=EXCLUDED.granted, ts=EXCLUDED.ts',
                     (site, user, int(granted), ts))
@@ -252,9 +530,33 @@ class PostgresStore:
         r = self._q('SELECT granted FROM consents WHERE site=%s AND "user"=%s', (site, user)).fetchone()
         return bool(r["granted"]) if r else False
 
+    # ---- consent requests (the memory inbox) ----
+    def upsert_consent_request(self, site, user, requested_by, ts, reopen_denied=True):
+        keep = "" if reopen_denied else " WHERE consent_requests.status <> 'denied'"
+        with self._session():
+            self._q('INSERT INTO consent_requests(site,"user",requested_by,requested_ts,status) '
+                    "VALUES(%s,%s,%s,%s,'pending') ON CONFLICT(site,\"user\") DO UPDATE SET "
+                    "requested_by=EXCLUDED.requested_by, requested_ts=EXCLUDED.requested_ts, "
+                    "status='pending', decided_ts=NULL" + keep, (site, user, requested_by, ts))
+            row = self._q('SELECT status FROM consent_requests WHERE site=%s AND "user"=%s',
+                          (site, user)).fetchone()
+        return row["status"] if row else "pending"
+
+    def list_consent_requests(self, status="pending", limit=100):
+        return [dict(r) for r in self._q(
+            'SELECT site,"user",requested_by,requested_ts,status,decided_ts FROM consent_requests '
+            "WHERE status=%s ORDER BY requested_ts DESC LIMIT %s", (status, int(limit))).fetchall()]
+
+    def decide_consent_request(self, site, user, status, ts) -> bool:
+        with self._session():
+            cur = self._q('UPDATE consent_requests SET status=%s, decided_ts=%s '
+                          'WHERE site=%s AND "user"=%s AND status=\'pending\'',
+                          (status, ts, site, user))
+            return (cur.rowcount or 0) > 0
+
     # ---- user graph ----
     def load_user(self, site, user) -> UserGraph:
-        with self._lock:
+        with self._session():
             ug = self._load_user_unlocked(site, user)
         ug._persisted_edges = set(ug.edges)
         ug._persisted_history = {a: tuple(ts) for a, ts in ug.history.items()}
@@ -280,7 +582,7 @@ class PostgresStore:
     def save_user(self, ug: UserGraph):
         persisted_edges = getattr(ug, "_persisted_edges", None)
         persisted_hist = getattr(ug, "_persisted_history", None)
-        with self._lock, self._conn.transaction(), self._conn.cursor() as c:
+        with self._session(), self._conn.transaction(), self._conn.cursor() as c:
             if persisted_edges is None or persisted_hist is None:
                 c.execute('DELETE FROM user_edges WHERE site=%s AND "user"=%s', (ug.site, ug.user))
                 c.execute('DELETE FROM user_history WHERE site=%s AND "user"=%s', (ug.site, ug.user))
@@ -324,7 +626,7 @@ class PostgresStore:
         ug._persisted_history = {a: tuple(ts) for a, ts in ug.history.items()}
 
     def delete_user(self, site, user):
-        with self._lock, self._conn.transaction():
+        with self._session(), self._conn.transaction():
             persons = [r["person"] for r in self._q(
                 "SELECT DISTINCT person FROM identities WHERE site=%s AND local_user=%s",
                 (site, user)).fetchall()]
@@ -357,7 +659,8 @@ class PostgresStore:
             self._q('DELETE FROM assoc_edge_users WHERE site=%s AND "user"=%s',
                     (site, user))
             self._refresh_assoc_user_counts(site, assoc_pairs, delete_empty=True)
-            for t in ("user_edges", "user_numeric", "user_history", "events", "consents"):
+            for t in ("user_edges", "user_numeric", "user_history", "events", "consents",
+                      "consent_requests", "settings"):
                 self._q(f'DELETE FROM {t} WHERE site=%s AND "user"=%s', (site, user))
             self._q('DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s',
                     (site, user))
@@ -372,7 +675,57 @@ class PostgresStore:
         return {"site": site, "user": user,
                 "edges": {a: e.__dict__ for a, e in ug.edges.items()},
                 "numeric": ug.numeric, "events": self.recall(site, user, limit=100000),
+                "settings": self.list_settings(site, user),
                 "consent": self.has_consent(site, user)}
+
+    # ---- pinned settings ----
+    def upsert_setting(self, site, user, key, value, text, ts):
+        self._q('INSERT INTO settings(site,"user",key,value,text,ts) VALUES(%s,%s,%s,%s,%s,%s) '
+                'ON CONFLICT(site,"user",key) DO UPDATE SET value=EXCLUDED.value, '
+                'text=EXCLUDED.text, ts=EXCLUDED.ts', (site, user, key, value, text, ts))
+
+    def list_settings(self, site, user) -> List[Dict]:
+        return [dict(r) for r in self._q(
+            'SELECT key,value,text,ts FROM settings WHERE site=%s AND "user"=%s ORDER BY key',
+            (site, user)).fetchall()]
+
+    def delete_setting(self, site, user, key) -> bool:
+        return (self._q('DELETE FROM settings WHERE site=%s AND "user"=%s AND key=%s',
+                        (site, user, key)).rowcount or 0) > 0
+
+    # ---- per-site policy ----
+    def get_site_policy(self, site) -> Dict[str, str]:
+        return {r["key"]: r["value"] for r in self._q(
+            "SELECT key,value FROM site_policy WHERE site=%s", (site,)).fetchall()}
+
+    def set_site_policy(self, site, key, value):
+        self._q("INSERT INTO site_policy(site,key,value) VALUES(%s,%s,%s) "
+                "ON CONFLICT(site,key) DO UPDATE SET value=EXCLUDED.value",
+                (site, key, str(value)))
+
+    # ---- verifiable audit log ----
+    def append_audit(self, site, user, ts, action, detail, key):
+        """Same HMAC chain as SQLiteStore. The (site, user) advisory lock keeps
+        sequence numbers gap-free when several processes append at once."""
+        with self._session() as conn, conn.transaction():
+            conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                         (self._lock_name("audit", site, str(user)),))
+            r = conn.execute(
+                'SELECT seq, hash FROM audit WHERE site=%s AND "user"=%s '
+                'ORDER BY seq DESC LIMIT 1', (site, user)).fetchone()
+            seq = (r["seq"] + 1) if r else 0
+            prev = r["hash"] if r else GENESIS
+            h = entry_hash(key, prev, seq, ts, action, detail)
+            conn.execute('INSERT INTO audit(site,"user",seq,ts,action,detail,prev_hash,hash) '
+                         'VALUES(%s,%s,%s,%s,%s,%s,%s,%s)',
+                         (site, user, seq, ts, action, json.dumps(detail), prev, h))
+            return {"seq": seq, "hash": h}
+
+    def read_audit(self, site, user):
+        return [{"seq": r["seq"], "ts": r["ts"], "action": r["action"],
+                 "detail": json.loads(r["detail"]), "hash": r["hash"]}
+                for r in self._q('SELECT * FROM audit WHERE site=%s AND "user"=%s ORDER BY seq',
+                                 (site, user)).fetchall()]
 
     # ---- assoc ----
     def load_assoc(self, site, user=None, min_users=1) -> AssocGraph:
@@ -396,10 +749,45 @@ class PostgresStore:
             ag.edges[(r["a"], r["b"])] = r["weight"]
         return ag
 
+    def load_assoc_neighborhood(self, site, nodes, hops=2, user=None, min_users=1) -> AssocGraph:
+        """Edges reachable from ``nodes`` within ``hops`` (see SQLiteStore)."""
+        ag = AssocGraph(site)
+        min_users = int(min_users or 1)
+        frontier = set(n for n in nodes if n)
+        seen = set()
+        with self._session():
+            for _ in range(max(1, int(hops))):
+                batch = sorted(frontier - seen)
+                if not batch:
+                    break
+                seen |= set(batch)
+                found = set()
+                if min_users <= 1:
+                    rows = self._q("SELECT e.a,e.b,e.weight FROM assoc_edges e WHERE e.site=%s "
+                                   "AND (e.a = ANY(%s) OR e.b = ANY(%s))",
+                                   (site, batch, batch)).fetchall()
+                elif user is None:
+                    rows = self._q("SELECT e.a,e.b,e.weight FROM assoc_edges e WHERE e.site=%s "
+                                   "AND e.users>=%s AND (e.a = ANY(%s) OR e.b = ANY(%s))",
+                                   (site, min_users, batch, batch)).fetchall()
+                else:
+                    rows = self._q(
+                        "SELECT e.a,e.b,e.weight FROM assoc_edges e "
+                        "LEFT JOIN assoc_edge_users u ON u.site=e.site AND u.a=e.a "
+                        'AND u.b=e.b AND u."user"=%s '
+                        'WHERE e.site=%s AND (e.users>=%s OR u."user" IS NOT NULL) '
+                        "AND (e.a = ANY(%s) OR e.b = ANY(%s))",
+                        (user, site, min_users, batch, batch)).fetchall()
+                for r in rows:
+                    ag.edges[(r["a"], r["b"])] = r["weight"]
+                    found.add(r["a"]); found.add(r["b"])
+                frontier = found
+        return ag
+
     def load_assoc_pairs(self, site, pairs) -> AssocGraph:
         ag = AssocGraph(site)
         keys = list(dict.fromkeys(self._assoc_key(a, b) for a, b in pairs))
-        with self._lock:
+        with self._session():
             for a, b in keys:
                 r = self._q("SELECT weight FROM assoc_edges WHERE site=%s AND a=%s AND b=%s",
                             (site, a, b)).fetchone()
@@ -411,7 +799,7 @@ class PostgresStore:
         touched_pairs = [self._assoc_key(a, b) for a, b in (touched_pairs or [])]
         keys = touched_pairs if touched_pairs else list(ag.edges)
         rows = [(ag.site, k[0], k[1], ag.edges[k]) for k in dict.fromkeys(keys) if k in ag.edges]
-        with self._lock, self._conn.transaction(), self._conn.cursor() as c:
+        with self._session(), self._conn.transaction(), self._conn.cursor() as c:
             if rows:
                 c.executemany("INSERT INTO assoc_edges(site,a,b,weight) VALUES(%s,%s,%s,%s) "
                               "ON CONFLICT(site,a,b) DO UPDATE SET weight=EXCLUDED.weight", rows)
@@ -425,7 +813,7 @@ class PostgresStore:
 
     # ---- cabinet ----
     def append_event(self, ev: Event):
-        with self._lock:
+        with self._session():
             row = self._q(
                 'INSERT INTO events(site,"user",ts,type,payload,attrs) '
                 'VALUES(%s,%s,%s,%s,%s,%s) RETURNING id',
@@ -438,7 +826,7 @@ class PostgresStore:
         args = [site, user]
         if type: q += " AND type=%s"; args.append(type)
         if contains: q += " AND payload LIKE %s"; args.append(f"%{contains}%")
-        q += " ORDER BY ts DESC LIMIT %s"; args.append(limit)
+        q += " ORDER BY ts DESC, id DESC LIMIT %s"; args.append(limit)
         return [{"ts": r["ts"], "type": r["type"], "payload": json.loads(r["payload"]),
                  "attrs": json.loads(r["attrs"])} for r in self._q(q, tuple(args)).fetchall()]
 
@@ -479,7 +867,7 @@ class PostgresStore:
         users_by_pair = {}
         for _site, user, a, b, _hits in rows:
             users_by_pair.setdefault((a, b), set()).add(user)
-        with self._lock, self._conn.transaction(), self._conn.cursor() as cursor:
+        with self._session(), self._conn.transaction(), self._conn.cursor() as cursor:
             cursor.execute(
                 "DELETE FROM assoc_edge_users WHERE site=%s", (ag.site,))
             cursor.execute("DELETE FROM assoc_edges WHERE site=%s", (ag.site,))
@@ -497,7 +885,7 @@ class PostgresStore:
 
     def delete_document_artifacts(self, site, user, source_sha256,
                                   document_id=None) -> Dict:
-        with self._lock:
+        with self._session():
             event_rows = self._q(
                 'SELECT id,ts,type,payload,attrs FROM events '
                 'WHERE site=%s AND "user"=%s ORDER BY id ASC',
@@ -552,7 +940,7 @@ class PostgresStore:
         return out
 
     def insert_document(self, row):
-        with self._lock:
+        with self._session():
             self._q(
                 'INSERT INTO documents(document_id,site,"user",source_sha256,'
                 'source_name,markdown_path,envelope_path,mime_type,extraction_quality,'
@@ -607,7 +995,7 @@ class PostgresStore:
         sets = ",".join(key + "=%s" for key, _value in items)
         values = [int(value) if key in ("pinned", "authoritative") else value
                   for key, value in items]
-        with self._lock:
+        with self._session():
             self._q(
                 'UPDATE documents SET ' + sets +
                 ' WHERE site=%s AND "user"=%s AND document_id=%s',
@@ -619,7 +1007,7 @@ class PostgresStore:
                           suggestion_id, approved_ts):
         rows = [(document_id, site, user, tag, "human_approved",
                  suggestion_id or "", float(approved_ts)) for tag in tags]
-        with self._lock, self._conn.cursor() as cursor:
+        with self._session(), self._conn.cursor() as cursor:
             cursor.executemany(
                 'INSERT INTO document_tags(document_id,site,"user",tag,provenance,'
                 'suggestion_id,approved_ts) VALUES(%s,%s,%s,%s,%s,%s,%s) '
@@ -640,7 +1028,7 @@ class PostgresStore:
         return [dict(row) for row in self._q(query, tuple(args)).fetchall()]
 
     def delete_document_catalog(self, site, user, document_id):
-        with self._lock:
+        with self._session():
             tags = self._q(
                 'SELECT tag FROM document_tags WHERE site=%s AND "user"=%s '
                 'AND document_id=%s', (site, user, document_id)).fetchall()
@@ -664,7 +1052,7 @@ class PostgresStore:
         return out
 
     def insert_asset(self, row):
-        with self._lock:
+        with self._session():
             self._q(
                 'INSERT INTO assets(id,site,"user",type,mime,uri,sha256,bytes,'
                 'created_ts,source,thumbnail_uri,exif_stripped,sensitive,consent,status) '
@@ -693,7 +1081,7 @@ class PostgresStore:
         return [self._asset_row(row) for row in rows]
 
     def set_asset_sensitive(self, site, user, asset_id, sensitive):
-        with self._lock:
+        with self._session():
             self._q(
                 'UPDATE assets SET sensitive=%s WHERE site=%s AND "user"=%s '
                 "AND id=%s AND status='active'",
@@ -702,14 +1090,14 @@ class PostgresStore:
         return self.get_asset(site, user, asset_id)
 
     def delete_asset_row(self, site, user, asset_id):
-        with self._lock:
+        with self._session():
             self._q(
                 'DELETE FROM assets WHERE site=%s AND "user"=%s AND id=%s',
                 (site, user, asset_id),
             )
 
     def delete_asset_artifacts(self, site, user, asset_id, source_sha256):
-        with self._lock:
+        with self._session():
             event_rows = self._q(
                 'SELECT id,ts,type,payload,attrs FROM events '
                 'WHERE site=%s AND "user"=%s AND type=%s ORDER BY id ASC',
@@ -760,7 +1148,7 @@ class PostgresStore:
 
     def save_prior(self, pp: PopulationPrior):
         """Replace the site's prior with ``pp`` (stale attributes removed)."""
-        with self._lock, self._conn.transaction(), self._conn.cursor() as c:
+        with self._session(), self._conn.transaction(), self._conn.cursor() as c:
             c.execute("DELETE FROM prior_node WHERE site=%s", (pp.site,))
             if pp._sum:
                 c.executemany("INSERT INTO prior_node VALUES(%s,%s,%s,%s) "
@@ -772,12 +1160,12 @@ class PostgresStore:
 
     # ---- identities + sharing ----
     def link_identity(self, person, site, local_user, ts=0.0):
-        with self._lock:
+        with self._session():
             self._q("INSERT INTO identities(person,site,local_user,ts) VALUES(%s,%s,%s,%s) "
                     "ON CONFLICT DO NOTHING", (person, site, local_user, ts))
 
     def unlink_identity(self, person, site, local_user):
-        with self._lock:
+        with self._session():
             self._q("DELETE FROM identities WHERE person=%s AND site=%s AND local_user=%s",
                     (person, site, local_user))
 
@@ -786,7 +1174,7 @@ class PostgresStore:
                 self._q("SELECT site,local_user FROM identities WHERE person=%s", (person,)).fetchall()]
 
     def set_share(self, person, target_site, category, allowed):
-        with self._lock:
+        with self._session():
             self._q("INSERT INTO share_policy(person,target_site,category,allowed) VALUES(%s,%s,%s,%s) "
                     "ON CONFLICT(person,target_site,category) DO UPDATE SET allowed=EXCLUDED.allowed",
                     (person, target_site, category, int(allowed)))
@@ -798,7 +1186,7 @@ class PostgresStore:
 
     # ---- typed entity layer ----
     def create_entity(self, entity_id, site, user, kind, display_name, created_at):
-        with self._lock:
+        with self._session():
             self._q('INSERT INTO entities(entity_id,site,"user",kind,display_name,created_at) '
                     'VALUES(%s,%s,%s,%s,%s,%s)',
                     (entity_id, site, user, kind, display_name, created_at))
@@ -817,7 +1205,7 @@ class PostgresStore:
 
     def link_entity_alias(self, site, user, entity_id, alias_attr,
                           source="stated", confidence=1.0):
-        with self._lock:
+        with self._session():
             self._q('INSERT INTO entity_aliases(site,"user",alias_attr,entity_id,source,confidence) '
                     'VALUES(%s,%s,%s,%s,%s,%s) '
                     'ON CONFLICT(site,"user",alias_attr) DO UPDATE SET '
@@ -825,7 +1213,7 @@ class PostgresStore:
                     (site, user, alias_attr, entity_id, source, float(confidence)))
 
     def unlink_entity_alias(self, site, user, entity_id, alias_attr):
-        with self._lock:
+        with self._session():
             self._q('DELETE FROM entity_aliases WHERE site=%s AND "user"=%s '
                     'AND entity_id=%s AND alias_attr=%s',
                     (site, user, entity_id, alias_attr))
@@ -843,13 +1231,13 @@ class PostgresStore:
             (site, user)).fetchall()]
 
     def update_entity_kind(self, site, user, entity_id, kind):
-        with self._lock:
+        with self._session():
             self._q(
                 'UPDATE entities SET kind=%s WHERE site=%s AND "user"=%s AND entity_id=%s',
                 (kind, site, user, entity_id))
 
     def set_entity_field(self, entity_id, field, value, provenance, ts):
-        with self._lock:
+        with self._session():
             self._q("INSERT INTO entity_fields(entity_id,field,value,provenance,ts) "
                     "VALUES(%s,%s,%s,%s,%s) "
                     "ON CONFLICT(entity_id,field) DO UPDATE SET "
@@ -869,7 +1257,7 @@ class PostgresStore:
         return dict(row) if row else None
 
     def upsert_entity_relation(self, row):
-        with self._lock:
+        with self._session():
             self._q(
                 'INSERT INTO entity_relations(site,"user",subject_id,relation,object_id,'
                 'weight,confidence,hits,last_reinforced,salience,provenance,note) '
@@ -907,7 +1295,7 @@ class PostgresStore:
         return dict(row) if row else None
 
     def upsert_relation_fact(self, row):
-        with self._lock:
+        with self._session():
             existing = self.get_relation_fact_by_note(
                 row["site"], row["user"], row["subject_id"], row["relation"],
                 row["object_id"], row["note"])
@@ -938,12 +1326,12 @@ class PostgresStore:
             (site, user, subject_id, relation, object_id, int(limit))).fetchall()]
 
     def delete_relation_fact(self, fact_id):
-        with self._lock:
+        with self._session():
             cur = self._q("DELETE FROM relation_facts WHERE fact_id=%s", (fact_id,))
             return cur.rowcount > 0
 
     def delete_entity_relation(self, site, user, subject_id, relation, object_id):
-        with self._lock:
+        with self._session():
             self._q('DELETE FROM relation_facts WHERE site=%s AND "user"=%s '
                     'AND subject_id=%s AND relation=%s AND object_id=%s',
                     (site, user, subject_id, relation, object_id))
@@ -952,7 +1340,7 @@ class PostgresStore:
                     (site, user, subject_id, relation, object_id))
 
     def delete_entity(self, site, user, entity_id):
-        with self._lock:
+        with self._session():
             self._q('DELETE FROM relation_facts WHERE site=%s AND "user"=%s '
                     'AND (subject_id=%s OR object_id=%s)',
                     (site, user, entity_id, entity_id))
@@ -991,7 +1379,7 @@ class PostgresStore:
 
     def upsert_suggestion(self, row):
         payload = json.dumps(row["payload"], sort_keys=True, separators=(",", ":"))
-        with self._lock:
+        with self._session():
             existing = self._q(
                 "SELECT status FROM canonicalization_suggestions WHERE suggestion_id=%s",
                 (row["suggestion_id"],)).fetchone()
@@ -1027,7 +1415,7 @@ class PostgresStore:
         return [self._suggestion_row(r) for r in self._q(q, tuple(args)).fetchall()]
 
     def decide_suggestion(self, suggestion_id, status, decided_ts):
-        with self._lock:
+        with self._session():
             self._q(
                 "UPDATE canonicalization_suggestions SET status=%s, decided_ts=%s "
                 "WHERE suggestion_id=%s",
@@ -1036,7 +1424,7 @@ class PostgresStore:
 
     def purge_expired_suggestions(self, site, user, now, ttl_days):
         cutoff = float(now) - float(ttl_days)
-        with self._lock:
+        with self._session():
             cur = self._q(
                 'DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
                 "AND status='pending' AND created_ts<%s",
@@ -1048,7 +1436,7 @@ class PostgresStore:
         if len(pending) <= cap:
             return 0
         drop = pending[int(cap):]
-        with self._lock:
+        with self._session():
             with self._conn.cursor() as c:
                 c.executemany(
                     "DELETE FROM canonicalization_suggestions WHERE suggestion_id=%s",
@@ -1056,7 +1444,7 @@ class PostgresStore:
         return len(drop)
 
     def delete_suggestions_for_entity(self, site, user, entity_id):
-        with self._lock:
+        with self._session():
             cur = self._q(
                 'DELETE FROM canonicalization_suggestions WHERE site=%s AND "user"=%s '
                 'AND (payload LIKE %s OR payload LIKE %s OR payload LIKE %s)',

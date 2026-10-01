@@ -16,7 +16,8 @@ from .config import Config, DEFAULT
 from .store.sqlite_store import SQLiteStore
 from .runtime_config import default_db_path, ensure_default_db_path
 from .supernode import Supernode
-from .safety import sanitize_tags, cap_numeric, sanitize_display_text, sanitize_glosses
+from .safety import (sanitize_tags, cap_numeric, sanitize_display_text, sanitize_glosses,
+                     looks_like_injection)
 from .tagging import DeterministicTagger
 from . import style as _style
 from .dp import PrivatePrior
@@ -78,6 +79,35 @@ def _valid_uuid(value: str) -> str:
     return str(parsed)
 
 
+def _dup_key(value: str) -> str:
+    v = "".join(ch for ch in value.lower() if ch.isalnum())
+    return v[:-1] if len(v) > 4 and v.endswith("s") else v
+
+
+def _near_duplicates(new_tags, existing) -> Dict[str, List[str]]:
+    def split(tag):
+        neg = tag.startswith("!")
+        ns, _, val = tag.lstrip("!").partition(":")
+        return neg, (ns if val else ""), (val or ns)
+    index: Dict[str, List[str]] = {}
+    for tag in existing:
+        neg, ns, val = split(tag)
+        index.setdefault(f"{neg}|{_dup_key(val)}", []).append(tag)
+    out: Dict[str, List[str]] = {}
+    have = set(existing)
+    for tag in new_tags:
+        if tag in have:
+            continue
+        neg, ns, val = split(tag)
+        key = _dup_key(val)
+        if len(key) < 3:
+            continue
+        hits = [t for t in index.get(f"{neg}|{key}", []) if t != tag]
+        if hits:
+            out[tag] = sorted(hits)
+    return out
+
+
 def _assoc_pairs(mapped) -> List[tuple]:
     attrs = [a for a, _ in mapped]
     out = []
@@ -114,20 +144,108 @@ def _atomic(fn):
     Stores that expose ``transaction()`` (SQLite, Postgres) serialize the whole
     read-modify-write so concurrent writers cannot overwrite each other or leave
     a graph update without its Cabinet event. Other stores run unchanged."""
-    @_functools.wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        tx = getattr(self.store, "transaction", None)
-        site = args[0] if args and isinstance(args[0], str) else kwargs.get("site")
-        with (tx(lock_key=site) if callable(tx) else _contextlib.nullcontext()):
-            return fn(self, *args, **kwargs)
-    return wrapper
+    return _atomic_scope(site_lock=True)(fn)
+
+
+def _atomic_scope(site_lock: bool):
+    """``site_lock=False`` for writes that touch only one user's own rows (e.g.
+    pinned settings): they take the (site, user) lock but not the site lock, so
+    users of one busy site do not wait on each other."""
+    def decorate(fn):
+        @_functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            tx = getattr(self.store, "transaction", None)
+            site = args[0] if args and isinstance(args[0], str) else kwargs.get("site")
+            user = args[1] if len(args) > 1 and isinstance(args[1], str) else kwargs.get("user")
+            if not callable(tx):
+                return fn(self, *args, **kwargs)
+            try:
+                ctx = tx(lock_key=site, user_key=user, site_lock=site_lock)
+            except TypeError:                 # a store with the older signature
+                ctx = tx(lock_key=site)
+            with ctx:
+                return fn(self, *args, **kwargs)
+        return wrapper
+    return decorate
+
+
+_SETTING_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_.\-]{0,63}$")
+# Settings sit on every card, so values are short plain data: letters (any
+# script), digits, combining marks, spaces and a few punctuation marks; nothing
+# that can open a new wire section, quote, or reach a shell or URL.
+_SETTING_PUNCT = set(" .,:/+-_#%()'&@")
+_SETTING_MAX_WORDS = 8
+_SETTING_SCHEME = re.compile(r"\b[a-z][a-z0-9+.\-]*://|\b(data|javascript|file|mailto):", re.I)
+# Instruction phrases (narrower than safety.looks_like_injection, which also
+# rejects single words such as "prompt"/"override" that are fine in a setting).
+_SETTING_INJECTION = re.compile(
+    r"(ignore (all |any )?(the )?(previous|above|prior|earlier)|disregard|forget (all|everything|previous)|"
+    r"system ?:|assistant ?:|developer ?:|new instructions|you are now|act as|"
+    r"exfiltrat|https?:|www\.|\b(send|upload|forward|post|email|mail)\b.*\bto\b|"
+    r"\bcurl\b|\bwget\b|\bssh\b|\binstructions?\b|\bexecute\b)", re.I)
+
+
+def _setting_chars_ok(text: str) -> bool:
+    """Letters and marks in any script, digits, spaces and a few punctuation
+    marks; no quotes or wire separators."""
+    import unicodedata
+    for ch in text:
+        if ch in _SETTING_PUNCT:
+            continue
+        if unicodedata.category(ch)[0] not in ("L", "N", "M"):
+            return False
+    return True
+
+
+def _mixed_script_word(text: str) -> bool:
+    """True if a word mixes Latin with Cyrillic or Greek letters (look-alike
+    spellings such as a Cyrillic 'ѕуѕtеm' used to dodge the phrase filter)."""
+    import unicodedata
+    for word in text.split():
+        scripts = set()
+        for ch in word:
+            if ch.isalpha():
+                name = unicodedata.name(ch, "")
+                scripts.add(name.split(" ")[0])
+        if "LATIN" in scripts and scripts & {"CYRILLIC", "GREEK"}:
+            return True
+    return False
+
+
+def _plain_setting_value(value) -> str:
+    """NFKC-normalize (fullwidth and compatibility forms become ASCII), drop
+    invisible format/separator/control characters (zero-width, bidi overrides,
+    line separators), then collapse whitespace."""
+    import unicodedata
+    text = unicodedata.normalize("NFKC", str(value))
+    out = []
+    for ch in text:
+        cat = unicodedata.category(ch)
+        if cat in ("Zl", "Zp", "Cc"):
+            out.append(" ")                   # line breaks and controls separate words
+        elif cat not in ("Cf", "Co", "Cs"):   # zero-width, bidi, private use: dropped
+            out.append(ch)
+    return " ".join("".join(out).split())
+
+
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 class FernService:
     def __init__(self, db_path: str = None, cfg: Config = DEFAULT, store=None,
                  memory_mode: str = "pure", tagger=None, enricher=None, catalog=None,
                  vocabulary=None, media_root: str = None,
-                 vault_root: str = None):
+                 vault_root: str = None, *, audit: bool = True,
+                 secret_key=None, strict: bool = None):
+        """``audit``: keep the tamper-evident audit chain (default). A store
+        without ``append_audit``/``read_audit`` runs unaudited with a warning
+        (an error in strict mode); ``audit=False`` opts out explicitly.
+        ``secret_key``: per-install secret for the audit chain and prior noise
+        (default: FERNME_SECRET_KEY / FERNME_AUDIT_KEY, a key file next to a
+        SQLite DB, or one secret stored in Postgres). ``strict`` (default:
+        FERNME_STRICT): refuse the legacy public audit key and keys that would
+        not survive a restart."""
         # memory_mode: "pure" (default, key-less) | "gated" | "offline".
         # All hot writes and recalls are deterministic. Legacy tagger/enricher
         # objects are only used by explicit propose-only enrichment wrappers.
@@ -144,14 +262,179 @@ class FernService:
         self.vocabulary = vocabulary
         # Per-install secret (see fernme/install_key.py). Existing SQLite chains
         # signed with the old public constant keep verifying with it.
-        self._secret, self.audit_key_legacy = _install_key.resolve(self.store)
+        self.strict = _truthy_env("FERNME_STRICT") if strict is None else bool(strict)
+        self.audit_enabled = bool(audit)
+        if self.audit_enabled and not (hasattr(self.store, "append_audit")
+                                       and hasattr(self.store, "read_audit")):
+            problem = (f"{type(self.store).__name__} has no audit log "
+                       "(append_audit/read_audit), so nothing is audited; implement "
+                       "them or pass audit=False to run without an audit chain")
+            if self.strict:
+                raise TypeError(f"FERNme strict mode: {problem}")
+            import warnings
+            warnings.warn(f"FERNme: {problem}", RuntimeWarning, stacklevel=2)
+            self.audit_enabled = False
+        self._secret, self.audit_key_legacy, self.secret_source = (
+            _install_key.resolve_detailed(self.store, secret_key))
         self.audit_key = (_install_key.LEGACY_AUDIT_KEY if self.audit_key_legacy
                           else _install_key.derive(self._secret, "audit"))
+        self._check_key_policy()
         self._ask_count = {}                  # ask-budget rate limit per (site,user)
         self.llm_calls = 0                    # transparency: count LLM invocations
         self._last_enrich_ts = {}             # in-service watermark for batch fallback
         self.media_root = _media.blob_root_for_store(self.store, media_root)
         self.vault_root = _documents.vault_root_for_store(self.store, vault_root)
+
+    def _check_key_policy(self):
+        import warnings
+        problems = []
+        if self.audit_enabled and self.audit_key_legacy:
+            problems.append(
+                "the audit chain still uses the legacy public key (existing chains were "
+                "signed with it); start a new chain with FERNME_SECRET_KEY on a fresh "
+                "database to get a private key")
+        persistent = getattr(self.store, "path", ":memory:") not in (":memory:", None)
+        if self.secret_source == "ephemeral" and persistent:
+            problems.append("no stable secret could be stored; set FERNME_SECRET_KEY")
+        for problem in problems:
+            if self.strict:
+                raise RuntimeError(f"FERNme strict mode: {problem}")
+            warnings.warn(f"FERNme: {problem}", RuntimeWarning, stacklevel=3)
+
+    # ---------- pinned settings ----------
+    def _clean_setting(self, key, value=None):
+        key = str(key or "").strip().lower()
+        if not _SETTING_KEY_RE.match(key) or _SETTING_INJECTION.search(
+                re.sub(r"[_\-.]+", " ", key)):
+            raise ValueError("setting key: 1-64 chars of a-z, 0-9, '.', '_' or '-', "
+                             "starting with a letter or digit (e.g. 'plot.style')")
+        if value is None:
+            return key, None
+        if isinstance(value, bool):
+            value = "true" if value else "false"
+        text = _plain_setting_value(value)
+        if not text or len(text) > self.cfg.settings_value_max:
+            raise ValueError(f"setting value: 1-{self.cfg.settings_value_max} characters")
+        if len(text.split()) > _SETTING_MAX_WORDS or not _setting_chars_ok(text):
+            raise ValueError(
+                f"setting value: a short plain value (at most {_SETTING_MAX_WORDS} words; "
+                "letters, digits, spaces and . , : / + - _ # % ( ) ' & @)")
+        spaced = re.sub(r"[_\-.]+", " ", re.sub(r"(?<=[a-z])(?=[A-Z])", " ", text))
+        if (_SETTING_INJECTION.search(text) or _SETTING_INJECTION.search(spaced)
+                or _SETTING_SCHEME.search(text) or _mixed_script_word(text)):
+            raise ValueError("setting value looks like an instruction or a link; "
+                             "settings hold plain values only")
+        return key, text
+
+    @_atomic_scope(site_lock=False)
+    def set_setting(self, site: str, user: str, key: str, value, text: str = "",
+                    ts: float = None) -> Dict:
+        """Pin an explicit ``key=value`` setting (e.g. ``plot.style=box``).
+
+        Settings are what the user asked for outright: one value per key (a new
+        value replaces the old), they never decay, and every card carries all
+        of them in its ``settings`` section whatever the context, budget or
+        population prior. ``text`` is the sentence it came from (kept as data,
+        not shown on the card). Consent-gated and audited."""
+        self._require_consent(site, user)
+        key, value = self._clean_setting(key, value)
+        existing = {row["key"]: row for row in self.store.list_settings(site, user)}
+        if key not in existing and len(existing) >= self.cfg.settings_max:
+            raise ValueError(f"at most {self.cfg.settings_max} settings per user; "
+                             "clear one first")
+        size = sum(len(k) + len(r["value"]) + 4 for k, r in existing.items() if k != key)
+        if size + len(key) + len(value) + 4 > self.cfg.settings_card_chars:
+            raise ValueError(f"settings are limited to {self.cfg.settings_card_chars} "
+                             "characters in total on the card; clear or shorten one first")
+        now = _timestamp(ts)
+        note = sanitize_display_text(text or "", 300)
+        self.store.upsert_setting(site, user, key, value, note, now)
+        previous = existing.get(key, {}).get("value")
+        self._audit(site, user, "setting_set", {"key_ref": self._audit_ref(key),
+                                                "replaced": previous is not None}, now)
+        out = {"site": site, "user": user, "key": key, "value": value}
+        if previous is not None and previous != value:
+            out["replaced"] = previous
+        return out
+
+    def get_settings(self, site: str, user: str) -> Dict:
+        """All pinned settings: ``{"settings": {key: value}, "details": [...]}``."""
+        self._require_consent(site, user)
+        rows = self.store.list_settings(site, user)
+        return {"site": site, "user": user,
+                "settings": {r["key"]: r["value"] for r in rows},
+                "details": rows}
+
+    @_atomic_scope(site_lock=False)
+    def clear_setting(self, site: str, user: str, key: str, ts: float = None) -> Dict:
+        """Remove one pinned setting. Works without consent (it only deletes)."""
+        key, _ = self._clean_setting(key)
+        cleared = bool(self.store.delete_setting(site, user, key))
+        if cleared and self.store.has_consent(site, user):
+            self._audit(site, user, "setting_clear", {"key_ref": self._audit_ref(key)},
+                        _timestamp(ts))
+        return {"site": site, "user": user, "key": key, "cleared": cleared}
+
+    def _attach_settings(self, card: Dict, site: str, user: str) -> Dict:
+        lister = getattr(self.store, "list_settings", None)
+        rows = lister(site, user) if callable(lister) else []
+        if not rows:
+            return card
+        from .retrieve.card import card_exclude_namespaces, estimate_tokens
+        hidden = card_exclude_namespaces(self.cfg)
+        settings = {r["key"]: r["value"] for r in rows
+                    if r["key"].split(".", 1)[0] not in hidden}
+        if not settings:
+            return card
+        section = "settings: " + "; ".join(f'{k}="{v}"' for k, v in settings.items())
+        card["settings"] = settings
+        card["wire"] = f"{card['wire']} | {section}"
+        card["tokens"] = estimate_tokens(card["wire"])
+        return card
+
+    # ---------- per-site prior policy ----------
+    _SITE_POLICY_KEYS = ("prior", "cold_start")
+
+    @_atomic
+    def set_site_policy(self, site: str, prior: bool = None,
+                        cold_start: bool = None) -> Dict:
+        """Per-site switches for the population prior. ``prior=False``: the site
+        keeps no population prior at all (no cold start, no ranking from other
+        users' data; existing prior rows are cleared). ``cold_start=False``: keep
+        the prior but never seed guessed memories for new users."""
+        if not hasattr(self.store, "set_site_policy"):
+            raise TypeError(f"{type(self.store).__name__} does not store site policies")
+        for key, value in (("prior", prior), ("cold_start", cold_start)):
+            if value is not None:
+                self.store.set_site_policy(site, key, "on" if value else "off")
+        if prior is False:
+            self.prior_refresh(site)            # clears the stored prior
+        return self.site_policy(site)
+
+    def site_policy(self, site: str) -> Dict:
+        stored = (self.store.get_site_policy(site)
+                  if hasattr(self.store, "get_site_policy") else {})
+        prior_on = stored.get("prior", "on" if self.cfg.prior_enabled else "off") == "on"
+        cold_on = stored.get("cold_start", "on" if self.cfg.cold_start else "off") == "on"
+        return {"site": site, "prior": prior_on, "cold_start": prior_on and cold_on}
+
+    def _site_prior(self, site: str):
+        """The prior for ranking and cold start under the site policy, with
+        counts below ``prior_k_anon`` treated as zero so a card's ranking never
+        depends on how many (fewer than k) other users share a trait."""
+        policy = self.site_policy(site)
+        if not policy["prior"]:
+            return None, policy
+        prior = self.store.load_prior(site)
+        k = int(self.cfg.prior_k_anon or 0) if self.cfg.prior_rank_k_anon else 0
+        if k > 1 and prior._n:
+            rare = [a for a, n in prior._n.items() if n < k]
+            if rare:
+                import copy
+                prior = copy.copy(prior)
+                prior._n = {a: n for a, n in prior._n.items() if n >= k}
+                prior._sum = {a: v for a, v in prior._sum.items() if a in prior._n}
+        return prior, policy
 
     # ---------- consent / governance ----------
     @_atomic
@@ -165,6 +448,45 @@ class FernService:
             self.store.delete_user(site, user)
             self._unlearn_from_prior(site)
         return {"site": site, "user": user, "consent": granted}
+
+    # ---------- memory inbox: consent requests the owner approves ----------
+    def request_consent(self, site: str, user: str, requested_by: str = "agent",
+                        ts: float = None, reopen_denied: bool = True) -> Dict:
+        """Record that an agent asked to remember this site/user. The owner sees
+        it in the FERNme UI review queue and approves or denies it there.
+
+        With ``reopen_denied=False`` a request the owner already denied stays
+        denied (returns ``denied``), so an agent cannot keep re-filing it."""
+        import time as _t
+        if self.store.has_consent(site, user):
+            return {"site": site, "user": user, "consent": True, "already_granted": True}
+        status = "pending"
+        if hasattr(self.store, "upsert_consent_request"):
+            status = self.store.upsert_consent_request(
+                site, user, sanitize_display_text(requested_by, 60) or "agent",
+                float(ts if ts is not None else _t.time()),
+                reopen_denied=reopen_denied) or "pending"
+        if status == "denied":
+            return {"site": site, "user": user, "consent": False, "denied": True}
+        return {"site": site, "user": user, "consent": False, "pending": True}
+
+    def consent_requests(self, status: str = "pending", limit: int = 100) -> List[Dict]:
+        if not hasattr(self.store, "list_consent_requests"):
+            return []
+        return self.store.list_consent_requests(status=status, limit=limit)
+
+    def decide_consent_request(self, site: str, user: str, approve: bool,
+                               ts: float = None) -> Dict:
+        """Owner's decision from the inbox. Approving grants consent."""
+        import time as _t
+        now = float(ts if ts is not None else _t.time())
+        decide = getattr(self.store, "decide_consent_request", None)
+        if callable(decide) and not decide(site, user, "approved" if approve else "denied", now):
+            raise ValueError("no pending consent request for this site/user")
+        if approve:
+            return self.consent(site, user, True, ts=now)
+        self._audit(site, user, "consent_denied", {}, now)
+        return {"site": site, "user": user, "consent": False, "denied": True}
 
     def _require_consent(self, site: str, user: str):
         if not self.store.has_consent(site, user):
@@ -460,17 +782,20 @@ class FernService:
              now: float = 0.0, cold_start: bool = True) -> Dict:
         self._require_consent(site, user)
         ug = self.store.load_user(site, user)
-        ag = self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
-        prior = self.store.load_prior(site)
-        if cold_start and ug.n_edges() == 0 and prior.n_users > 0:
+        prior, policy = self._site_prior(site)
+        if (cold_start and policy["cold_start"] and prior is not None
+                and ug.n_edges() == 0 and prior.n_users > 0):
             # turn-one usefulness from the population, released privately only
-            self._released_prior(prior).cold_start(ug, self.cfg)
+            self._released_prior(self.store.load_prior(site)).cold_start(ug, self.cfg)
+        ag = self._assoc_for_recall(site, user, ug, context)
         if self.cfg.entities or self.cfg.entity_aggregation:
-            return compile_entity_card(
+            out = compile_entity_card(
                 ug, ag, context or [], now, prior, self.cfg,
                 self._entity_card_context(site, user, ug),
             )
-        return compile_card(ug, ag, context or [], now, prior, self.cfg)
+        else:
+            out = compile_card(ug, ag, context or [], now, prior, self.cfg)
+        return self._attach_settings(out, site, user)
 
     def _released_prior(self, prior) -> PrivatePrior:
         """The population prior as it may be shown to *other* users.
@@ -501,13 +826,23 @@ class FernService:
                            fingerprint.encode("utf-8"), _hashlib.sha256).digest()
         return int.from_bytes(digest[:8], "big")
 
+    def _assoc_for_recall(self, site: str, user: str, ug: UserGraph, seeds) -> AssocGraph:
+        """The part of the site's association graph a card can reach: the user's
+        own attributes and the context, expanded ``cfg.hops`` steps. Falls back
+        to the whole site graph for stores without neighbourhood loading."""
+        loader = getattr(self.store, "load_assoc_neighborhood", None)
+        if callable(loader):
+            return loader(site, list(ug.edges) + list(seeds or []), hops=self.cfg.hops,
+                          user=user, min_users=self.cfg.assoc_min_users)
+        return self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
+
     def recall_replay(self, site: str, user: str, context: Optional[List[str]] = None,
                       now: float = 0.0) -> Dict:
         """Return a deterministic trace of the activation path used by recall."""
         self._require_consent(site, user)
         seeds = list(context or [])
         ug = self.store.load_user(site, user)
-        ag = self.store.load_assoc(site, user=user, min_users=self.cfg.assoc_min_users)
+        ag = self._assoc_for_recall(site, user, ug, seeds)
         prior = self.store.load_prior(site)
         activation = spread(ug, ag, seeds, now, self.cfg)
         card = self.card(site, user, seeds, now, cold_start=False)
@@ -1649,6 +1984,9 @@ class FernService:
     def export(self, site: str, user: str) -> Dict:
         self._require_consent(site, user)
         exported = self.store.export_user(site, user)
+        if isinstance(exported.get("numeric"), dict):   # internal bookkeeping keys
+            exported["numeric"] = {k: v for k, v in exported["numeric"].items()
+                                   if not str(k).startswith("_")}
         if self.cfg.media_enabled and hasattr(self.store, "list_assets"):
             exported["assets"] = [
                 self._asset_metadata(row)
@@ -1668,6 +2006,32 @@ class FernService:
             ]
         return exported
 
+    def export_to_file(self, site: str, user: str, directory: str = None) -> Dict:
+        """Write the full export to a JSON file the owner keeps; return only the
+        path and counts (the memory itself never passes through the agent)."""
+        import json as _json
+        import os as _os
+        import re as _re
+        import time as _t
+        data = self.export(site, user)
+        if directory is None:
+            base = getattr(self.store, "path", None)
+            root = (_os.path.dirname(_os.path.abspath(base)) if base and base != ":memory:"
+                    else _os.path.join(_os.path.expanduser("~"), ".fernme"))
+            directory = _os.path.join(root, "exports")
+        _os.makedirs(directory, exist_ok=True)
+        safe = lambda v: _re.sub(r"[^A-Za-z0-9._-]+", "_", str(v))[:40] or "x"
+        import secrets as _secrets
+        path = _os.path.join(directory, f"{safe(site)}__{safe(user)}__"
+                             f"{int(_t.time())}_{_secrets.token_hex(3)}.json")
+        fd = _os.open(path, _os.O_WRONLY | _os.O_CREAT | _os.O_EXCL, 0o600)
+        with _os.fdopen(fd, "w", encoding="utf-8") as fh:
+            _json.dump(data, fh, indent=2, default=str)
+        self._audit(site, user, "export", {"memories": len(data.get("edges", {}))})
+        return {"path": path, "memories": len(data.get("edges", {})),
+                "events": len(data.get("events", []))}
+
+    @_atomic
     def delete(self, site: str, user: str) -> Dict:
         self._purge_user_asset_files(site, user)
         self._purge_user_document_files(site, user)
@@ -1686,10 +2050,15 @@ class FernService:
     @_atomic
     def decay(self, site: str, user: str, now: float) -> Dict:
         ug = self.store.load_user(site, user)
+        dropped_relations = self._decay_entity_relations(site, user, now)
+        if not ug.edges:
+            # Nothing to fade; saving would recreate a row (the decay clock) for a
+            # deleted or never-seen user.
+            return {"dropped": 0, "remaining": 0,
+                    "dropped_relations": dropped_relations}
         conflict_map = self._decay_conflicts(ug) if self.cfg.resolution else {}
         dropped = decay(ug, now, self.cfg, conflict_map=conflict_map,
                         ctx={"now": now})
-        dropped_relations = self._decay_entity_relations(site, user, now)
         self.store.save_user(ug)
         return {"dropped": dropped, "remaining": ug.n_edges(),
                 "dropped_relations": dropped_relations}
@@ -2489,13 +2858,23 @@ class FernService:
         the goal? (purchase, booking, resolved ticket, completed lesson, kept appt...)
         Reinforces the involved attributes on success, penalizes on failure."""
         self._require_consent(site, user)
+        try:
+            weight = float(weight)
+        except (TypeError, ValueError):
+            raise ValueError("weight must be a number between 0 and 1")
+        if not math.isfinite(weight):
+            raise ValueError("weight must be a number between 0 and 1")
+        weight = min(1.0, max(0.0, weight))
         ug = self.store.load_user(site, user)
         if attrs is None:
-            evs = self.store.recall(site, user, limit=1)
-            attrs = [a for a, _ in (evs[0]["attrs"] if evs else [])]
+            attrs = []
+            for ev in self.store.recall(site, user, limit=50):
+                if ev["type"] != "outcome" and ev.get("attrs"):
+                    attrs = [a for a, _ in ev["attrs"]]
+                    break
         for attr in attrs:
             e = ug.edges.get(attr)
-            if e is None:
+            if e is None or e.source == "override":   # hand-edited memories stay put
                 continue
             if success:
                 e.weight = min(self.cfg.w_max, e.weight + self.cfg.alpha * 0.5 * weight * (1 - e.weight / self.cfg.w_max))
@@ -2517,6 +2896,20 @@ class FernService:
             auto = self.cfg.auto_gloss
         events = self.store.recall(site, user, limit=100000)
         return _glossary.assemble(events, auto=auto)
+
+    def near_duplicate_tags(self, site: str, user: str, tags) -> Dict[str, List[str]]:
+        """Existing memories that look like the same thing as a new tag.
+
+        Agents often invent a new spelling for something already remembered
+        (`pref:oat_milk` vs `pref:oat-milk`, `likes:tea` vs `pref:tea`), which
+        splits one memory into pieces. Deterministic string rules, no model:
+        same text ignoring separators and a trailing plural 's', or the same value
+        under another namespace. Returns {new_tag: [existing, ...]} for tags that
+        are not already stored."""
+        self._require_consent(site, user)
+        existing = [a for a, e in self.store.load_user(site, user).edges.items()
+                    if e.source != "guessed"]
+        return _near_duplicates(sanitize_tags(list(tags or [])), existing)
 
     def why(self, site: str, user: str, attr: str, now: float = 0.0) -> Dict:
         """Explainability (#8): the evidence behind a stored attribute."""
@@ -2561,8 +2954,10 @@ class FernService:
 
     # ---------- verifiable data ownership (#4) ----------
     def _audit(self, site, user, action, detail, ts=0.0):
-        if hasattr(self.store, "append_audit"):
-            return self.store.append_audit(site, user, ts, action, detail, self.audit_key)
+        if not self.audit_enabled:
+            return None
+        return self.store.append_audit(site, user, float(ts or 0.0), action, detail,
+                                       self.audit_key)
 
     def _audit_ref(self, value: str) -> str:
         """Keyed reference to a memory name for the audit chain. The owner (who
@@ -2572,22 +2967,26 @@ class FernService:
                          value.encode("utf-8"), _hashlib.sha256).hexdigest()[:24]
 
     def audit_log(self, site: str, user: str):
-        return self.store.read_audit(site, user) if hasattr(self.store, "read_audit") else []
+        return self.store.read_audit(site, user) if self.audit_enabled else []
 
     def verify_audit(self, site: str, user: str) -> Dict:
         """Replay the tamper-evident chain. ok=False means it was altered."""
+        if not self.audit_enabled:
+            return {"ok": None, "audit": "disabled", "broken_at_seq": None}
         ok, broken = _audit_mod.verify(self.audit_log(site, user), self.audit_key)
         out = {"ok": ok, "broken_at_seq": broken}
         if self.audit_key_legacy:
             out["legacy_key"] = True
         return out
 
+    @_atomic
     def forget_everywhere(self, site: str, user: str) -> Dict:
         """Right to be forgotten, provably: record the deletion in the audit chain,
         wipe the profile, then UNLEARN the user's contribution from the population
         prior (cascading). The audit chain (no PII) remains as proof it happened."""
         self._audit(site, user, "forget", {})
         self._purge_user_asset_files(site, user)
+        self._purge_user_document_files(site, user)
         self.store.delete_user(site, user)
         refreshed = self.prior_refresh(site)          # recompute prior without them
         return {"forgotten": True, "site": site, "user": user, "prior": refreshed}
@@ -2609,6 +3008,9 @@ class FernService:
         the population prior -- they're redundant (read-through from the prior gives
         the same value), so only DEVIATIONS are kept. Overrides are never pruned."""
         theta = self.cfg.theta if theta is None else theta
+        if not self.site_policy(site)["prior"]:
+            return {"pruned": 0, "remaining": self.store.load_user(site, user).n_edges(),
+                    "prior": "disabled"}
         prior = self.store.load_prior(site)
         ug = self.store.load_user(site, user)
         pruned = []
@@ -2994,6 +3396,8 @@ class FernService:
         prior's contents; pass an explicit seed only for reproducible experiments
         (a public seed lets anyone recompute and remove the noise)."""
         prior = self.store.load_prior(site)
+        if not self.site_policy(site)["prior"]:          # prior off: release nothing
+            prior._sum.clear(); prior._n.clear(); prior.n_users = 0
         if seed is None:
             seed = self._prior_noise_seed(prior, list(prior._n))
         return PrivatePrior(prior, epsilon=epsilon, k=k, w_max=self.cfg.w_max, seed=seed)
@@ -3006,13 +3410,16 @@ class FernService:
         self.cfg = _replace(self.cfg, lam=res["best_lam"])
         return res
 
+    @_atomic
     def prior_refresh(self, site: str) -> Dict:
         """Fold every consented user's graph into the population prior."""
         prior = self.store.load_prior(site)
         prior._sum.clear(); prior._n.clear(); prior.n_users = 0
-        users = [u for u in self.store.list_users(site) if self.store.has_consent(site, u)]
-        for u in users:
-            prior.update_from_user(self.store.load_user(site, u))
+        if self.site_policy(site)["prior"]:      # prior off: store an empty prior
+            users = [u for u in self.store.list_users(site)
+                     if self.store.has_consent(site, u)]
+            for u in users:
+                prior.update_from_user(self.store.load_user(site, u))
         self.store.save_prior(prior)
         return {"site": site, "n_users": prior.n_users, "attrs": len(prior._n)}
 

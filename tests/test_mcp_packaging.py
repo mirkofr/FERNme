@@ -14,7 +14,7 @@ else:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_PACKAGE_VERSION = "0.4.0b4"
+EXPECTED_PACKAGE_VERSION = "0.4.1"
 PACKAGE_VERSION = tomllib.loads(
     (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 )["project"]["version"]
@@ -24,24 +24,35 @@ FERNMARK_VCS = (
     "fernmark @ git+https://github.com/mirkofr/FERNmark.git@"
     "23e16ea5b01f4ce77fee81b5bf4f7e0d87d77bae")
 PLUGIN_VERSION = PACKAGE_VERSION
-# Released tags up to v0.4.0b4 import mcp.server.fastmcp (mcp 1.x only); the
-# plugin pins the SDK so a fresh uvx resolve cannot pull an incompatible 2.x.
-MCP_SDK_PIN = "mcp>=1.0,<2"
+CORE_TOOLS = {
+    "remember", "recall_glossary", "grant_consent", "recall_card", "recall_events",
+    "import_obsidian", "edit_memory", "forget_me", "list_canonicalization_suggestions",
+    "accept_canonicalization_suggestion", "reject_canonicalization_suggestion",
+    "propose_entity_link", "propose_tags", "propose_relation",
+    "record_outcome", "why", "export_memory",
+    "set_setting", "get_settings", "clear_setting",
+}
+DOCUMENT_TOOLS = {
+    "import_document", "forget_document", "recall_documents", "archive_document",
+    "supersede_document", "set_document_flags", "remember_document_use",
+    "read_document", "backfill_documents",
+}
+PHOTO_TOOLS = {"remember_photo", "forget_photo"}
 
 
 def _read_json(path):
     return json.loads((ROOT / path).read_text(encoding="utf-8"))
 
 
-def _assert_uvx_git_mcp(mcp):
-    server = mcp["mcpServers"]["fernme"]
+def _assert_uvx_git_mcp(mcp, server_name="fernme", tools="core", fernmark=False):
+    server = mcp["mcpServers"][server_name]
     assert server["command"] == "uvx"
-    assert server["args"] == [
-        "--with", FERNMARK_VCS, "--with", MCP_SDK_PIN, "--from", UVX_FROM, "fernme-mcp"]
-    assert "[mcp]" in server["args"][5]
-    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in server["args"][5]
+    expected = (["--with", FERNMARK_VCS] if fernmark else []) + [
+        "--from", UVX_FROM, "fernme-mcp", "--tools", tools]
+    assert server["args"] == expected
+    assert f"git+https://github.com/mirkofr/FERNme@{TEST_RELEASE_TAG}" in UVX_FROM
     assert server["env"]["FERNME_DB"] == ""
-    assert server["env"]["FERNME_MANAGED_DOCUMENTS"] == "true"
+    return server
 
 
 def test_packaging_json_files_are_valid():
@@ -76,62 +87,66 @@ def test_console_script_and_plugin_manifests_reference_mcp_server():
     assert pyproject["project"]["optional-dependencies"]["media"] == [
         "Pillow>=10"]
 
+    for host in ("codex", "claude"):
+        base = f"packaging/{host}/plugins"
+        # the main plugin is memory only: no FERNmark, no document or photo tools
+        core = _assert_uvx_git_mcp(_read_json(f"{base}/fernme-memory/.mcp.json"))
+        assert "FERNME_MANAGED_DOCUMENTS" not in core["env"]
+        local = _read_json(f"{base}/fernme-memory/.mcp.local.json")["mcpServers"]["fernme"]
+        assert local["command"] == "fernme-mcp" and local["args"] == ["--tools", "core"]
+        # the optional add-on serves documents and photos from the same database
+        docs = _assert_uvx_git_mcp(_read_json(f"{base}/fernme-docs/.mcp.json"),
+                                   server_name="fernme-docs", tools="documents,photos",
+                                   fernmark=True)
+        assert docs["env"]["FERNME_MANAGED_DOCUMENTS"] == "true"
+        docs_local = _read_json(f"{base}/fernme-docs/.mcp.local.json")["mcpServers"]["fernme-docs"]
+        assert docs_local["args"] == ["--tools", "documents,photos"]
+
     codex_plugin = _read_json(
         "packaging/codex/plugins/fernme-memory/.codex-plugin/plugin.json")
-    codex_mcp = _read_json("packaging/codex/plugins/fernme-memory/.mcp.json")
-    codex_local_mcp = _read_json(
-        "packaging/codex/plugins/fernme-memory/.mcp.local.json")
+    codex_docs = _read_json("packaging/codex/plugins/fernme-docs/.codex-plugin/plugin.json")
     codex_marketplace = _read_json("packaging/codex/.agents/plugins/marketplace.json")
-
     assert codex_plugin["name"] == "fernme-memory"
-    assert codex_plugin["version"] == PLUGIN_VERSION
+    assert codex_plugin["version"] == PLUGIN_VERSION == codex_docs["version"]
     assert codex_plugin["skills"] == "./skills/"
     assert codex_plugin["mcpServers"] == "./.mcp.json"
-    assert "Document Import" in codex_plugin["interface"]["capabilities"]
-    assert "Managed Document Evidence" in codex_plugin["interface"]["capabilities"]
-    assert "Photo Memory" in codex_plugin["interface"]["capabilities"]
-    _assert_uvx_git_mcp(codex_mcp)
-    assert codex_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
-    assert codex_local_mcp["mcpServers"]["fernme"]["env"][
-        "FERNME_MANAGED_DOCUMENTS"] == "true"
-    assert codex_marketplace["plugins"][0]["source"]["path"] == "./plugins/fernme-memory"
+    assert codex_plugin["interface"]["capabilities"] == ["MCP", "Memory"]
+    assert "Managed Document Evidence" in codex_docs["interface"]["capabilities"]
+    assert "Photo Memory" in codex_docs["interface"]["capabilities"]
+    assert [p["source"]["path"] for p in codex_marketplace["plugins"]] == [
+        "./plugins/fernme-memory", "./plugins/fernme-docs"]
 
     claude_plugin = _read_json(
         "packaging/claude/plugins/fernme-memory/.claude-plugin/plugin.json")
-    claude_mcp = _read_json("packaging/claude/plugins/fernme-memory/.mcp.json")
-    claude_local_mcp = _read_json(
-        "packaging/claude/plugins/fernme-memory/.mcp.local.json")
+    claude_docs = _read_json("packaging/claude/plugins/fernme-docs/.claude-plugin/plugin.json")
     claude_marketplace = _read_json("packaging/claude/.claude-plugin/marketplace.json")
     root_claude_marketplace = _read_json(".claude-plugin/marketplace.json")
-
-    assert claude_plugin["name"] == "fernme-memory"
-    assert claude_plugin["version"] == PLUGIN_VERSION
+    assert claude_plugin["name"] == "fernme-memory" and claude_docs["name"] == "fernme-docs"
+    assert claude_plugin["version"] == PLUGIN_VERSION == claude_docs["version"]
     assert claude_plugin["skills"] == "./skills/"
-    _assert_uvx_git_mcp(claude_mcp)
-    assert claude_local_mcp["mcpServers"]["fernme"]["command"] == "fernme-mcp"
-    assert claude_local_mcp["mcpServers"]["fernme"]["env"][
-        "FERNME_MANAGED_DOCUMENTS"] == "true"
-    assert claude_marketplace["plugins"][0]["source"] == "./plugins/fernme-memory"
+    assert [p["source"] for p in claude_marketplace["plugins"]] == [
+        "./plugins/fernme-memory", "./plugins/fernme-docs"]
     assert root_claude_marketplace["interface"]["displayName"] == "FERNme Local"
-    root_source = root_claude_marketplace["plugins"][0]["source"]
-    assert root_source == "./packaging/claude/plugins/fernme-memory"
-    assert (ROOT / root_source).is_dir()
-    skill_text = (
-        ROOT / "packaging/codex/plugins/fernme-memory/skills/fernme-memory/SKILL.md"
-    ).read_text(encoding="utf-8")
-    assert skill_text == (
-        ROOT / "packaging/claude/plugins/fernme-memory/skills/fernme-memory/SKILL.md"
-    ).read_text(encoding="utf-8")
-    assert "import_document" in skill_text
-    assert "forget_document" in skill_text
-    assert "recall_documents" in skill_text
-    assert "document_id" in skill_text
-    assert "review is pending" in skill_text
-    assert "confirm=false" in skill_text
-    assert "remember_photo" in skill_text
-    assert "forget_photo" in skill_text
-    assert "fernme[media]" in skill_text
-    assert "new Codex task" in skill_text
+    for plugin in root_claude_marketplace["plugins"]:
+        assert (ROOT / plugin["source"]).is_dir()
+
+    for name in ("fernme-memory", "fernme-docs"):
+        codex_text = (ROOT / f"packaging/codex/plugins/{name}/skills/{name}/SKILL.md"
+                      ).read_text(encoding="utf-8")
+        assert codex_text == (ROOT / f"packaging/claude/plugins/{name}/skills/{name}/SKILL.md"
+                              ).read_text(encoding="utf-8")
+    skill_text = (ROOT / "packaging/claude/plugins/fernme-memory/skills/fernme-memory/SKILL.md"
+                  ).read_text(encoding="utf-8")
+    docs_text = (ROOT / "packaging/claude/plugins/fernme-docs/skills/fernme-docs/SKILL.md"
+                 ).read_text(encoding="utf-8")
+    for tool in ("recall_card", "remember", "propose_tags", "new Codex task", "fernme-docs"):
+        assert tool in skill_text
+    for tool in DOCUMENT_TOOLS | PHOTO_TOOLS:
+        assert tool not in skill_text
+    for phrase in ("import_document", "forget_document", "recall_documents", "document_id",
+                   "review is pending", "confirm=false", "remember_photo", "forget_photo",
+                   "fernme[media]"):
+        assert phrase in docs_text
 
 
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp extra not installed")
@@ -143,6 +158,7 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
         db_path = tmp_path / "smoke.db"
         env = os.environ.copy()
         env["FERNME_DB"] = str(db_path)
+        env["FERNME_MCP_TOOLS"] = "all"
         params = StdioServerParameters(
             command=sys.executable,
             args=["-m", "fernme.api.mcp_server"],
@@ -167,7 +183,7 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
                     assert "forget_photo" in tool_names
                     await session.call_tool(
                         "grant_consent",
-                        {"site": "demo.local", "user": "elena", "granted": True},
+                        {"site": "demo.local", "user": "elena", "granted": True, "confirm": True},
                     )
                     await session.call_tool(
                         "remember",
@@ -192,3 +208,27 @@ def test_mcp_stdio_smoke_remember_to_recall_card(tmp_path):
                     assert "pref:concise" in card.content[0].text
 
     anyio.run(run)
+
+
+@pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="mcp extra not installed")
+def test_tool_groups_keep_the_default_server_small(monkeypatch):
+    import asyncio
+    from fernme.api import mcp_server as server
+
+    def names(groups):
+        tools = asyncio.run(server.build_server(groups).list_tools())
+        return {tool.name for tool in tools}
+
+    assert names({"core"}) == CORE_TOOLS
+    assert names({"documents", "photos"}) == DOCUMENT_TOOLS | PHOTO_TOOLS
+    assert names(set(server.TOOL_GROUPS)) == CORE_TOOLS | DOCUMENT_TOOLS | PHOTO_TOOLS
+
+    monkeypatch.delenv("FERNME_MCP_TOOLS", raising=False)
+    monkeypatch.delenv("FERNME_MANAGED_DOCUMENTS", raising=False)
+    assert server.resolve_tool_groups() == {"core"}
+    monkeypatch.setenv("FERNME_MANAGED_DOCUMENTS", "true")
+    assert server.resolve_tool_groups() == {"core", "documents"}
+    assert server.resolve_tool_groups("core") == {"core"}
+    assert server.resolve_tool_groups("all") == set(server.TOOL_GROUPS)
+    with pytest.raises(SystemExit):
+        server.resolve_tool_groups("everything")

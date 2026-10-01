@@ -135,6 +135,11 @@ class Config:
     # has run. Weights on the card are the decayed ones. Storage is not modified.
     # False = pre-0.4.0b5 behavior (stored weights, no demotion).
     card_read_decay: bool = True
+    # Single-value slots (diet, city, employer, ...; see curation.SINGLE_VALUE_SLOTS):
+    # only the most recently confirmed value stays current on the card; older
+    # values rank behind current memories. "Confirmed" = stated by the user or
+    # seen at least twice, so one passing mention does not replace a fact.
+    card_single_value_latest: bool = True
     top_n: int = 8            # max attributes on the wire card
     # Cold-start seeding from the population prior is released through the
     # private prior only: attributes held by fewer than prior_k_anon users are
@@ -143,6 +148,21 @@ class Config:
     prior_k_anon: int = 5
     prior_epsilon: float = 1.0
     prior_exclude_sensitive: bool = True
+    # Population prior switches (per-site overrides: FernService.set_site_policy).
+    # prior_enabled=False: the site keeps no prior (no cold start, no idf ranking
+    # from other users). cold_start=False: keep the prior but never seed guesses.
+    prior_enabled: bool = True
+    cold_start: bool = True
+    # Card rarity weighting (idf) treats prior counts below prior_k_anon as zero,
+    # so a card never depends on how many (< k) other users share a trait.
+    # False = pre-0.4.1 ranking from raw counts.
+    prior_rank_k_anon: bool = True
+    # Pinned settings (key=value the user set explicitly): never decay, always on
+    # the card in full. Capped so the card's token cost stays bounded.
+    settings_max: int = 32
+    settings_value_max: int = 120
+    # Total size of all settings on the card (keys + values), about 200 tokens.
+    settings_card_chars: int = 800
     card_exclude_ns: frozenset = field(default_factory=frozenset)
     # Extra namespaces to keep out of the compact card, merged with built-ins.
 
